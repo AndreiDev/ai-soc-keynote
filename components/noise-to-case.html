@@ -1,0 +1,857 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Noise to case</title>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="../shared/ui.css">
+<style>
+@property --conf{syntax:'<number>';inherits:true;initial-value:0}
+@property --spin{syntax:'<angle>';inherits:false;initial-value:0deg}
+:root{
+  --gut:46px; --sh:32px; --ch:48px; --gh:30px; --wh:36px;
+  --cols:28px 48px minmax(0,1fr) 392px 172px 58px;
+  --eu:#8AB4FF; --ei:#FF6A55; --er:#C6A8FF; --eb:#7FD6EE;
+}
+html,body{height:100%;overflow:hidden}
+body{min-height:0;background:var(--ground)}
+.cmp{position:fixed;inset:0;display:grid;grid-template-rows:auto minmax(0,1fr) auto;background:var(--ground)}
+
+/* ---------- component header ---------- */
+.ch{display:flex;align-items:center;gap:8px 12px;padding:0 18px;min-height:54px;border-bottom:1px solid #1A2029;background:var(--side);min-width:0;flex-wrap:nowrap}
+.ch-id{display:flex;align-items:center;gap:10px;min-width:0}
+.ci{flex:none;width:30px;height:30px;border-radius:8px;display:grid;place-items:center;background:#131920;border:1px solid var(--line2)}
+.ch h1{font-size:15px;font-weight:600;white-space:nowrap;letter-spacing:-.01em}
+.ctx{font:500 11px/1 var(--mono);color:var(--text2);height:22px}
+.stt{display:inline-flex;align-items:center;gap:6px;font:500 11.5px var(--sans);color:var(--text2);white-space:nowrap}
+.stt .dot{color:var(--agent)}
+.stt.paused .dot{color:#5A6472;animation:none}
+.stt.inter .dot{color:var(--link);animation:none}
+.night{margin-left:auto;display:flex;align-items:center;gap:6px;white-space:nowrap;padding:5px 6px 5px 12px;border-radius:10px;background:#0F141A;border:1px solid var(--line)}
+.night .nl{font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--text3);margin-right:4px}
+.nc{display:inline-flex;align-items:baseline;gap:5px;padding:3px 7px;border-radius:7px;transition:background .3s}
+.nc b{font:600 15px/1 var(--mono);color:var(--text);font-feature-settings:"tnum" 1,"zero" 1}
+.nc i{font-style:normal;font-size:11.5px;color:var(--text3)}
+.nc.hum{background:rgba(255,255,255,.04)}
+.nc.bump{background:rgba(232,235,239,.10)}
+.nc.bump b{color:#fff}
+.arr{color:var(--line3);font-size:12px}
+
+/* ---------- stage + queue ---------- */
+.stage{position:relative;min-height:0;padding:12px 16px 0;display:flex;flex-direction:column}
+.q{position:relative;flex:1;min-height:0;display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px 12px 0 0;border-bottom:0;background:var(--panel);overflow:hidden}
+.qhead{flex:none;display:grid;grid-template-columns:var(--cols);align-items:center;height:30px;padding-left:var(--gut);padding-right:10px;border-bottom:1px solid var(--line);font-size:10.5px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--text3)}
+.qhead>div{padding:0 6px;white-space:nowrap;overflow:hidden}
+.qbody{position:relative;flex:1;min-height:0;overflow:hidden}
+.qbody::after{content:"";position:absolute;left:0;right:0;bottom:0;height:84px;background:linear-gradient(rgba(16,20,26,0),var(--panel) 92%);pointer-events:none;z-index:8}
+.qr{position:absolute;left:0;right:0;top:0;display:grid;grid-template-columns:var(--cols);align-items:center;padding-left:var(--gut);padding-right:10px;border-bottom:1px solid #171C24;background:var(--panel);will-change:transform,opacity;transform-origin:0 0}
+.qr>div{padding:0 6px;min-width:0}
+.qr.sig{height:var(--sh);background:#0E1217;pointer-events:none}
+.qr.case{height:var(--ch)}
+.qr.case.hero{cursor:pointer;z-index:3}
+.qr.atk{z-index:4}
+.qr.case.hero:hover{box-shadow:inset 0 0 0 1px #2A3442}
+.c-g{display:flex;align-items:center;justify-content:center;position:relative}
+svg.glyph{width:21px;height:21px;display:block;overflow:visible}
+.sig svg.glyph{width:17px;height:17px}
+.cn{display:none;align-items:center;justify-content:center;min-width:18px;height:17px;padding:0 4px;border:1px solid rgba(138,180,255,.45);border-radius:4px;font:500 10px/1 var(--mono);color:var(--link)}
+.qr.nested .cn{display:inline-flex}
+.qr.nested svg.glyph{display:none}
+.qr.nested{background:#0C1218}
+.src{display:inline-flex;align-items:center;justify-content:center;height:18px;min-width:38px;padding:0 5px;border-radius:4px;border:1px solid var(--line2);font:600 9.5px/1 var(--mono);color:var(--text2);letter-spacing:.03em;white-space:nowrap}
+.ttl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sig .ttl{font-size:12.5px}
+.rt{color:var(--text);font-weight:500}
+.rs{font:11px var(--mono);color:var(--text3);margin-left:9px}
+.rs.why-ok{color:var(--ben)}
+.case .ttl{font-weight:500;font-size:13px;color:var(--text)}
+.sub{display:flex;align-items:center;gap:7px;font:11px/1.3 var(--mono);color:var(--text3);white-space:nowrap;overflow:hidden;margin-top:3px;min-width:0}
+.sub .s1{overflow:hidden;text-overflow:ellipsis;min-width:0}
+.whyb{flex:none;display:inline-flex;align-items:center;gap:5px;height:18px;padding:0 7px 0 8px;border-radius:999px;border:1px solid rgba(138,180,255,.45);background:rgba(138,180,255,.08);color:var(--link);font:500 10.5px/1 var(--sans);cursor:pointer}
+.whyb:hover{background:rgba(138,180,255,.16)}
+.whyb svg{transition:transform .25s}
+.whyb[aria-expanded="true"] svg{transform:rotate(180deg)}
+.whyb.press{background:rgba(138,180,255,.28);transform:translateY(1px)}
+.ents{display:flex;gap:4px;white-space:nowrap;overflow:hidden}
+.ents.ov{-webkit-mask:linear-gradient(90deg,#000 86%,transparent);mask:linear-gradient(90deg,#000 86%,transparent)}
+.ent{flex:none;display:inline-flex;align-items:center;height:20px;padding:0 6px;border-radius:5px;border:1px solid var(--line2);font:500 11px/1 var(--mono);color:var(--text2);white-space:nowrap;transition:color .25s,border-color .25s,background-color .25s,opacity .25s}
+button.ent{cursor:pointer;background:transparent}
+.lit .ent.e-u,.ent.e-u.on{color:var(--eu);border-color:rgba(138,180,255,.55);background:rgba(138,180,255,.10)}
+.lit .ent.e-i,.ent.e-i.on{color:var(--ei);border-color:rgba(255,106,85,.55);background:rgba(255,106,85,.10)}
+.lit .ent.e-r,.ent.e-r.on{color:var(--er);border-color:rgba(198,168,255,.55);background:rgba(198,168,255,.10)}
+.lit .ent.e-b,.ent.e-b.on{color:var(--eb);border-color:rgba(127,214,238,.55);background:rgba(127,214,238,.10)}
+.age{font:12px/1 var(--mono);color:var(--text2);white-space:nowrap;text-align:right}
+.sig .age{color:var(--text3);font-size:11px}
+.vcell{display:flex;align-items:center;gap:8px;white-space:nowrap;min-width:0}
+.vl{font-weight:500;font-size:12.5px}
+.vl.mal{color:var(--mal)}.vl.sus{color:var(--sus)}.vl.ben{color:var(--ben)}.vl.inc{color:var(--inc)}.vl.run{color:var(--agent)}.vl.unk{color:var(--text3);font-weight:400}.vl.lnk{color:var(--text2);font-weight:400;font-size:12px}
+.vc{font:500 11.5px/1 var(--mono);color:var(--text2)}
+.vcal{font:10.5px/1 var(--mono);color:var(--text3)}
+.prog{display:inline-flex;gap:2px}
+.prog i{display:block;width:3px;height:10px;border-radius:1px;background:#2C3540}
+.prog i.on{background:var(--agent)}
+.sig .ring,.sig .vc{display:none}
+.sig.closed .ring,.sig.closed .vc{display:inline-block}
+.dim>div{opacity:.42;transition:opacity .3s}
+/* typed @property confidence ring with CSS-trig ticks */
+.ring{--c:var(--text3);position:relative;width:26px;height:26px;flex:none;border-radius:50%}
+.sig .ring{width:20px;height:20px}
+.ring::before{content:"";position:absolute;inset:3px;border-radius:50%;background:conic-gradient(var(--c) calc(var(--conf) * 1%),#232B35 0);
+  -webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 3.5px),#000 calc(100% - 3px));mask:radial-gradient(farthest-side,transparent calc(100% - 3.5px),#000 calc(100% - 3px))}
+.sig .ring::before{inset:2px}
+.ring i{--a:calc(var(--i) * 36deg - 90deg);position:absolute;width:2px;height:2px;border-radius:50%;background:var(--c);
+  left:calc(50% + cos(var(--a)) * 12.5px - 1px);top:calc(50% + sin(var(--a)) * 12.5px - 1px);opacity:clamp(.12,calc((var(--conf) - var(--i) * 10) / 10),1)}
+.sig .ring i{display:none}
+.ring.mal{--c:var(--mal)}.ring.sus{--c:var(--sus)}.ring.ben{--c:var(--ben)}.ring.inc{--c:var(--inc)}
+.ring.run{--c:var(--agent)}
+.ring.run::before{background:conic-gradient(from var(--spin),transparent 0 55%,rgba(198,243,107,.25) 70%,var(--agent) 100%);animation:spin 1.15s linear infinite}
+.ring.run i{opacity:.16}
+@keyframes spin{to{--spin:360deg}}
+
+/* group header, why line, overlays */
+.grp{position:absolute;left:0;right:0;top:0;height:var(--gh);display:flex;align-items:center;gap:9px;padding-left:var(--gut);padding-right:14px;background:#0C1015;border-bottom:1px solid #171C24;color:var(--text2);font-size:12px;white-space:nowrap;overflow:hidden;z-index:2}
+.grp b{color:var(--text);font-weight:500}
+.grp .gn{font:500 11.5px var(--mono);color:var(--text3)}
+.grp .gs{color:var(--text3);overflow:hidden;text-overflow:ellipsis}
+.grp .ag{width:18px;height:18px;font-size:7.5px}
+.why{position:absolute;left:0;right:0;top:0;height:var(--wh);display:flex;align-items:center;gap:8px;padding-left:calc(var(--gut) + 82px);padding-right:14px;background:#0D1319;border-bottom:1px solid #1A2029;font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden;z-index:2}
+.why .ag{width:18px;height:18px;font-size:7.5px}
+.why .w-m{font:11px var(--mono);color:var(--text3)}
+.why .w-m b{color:var(--text2);font-weight:500}
+.why .ent{height:19px}
+.rails{position:absolute;left:0;top:0;width:var(--gut);height:100%;pointer-events:none;overflow:visible;z-index:6}
+.rails .rl{transition:opacity .3s}
+.scan{position:absolute;left:0;right:0;top:0;height:34px;pointer-events:none;opacity:0;z-index:5;background:linear-gradient(180deg,rgba(198,243,107,0),rgba(198,243,107,.10) 70%,rgba(198,243,107,.42) 100%);border-bottom:1px solid var(--agent)}
+.sel{position:absolute;left:3px;right:3px;top:0;height:var(--ch);border-radius:7px;box-shadow:inset 0 0 0 1.5px var(--link),0 0 0 3px rgba(138,180,255,.12);pointer-events:none;opacity:0;z-index:7}
+/* entity isolate */
+.iso .rails .rl{opacity:.16}
+.iso-u .rails .rl.r-u,.iso-i .rails .rl.r-i,.iso-r .rails .rl.r-r,.iso-b .rails .rl.r-b{opacity:1}
+.iso .qr.nested:not(.has-u):not(.has-i):not(.has-r):not(.has-b)>div{opacity:.35}
+.iso-u .qr.nested:not(.has-u)>div,.iso-i .qr.nested:not(.has-i)>div,.iso-r .qr.nested:not(.has-r)>div,.iso-b .qr.nested:not(.has-b)>div{opacity:.32}
+.iso-u .ent:not(.e-u),.iso-i .ent:not(.e-i),.iso-r .ent:not(.e-r),.iso-b .ent:not(.e-b){opacity:.45}
+
+/* captions */
+.cap{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);z-index:20;max-width:calc(100% - 64px);padding:9px 16px;border-radius:12px;background:rgba(9,12,16,.93);border:1px solid rgba(170,179,191,.16);box-shadow:0 10px 30px rgba(0,0,0,.45);color:var(--text);font-size:14.5px;line-height:1.35;text-align:center;white-space:nowrap;pointer-events:none;opacity:0}
+.nocap .cap{display:none}
+
+/* footer: legend + controls */
+.cf{display:flex;align-items:center;gap:14px;height:42px;padding:0 16px;border-top:1px solid var(--line);background:#0C1015;min-width:0;margin:0 16px;border:1px solid var(--line);border-radius:0 0 12px 12px;margin-bottom:10px}
+.lg{display:flex;align-items:center;gap:12px;font-size:11.5px;color:var(--text3);white-space:nowrap;min-width:0}
+.lg span{display:inline-flex;align-items:center;gap:5px}
+.lg svg{width:15px;height:15px}
+.lge{display:flex;align-items:center;gap:5px;min-width:0}
+.lge .lbl{font-size:11.5px;color:var(--text3);margin-right:2px;white-space:nowrap}
+.ctl{margin-left:auto;display:flex;align-items:center;gap:6px}
+.ctl .btn{height:26px;font-size:12px;padding:0 10px;border-radius:7px}
+.hint{font-size:11.5px;color:var(--text3);white-space:nowrap}
+
+/* ---------- responsive ---------- */
+@media (max-width:1180px){:root{--cols:28px 48px minmax(0,1fr) 206px 160px}.k-a,.c-a{display:none!important}.lg{display:none}.vcal,.why .w-m.x{display:none}}
+@media (max-width:960px){:root{--cols:28px 46px minmax(0,1fr) 158px 52px}.k-e,.c-e{display:none!important}.lg{display:none}.night .nl{display:none}}
+@media (max-height:700px){:root{--sh:28px;--ch:42px;--gh:27px;--wh:32px}.ch{min-height:48px}.cf{height:38px}}
+@media (max-width:720px){
+  :root{--gut:30px;--sh:42px;--ch:58px;--gh:30px;--wh:56px;--cols:24px minmax(0,1fr) 50px}
+  .ch{flex-wrap:wrap;padding:8px 12px;gap:6px 10px}
+  .ch-id{flex:1 1 100%;gap:8px}
+  .ch h1{font-size:14px}
+  .ctx-x,.kx{display:none}
+  .stt{margin-left:auto}
+  .night{margin-left:0;flex:1 1 100%;justify-content:space-between;padding:4px 6px}
+  .night .nl,.night .arr{display:none}
+  .nc{padding:3px 4px}.nc b{font-size:13.5px}.nc i{font-size:10.5px}
+  .stage{padding:8px 8px 0}
+  .cf{margin:0 8px 8px;padding:0 10px}
+  .k-p,.c-p,.k-a,.c-a{display:none!important}
+  .sig .ttl{white-space:normal;line-height:1.25}
+  .rt{display:block;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rs{display:block;margin:2px 0 0;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .case .ttl{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;font-size:12px;line-height:1.3}
+  .case .sub{margin-top:2px;font-size:10px}
+  .case .sub .s1{display:none}
+  .vcell{flex-direction:column;gap:2px;align-items:center}
+  .vcell .vl,.vcell .vcal,.vcell .prog{display:none}
+  .sig .vcell .vl{display:block;font-size:10px}
+  .sig.closed .vcell .vl{display:none}
+  .why{padding-left:calc(var(--gut) + 6px);white-space:normal;flex-wrap:wrap;align-content:center;gap:4px 6px;font-size:11px}
+  .why .w-m{display:none}
+  #why-ents{display:contents!important}
+  .qr.nested .vcell .vl{display:none}
+  .lge{display:none}
+  .cap{font-size:12.5px;white-space:normal;width:calc(100% - 28px);bottom:12px;padding:8px 12px}
+  .hint{display:none}
+}
+@media (prefers-reduced-motion:reduce){.whyb svg{transition:none}}
+.nt *,.nt *::before,.nt *::after{transition:none!important}
+</style>
+</head>
+<body>
+<div class="cmp" id="cmp">
+  <header class="ch">
+    <div class="ch-id">
+      <span class="ci" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke-linecap="round"><path d="M2.5 3.5h5M2.5 7h4M2.5 10.5h4.6M2.5 14h5.4" stroke="#808A97" stroke-width="1.5"/><path d="M9 3.6c2.2.4 3 2.2 3.4 5.4M9 14c2.2-.4 3-2.2 3.4-5" stroke="#808A97" stroke-width="1.3"/><path d="M12.6 9h3" stroke="#C6F36B" stroke-width="2.2"/></svg></span>
+      <h1>Noise to case</h1>
+      <span class="chip ctx">CASE-4127<span class="ctx-x"> · Meridian Freight</span></span>
+      <span class="stt" id="stt"><span class="dot live"></span><span id="stt-t">Live</span></span>
+    </div>
+    <div class="night" id="night" role="group" aria-label="Tonight, shift C">
+      <span class="nl">Tonight</span>
+      <span class="nc" id="nc-s"><b id="n-sig">3,398</b><i>signals</i></span><span class="arr">→</span>
+      <span class="nc" id="nc-c"><b id="n-case">1,315</b><i>cases</i></span><span class="arr">→</span>
+      <span class="nc hum" id="nc-h"><b id="n-hum">6</b><i>need a human</i></span>
+    </div>
+  </header>
+
+  <main class="stage" id="stage">
+    <div class="q" id="q" role="grid" aria-label="Live case queue, sorted by AI priority">
+      <div class="qhead" role="row">
+        <div class="k-g" role="columnheader"></div><div class="k-p" role="columnheader">Pri</div><div class="k-t" role="columnheader">Case or signal</div><div class="k-e" role="columnheader">Entities</div><div class="k-v" role="columnheader">AI<span class="kx"> verdict</span></div><div class="k-a" role="columnheader" style="text-align:right">Age</div>
+      </div>
+      <div class="qbody" id="qbody">
+        <div class="grp" id="grp"><span class="ag" id="grp-ag" style="display:none">TR</span><b id="grp-t">Incoming signals</b><span class="gn" id="grp-n">0</span><span class="gs" id="grp-s">Okta · AWS CloudTrail · Microsoft 365 · CrowdStrike EDR</span></div>
+        <div class="why lit" id="why"><span class="ag">TR</span><span>Linked by</span><span id="why-ents"></span><span class="w-m"><b>9</b> signals · <b>3</b> tools · <b id="why-span">21 min</b></span><span class="w-m x">· ATT&amp;CK T1621 → T1078.004 → T1530</span></div>
+        <div class="scan" id="scan"></div>
+        <svg class="rails" id="railsA" aria-hidden="true"></svg>
+        <svg class="rails" id="railsB" aria-hidden="true"></svg>
+        <div class="sel" id="sel"></div>
+      </div>
+    </div>
+    <div class="cap" id="cap" aria-live="polite"><span id="cap-t"></span></div>
+  </main>
+
+  <footer class="cf" id="cf">
+    <div class="lg" id="lg"></div>
+    <div class="lge" id="lge"><span class="lbl">Shared entities</span></div>
+    <div class="ctl">
+      <span class="hint" id="hint">Click the case to see why</span>
+      <button class="btn" type="button" id="b-play" aria-pressed="false">Pause</button>
+      <button class="btn" type="button" id="b-replay">Replay</button>
+    </div>
+  </footer>
+</div>
+
+<script src="../shared/data.js"></script>
+<script>
+/* ScrambleText picks characters with Math.random, so it is swapped for a seeded mulberry32
+   before GSAP loads; frame(t) reseeds from t so a seek is a pure function of time. */
+(function () {
+  let s = 0x2545F491;
+  Math.random = function () { s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  window.__reseed = v => { s = v | 0; };
+})();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/Flip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/ScrambleTextPlugin.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/CustomEase.min.js"></script>
+<script>
+(() => {
+'use strict';
+/* ==========================================================================
+   Storyboard (29 s, every frame is a pure function of t)
+   0.5–4.4   14 raw signals arrive: 9 from the attack among 5 routine EDR/Okta alerts
+   4.7–6.3   Triage scans; entity chips light; rails link rows that share 4 entities
+   6.6–8.8   Flip.fit folds the 9 rows into one case row; ScrambleText rewrites its title
+   9.0       the unscored case sorts down into "AI working"
+   10.0–12.2 benign noise: SMIL glyphs morph to checks, rows auto-close, list compacts
+   12.6–14.1 verdict glyph morphs suspicious → malicious, ring sweeps to 97% (typed @property)
+   14.5      P1: the case re-sorts to the top
+   16.3–17.9 unfold in place: the nine source alerts with rails and the reason they belong
+   22.8      fold back · 23.5 the night in numbers · 27.4 fade · 27.95 reset
+   ========================================================================== */
+const P = 29, HERO = 18.4, LIVE_T = 16.05;
+const T = { arr0: 0.5, arrDt: 0.3, scan: 4.7, fold: 6.6, sortDown: 9.0, noise: 10.0, noiseOut: 11.15, compact: 11.6, v1: 12.6, v2: 13.6, p1: 14.5, sel: 15.6, press: 16.05, unf: 16.3, iso0: 19.4, iso1: 21.1, foldBack: 22.8, night: 23.6, fade: 27.4, reset: 27.95 };
+const UNF_END = T.unf + 1.6, FOLD_END = T.foldBack + 0.8;
+const Q = new URLSearchParams(location.search);
+const $ = id => document.getElementById(id);
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const clamp = (x, a, b) => x < a ? a : x > b ? b : x;
+const sm = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+const NS = 'http://www.w3.org/2000/svg';
+const D = window.CORVID;
+const fmtN = n => n.toLocaleString('en-US');
+const cmp = $('cmp'), qbody = $('qbody');
+if (Q.get('captions') === '0') cmp.classList.add('nocap');
+
+/* ------------------------------------------------------------------ scenario data (data.js) */
+const C27 = D.case4127, SIGN = Object.fromEntries(C27.signals.map(s => [s.n, s]));
+const ENT = [
+  { k: 'u', name: 'j.alvarez', col: '#8AB4FF', kind: 'user' },
+  { k: 'i', name: '203.0.113.77', col: '#FF6A55', kind: 'IP' },
+  { k: 'r', name: 'ops-admin', col: '#C6A8FF', kind: 'role' },
+  { k: 'b', name: 'mf-finance-exports', col: '#7FD6EE', kind: 'bucket' },
+];
+const EK = Object.fromEntries(ENT.map(e => [e.name, e.k]));
+// entities per signal, as the app maps them (cases.html SIG_ENTS)
+const SIG_ENTS = { 1: ['j.alvarez', '203.0.113.77'], 2: ['j.alvarez', '203.0.113.77', 'WIN-7F2C'], 3: ['j.alvarez', '203.0.113.77'], 4: ['FinanceDataReadOnly', '203.0.113.77'], 5: ['ops-admin', 'j.alvarez'], 6: ['mf-finance-exports', '203.0.113.77', 'ops-admin'], 7: ['mf-finance-exports', 'ops-admin'], 8: ['j.alvarez'], 9: ['j.alvarez'] };
+const SRC = { Okta: ['OKTA', 'Okta System Log'], CloudTrail: ['AWS', 'AWS CloudTrail'], M365: ['M365', 'Microsoft 365 audit'], EDR: ['EDR', 'CrowdStrike EDR'] };
+// arrival order by time: the nine CASE-4127 signals among routine noise that becomes CASE-4121 and CASE-4124
+const NOISE_T = { src: 'Okta', at: '02:11:20', rule: 'Impossible travel', summary: 'k.lund: new egress IP after the Zscaler ZIA change', ents: ['k.lund', 'ZIA egress'], close: { conf: 98, why: 'corporate proxy egress, lesson L-207 · CASE-4121' } };
+const PSX = (at, host) => ({ src: 'EDR', at, rule: 'PsExec remote execution', summary: `it-svc-deploy started PSEXESVC on ${host}`, ents: ['it-svc-deploy', 'PSEXESVC'], close: { conf: 99, why: 'planned change CHG-88213 · CASE-4124' } });
+const ARR = [
+  NOISE_T, { n: 1 }, { n: 2 }, { n: 8 }, { n: 3 }, PSX('02:16:05', 'a finance app server'), { n: 4 }, PSX('02:19:40', 'a print server'),
+  { n: 5 }, PSX('02:24:12', 'a file server'), PSX('02:25:30', 'a build agent'), { n: 6 }, { n: 7 }, { n: 9 },
+].map(a => a.n ? { ...SIGN[a.n], ents: SIG_ENTS[a.n], atk: true, summary: SIGN[a.n].summary, at: SIGN[a.n].t } : { ...a, atk: false });
+const ATK = ARR.map((a, i) => a.atk ? i : -1).filter(i => i >= 0);      // arrival indices of the 9
+const NOISE = ARR.map((a, i) => a.atk ? -1 : i).filter(i => i >= 0);    // arrival indices of the 5
+const span = (() => { const ts = ATK.map(i => ARR[i].at).sort(), s = x => { const [h, m, ss] = x.split(':').map(Number); return h * 3600 + m * 60 + ss; }; return Math.ceil((s(ts[ts.length - 1]) - s(ts[0])) / 60); })();
+const M0 = D.metrics, SIG0 = M0.signals24h - ARR.length, CASE0 = M0.cases24h - 3, HUM0 = M0.needsDecision - 1;
+const VC = { malicious: 'mal', suspicious: 'sus', benign: 'ben', inconclusive: 'inc' };
+const VL = { malicious: 'Malicious', suspicious: 'Suspicious', benign: 'Benign', inconclusive: 'Inconclusive' };
+// existing open cases, in the order the app's priority score puts them (cases.html score())
+const PW = { P1: 4, P2: 3, P3: 2, P4: 1 }, VW = { malicious: 3, suspicious: 2, inconclusive: 2, benign: 0.5 };
+const slaMin = s => { const h = /(\d+)\s*h/.exec(s), m = /(\d+)\s*m/.exec(s); return (h ? +h[1] * 60 : 0) + (m ? +m[1] : 0); };
+const score = c => PW[c.pri] * (VW[c.verdict] || 1.5) * ((c.conf || 60) / 100) * (c.pri === 'P1' ? 2 : 1) * (/left/.test(c.sla) ? Math.min(2, Math.max(0.6, 2 - slaMin(c.sla) / 120)) : 0.5);
+const OPEN = ['CASE-4118', 'CASE-4126', 'CASE-4122', 'CASE-4125', 'CASE-4123', 'CASE-4117'].map(id => D.cases.find(c => c.id === id)).sort((a, b) => score(b) - score(a))
+  .concat(D.cases.filter(c => c.id === 'CASE-4120'));        // AI working: unscored, after the decided cases
+// ATT&CK tactic of each CASE-4127 signal, shown on the unfolded evidence rows (data.js attackChain)
+const TACTIC = { 1: 'Credential access', 2: 'Initial access', 8: 'AI-directed text', 3: 'Initial access', 4: 'Initial access', 5: 'Privilege escalation', 6: 'Collection', 7: 'Exfil, blocked', 9: 'Defense evasion' };
+const ORD = OPEN.map(c => c.id);
+const TITLE0 = '9 signals from Okta, AWS CloudTrail and Microsoft 365';
+const TITLE1 = C27.title;
+
+/* ------------------------------------------------------------------ SMIL glyphs (resampled polygons) */
+const reg = (n, r, rot) => Array.from({ length: n }, (_, i) => [r * Math.cos(rot + i * 2 * Math.PI / n), r * Math.sin(rot + i * 2 * Math.PI / n)]);
+function area(p) { let a = 0; for (let i = 0; i < p.length; i++) { const [x0, y0] = p[i], [x1, y1] = p[(i + 1) % p.length]; a += x0 * y1 - x1 * y0; } return a / 2; }
+function resample(poly, N) {
+  let p = area(poly) < 0 ? poly.slice().reverse() : poly.slice();
+  let s = 0; for (let i = 1; i < p.length; i++) if (p[i][1] < p[s][1] - 1e-6 || (Math.abs(p[i][1] - p[s][1]) < 1e-6 && p[i][0] < p[s][0])) s = i;
+  p = p.slice(s).concat(p.slice(0, s));
+  const L = [], n = p.length; let tot = 0;
+  for (let i = 0; i < n; i++) { const a = p[i], b = p[(i + 1) % n]; const l = Math.hypot(b[0] - a[0], b[1] - a[1]); L.push(l); tot += l; }
+  const out = []; let seg = 0, acc = 0;
+  for (let k = 0; k < N; k++) { const d = k * tot / N; while (acc + L[seg] < d - 1e-9) { acc += L[seg]; seg++; } const a = p[seg], b = p[(seg + 1) % n], f = L[seg] ? (d - acc) / L[seg] : 0; out.push([a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]); }
+  return out;
+}
+const pathOf = pts => 'M' + pts.map(q => q[0].toFixed(2) + ',' + q[1].toFixed(2)).join('L') + 'Z';
+const rot45 = p => p.map(([x, y]) => [(x - y) * Math.SQRT1_2, (x + y) * Math.SQRT1_2]);
+const OUT = { hex: reg(6, 10, -Math.PI / 2), tri: [[0, -10.4], [10.6, 8.3], [-10.6, 8.3]], oct: reg(8, 10.4, -Math.PI / 2 + Math.PI / 8), circ: reg(40, 9.8, -Math.PI / 2) };
+const hh = 1.3, Lx = 4.6;
+const IN = {
+  core: reg(6, 3.3, -Math.PI / 2),
+  bang: [[-1.3, -5.6], [1.3, -5.6], [1.3, 1.2], [0.04, 1.2], [0.04, 2.9], [1.3, 2.9], [1.3, 5.3], [-1.3, 5.3], [-1.3, 2.9], [-0.04, 2.9], [-0.04, 1.2], [-1.3, 1.2]].map(([x, y]) => [x, y + 0.9]),
+  cross: rot45([[-hh, -Lx], [hh, -Lx], [hh, -hh], [Lx, -hh], [Lx, hh], [hh, hh], [hh, Lx], [-hh, Lx], [-hh, hh], [-Lx, hh], [-Lx, -hh], [-hh, -hh]]),
+  check: [[-5.4, 0.1], [-3.6, -1.7], [-1.5, 0.4], [3.9, -5.0], [5.7, -3.2], [-1.5, 4.0]],
+  ring: reg(28, 3.2, -Math.PI / 2),
+  q: [[-1.3, -1.3], [1.3, -1.3], [1.3, 1.3], [-1.3, 1.3]],
+};
+const SH = {}, MK = {}; for (const k in OUT) SH[k] = pathOf(resample(OUT[k], 48)); for (const k in IN) MK[k] = pathOf(resample(IN[k], 28));
+const COL = { run: '#C6F36B', sus: '#F2B53A', mal: '#FF7A66', ben: '#4CC9A6', inc: '#C2CAD6', queued: '#5E6976' };
+const SHAPE = { run: ['hex', 'core'], queued: ['hex', 'q'], sus: ['tri', 'bang'], mal: ['oct', 'cross'], ben: ['circ', 'check'], inc: ['circ', 'ring'] };
+const GLABEL = { run: 'running', queued: 'queued', sus: 'suspicious', mal: 'malicious', ben: 'benign', inc: 'inconclusive' };
+function smil(el, attr, keys) {
+  if (keys[0][0] > 0) keys.unshift([0, keys[0][1]]);
+  if (keys[keys.length - 1][0] < P) keys.push([P, keys[keys.length - 1][1]]);
+  const a = document.createElementNS(NS, 'animate');
+  a.setAttribute('attributeName', attr); a.setAttribute('begin', '0s'); a.setAttribute('dur', P + 's'); a.setAttribute('repeatCount', 'indefinite');
+  a.setAttribute('keyTimes', keys.map(k => (k[0] / P).toFixed(5)).join(';'));
+  a.setAttribute('values', keys.map(k => k[1]).join(';'));
+  a.setAttribute('calcMode', 'spline'); a.setAttribute('keySplines', keys.slice(1).map(() => '0.65 0 0.35 1').join(';'));
+  el.appendChild(a);
+}
+// states: [[t, state], ...]; each change morphs outline, mark and colour over 0.38 s on the shared loop clock
+function glyphSVG(states) {
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', '-12 -12 24 24'); svg.setAttribute('class', 'glyph'); svg.setAttribute('aria-hidden', 'true');
+  const s0 = states[0][1];
+  const o = document.createElementNS(NS, 'path'), m = document.createElementNS(NS, 'path');
+  o.setAttribute('d', SH[SHAPE[s0][0]]); o.setAttribute('fill', COL[s0]); o.setAttribute('fill-opacity', '0.16');
+  o.setAttribute('stroke', COL[s0]); o.setAttribute('stroke-width', '1.5'); o.setAttribute('stroke-linejoin', 'round');
+  if (s0 === 'inc') o.setAttribute('stroke-dasharray', '3 2.2');
+  m.setAttribute('d', MK[SHAPE[s0][1]]); m.setAttribute('fill', COL[s0]);
+  svg.appendChild(o); svg.appendChild(m);
+  if (states.length > 1) {
+    const ko = [], km = [], kc = [];
+    states.forEach(([t, s], i) => {
+      if (i === 0) { ko.push([0, SH[SHAPE[s][0]]]); km.push([0, MK[SHAPE[s][1]]]); kc.push([0, COL[s]]); return; }
+      const pv = states[i - 1][1];
+      ko.push([t, SH[SHAPE[pv][0]]], [t + 0.38, SH[SHAPE[s][0]]]);
+      km.push([t, MK[SHAPE[pv][1]]], [t + 0.38, MK[SHAPE[s][1]]]);
+      kc.push([t, COL[pv]], [t + 0.38, COL[s]]);
+    });
+    smil(o, 'd', ko); smil(m, 'd', km);
+    smil(o, 'fill', kc.map(k => k.slice())); smil(o, 'stroke', kc.map(k => k.slice())); smil(m, 'fill', kc.map(k => k.slice()));
+  }
+  return svg;
+}
+const staticGlyph = st => `<svg class="glyph" viewBox="-12 -12 24 24" aria-hidden="true"><path d="${SH[SHAPE[st][0]]}" fill="${COL[st]}" fill-opacity=".16" stroke="${COL[st]}" stroke-width="1.5" stroke-linejoin="round" ${st === 'inc' ? 'stroke-dasharray="3 2.2"' : ''}/><path d="${MK[SHAPE[st][1]]}" fill="${COL[st]}"/></svg>`;
+
+/* ------------------------------------------------------------------ rows */
+const ringHTML = (cls, conf) => `<span class="ring ${cls}" style="--conf:${conf}">${Array.from({ length: 10 }, (_, i) => `<i style="--i:${i}"></i>`).join('')}</span>`;
+const entHTML = (e, btn) => { const k = EK[e]; return btn && k ? `<button type="button" class="ent e-${k}" data-ent="${k}" title="Isolate ${e}">${e}</button>` : `<span class="ent${k ? ' e-' + k : ''}"${k ? ` data-ent="${k}"` : ''}>${e}</span>`; };
+const progHTML = n => `<span class="prog" aria-hidden="true">${Array.from({ length: 11 }, (_, i) => `<i${i < n ? ' class="on"' : ''}></i>`).join('')}</span>`;
+const ownerHTML = o => ['TR', 'IN', 'RS'].includes(o) ? `<span class="ag">${o}</span>` : `<span class="av">${o}</span>`;
+const CHEV = '<svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3.5l3 3 3-3"/></svg>';
+let SR = [], CR = {}, GLY = [];
+function buildRows() {
+  qbody.querySelectorAll('.qr').forEach(e => e.remove());
+  SR = []; CR = {};
+  const frag = document.createDocumentFragment();
+  ARR.forEach((s, i) => {
+    const r = document.createElement('div');
+    r.className = 'qr sig ' + (s.atk ? 'atk' : 'noise'); r.setAttribute('role', 'row');
+    (s.ents || []).forEach(e => { if (EK[e]) r.classList.add('has-' + EK[e]); });
+    const g = document.createElement('div'); g.className = 'c-g'; g.setAttribute('role', 'gridcell');
+    const st = [[0, 'queued'], [T.scan + 0.05 + i * 0.02, 'run']];
+    if (!s.atk) st.push([T.noise + NOISE.indexOf(i) * 0.2, 'ben']);
+    st.push([T.reset, 'queued']);
+    g.appendChild(glyphSVG(st));
+    if (s.atk) g.insertAdjacentHTML('beforeend', `<span class="cn">${s.n}</span>`);
+    r.appendChild(g);
+    r.insertAdjacentHTML('beforeend', `<div class="c-p" role="gridcell"><span class="src" title="${SRC[s.src][1]}">${SRC[s.src][0]}</span></div>
+      <div class="c-t" role="gridcell"><div class="ttl"><span class="rt">${s.rule}</span><span class="rs">${s.summary}</span></div></div>
+      <div class="c-e" role="gridcell"><div class="ents">${s.ents.map(e => entHTML(e, false)).join('')}</div></div>
+      <div class="c-v" role="gridcell"><div class="vcell">${ringHTML('ben', 0)}<span class="vl unk">Untriaged</span><span class="vc"></span></div></div>
+      <div class="c-a age" role="gridcell">${s.at}</div>`);
+    frag.appendChild(r); SR.push(r);
+  });
+  [...OPEN, { id: 'CASE-4127' }].forEach(c => {
+    const hero = c.id === 'CASE-4127';
+    const r = document.createElement('div');
+    r.className = 'qr case' + (hero ? ' hero lit' : ''); r.setAttribute('role', 'row'); r.dataset.id = c.id;
+    const g = document.createElement('div'); g.className = 'c-g'; g.setAttribute('role', 'gridcell');
+    if (hero) g.appendChild(glyphSVG([[0, 'run'], [T.v1, 'sus'], [T.v2, 'mal'], [T.reset, 'run']]));
+    else g.innerHTML = staticGlyph(VC[c.verdict] || 'run');
+    r.appendChild(g);
+    if (hero) {
+      r.insertAdjacentHTML('beforeend', `<div class="c-p" role="gridcell"><span class="pri p4" data-k="pri">—</span></div>
+        <div class="c-t" role="gridcell"><div class="ttl" data-k="ttl">${TITLE0}</div><div class="sub"><span data-k="id">CASE-4127</span><button class="whyb" type="button" id="whyb" aria-expanded="false" aria-controls="why">9 signals, why ${CHEV}</button><span class="s1" data-k="sub">new, created by Triage 02:36:40</span></div></div>
+        <div class="c-e" role="gridcell"><div class="ents">${ENT.map(e => entHTML(e.name, true)).join('')}</div></div>
+        <div class="c-v" role="gridcell"><div class="vcell">${ringHTML('run', 0)}<span class="vl run" data-k="vl">Investigating</span><span class="vc" data-k="vc"></span><span data-k="vx"></span></div></div>
+        <div class="c-a age" role="gridcell" data-k="age">now</div>`);
+    } else if (!c.verdict) {
+      r.insertAdjacentHTML('beforeend', `<div class="c-p" role="gridcell"><span class="pri ${c.pri.toLowerCase()}">${c.pri}</span></div>
+        <div class="c-t" role="gridcell"><div class="ttl">${c.title}</div><div class="sub"><span>${c.id}</span><span class="s1">${c.signals} signal · AI working, ${c.aiNote}</span></div></div>
+        <div class="c-e" role="gridcell"><div class="ents">${c.entities.map(e => entHTML(e, false)).join('')}</div></div>
+        <div class="c-v" role="gridcell"><div class="vcell">${ringHTML('run', 0)}<span class="vl run">Investigating</span>${progHTML(6)}</div></div>
+        <div class="c-a age" role="gridcell">${c.age}</div>`);
+      r.querySelector('.c-g').innerHTML = staticGlyph('run');
+    } else {
+      const v = VC[c.verdict] || 'inc';
+      r.insertAdjacentHTML('beforeend', `<div class="c-p" role="gridcell"><span class="pri ${c.pri.toLowerCase()}">${c.pri}</span></div>
+        <div class="c-t" role="gridcell"><div class="ttl">${c.title}</div><div class="sub"><span>${c.id}</span><span class="s1">${c.signals} signal${c.signals > 1 ? 's' : ''} · ${c.autonomy}</span></div></div>
+        <div class="c-e" role="gridcell"><div class="ents">${c.entities.map(e => entHTML(e, false)).join('')}</div></div>
+        <div class="c-v" role="gridcell"><div class="vcell">${ringHTML(v, c.conf || 0)}<span class="vl ${v}">${VL[c.verdict] || 'Inconclusive'}</span><span class="vc">${c.conf ? c.conf + '%' : ''}</span></div></div>
+        <div class="c-a age" role="gridcell">${c.age}</div>`);
+    }
+    frag.appendChild(r); CR[c.id] = r;
+  });
+  qbody.insertBefore(frag, $('grp'));
+  $('why-ents').innerHTML = ENT.map(e => entHTML(e.name, true)).join(' ');
+  $('why-ents').style.display = 'inline-flex'; $('why-ents').style.gap = '4px';
+  $('why-span').textContent = span + ' min';
+  GLY = [...qbody.querySelectorAll('svg.glyph')].filter(s => s.querySelector('animate'));
+  bindRows();
+  requestAnimationFrame(markOverflow);
+}
+const q27 = k => CR['CASE-4127'].querySelector(`[data-k="${k}"]`);
+function markOverflow() { qbody.querySelectorAll('.ents').forEach(e => e.classList.toggle('ov', e.scrollWidth > e.clientWidth + 1)); }
+
+/* ------------------------------------------------------------------ legend */
+$('lg').innerHTML = ['run', 'sus', 'mal', 'ben'].map((s, i) => `<span class="${i ? 'lg-x' : ''}">${staticGlyph(s)}${GLABEL[s]}</span>`).join('');
+$('lge').insertAdjacentHTML('beforeend', ENT.map(e => `<button type="button" class="ent e-${e.k} on" data-ent="${e.k}" title="Show where ${e.name} appears">${e.name}</button>`).join(''));
+
+/* ------------------------------------------------------------------ layout */
+let M = {};
+function layout() {
+  const cs = getComputedStyle(document.documentElement), px = v => parseFloat(cs.getPropertyValue(v));
+  const mob = innerWidth <= 720;
+  M = { mob, SH: px('--sh'), CH: px('--ch'), GH: px('--gh'), WH: px('--wh'), GUT: px('--gut'), GAP: 8, H: qbody.clientHeight, W: qbody.clientWidth };
+}
+// rails: one vertical line per shared entity, with a dot on every row that carries it
+function drawRails(svg, ys, cls) {
+  const G = M.GUT, xs = M.mob ? [6, 12, 18, 24] : [10, 18, 26, 34];
+  let out = '';
+  ENT.forEach((e, k) => {
+    const pts = ys.filter(p => p.ents.includes(e.name)).map(p => p.y);
+    if (pts.length < 2) return;
+    const y0 = Math.min(...pts), y1 = Math.max(...pts), L = y1 - y0;
+    out += `<g class="rl r-${e.k}"><path class="ln" d="M${xs[k]} ${y0}V${y1}" stroke="${e.col}" stroke-width="1.6" stroke-linecap="round" fill="none" stroke-dasharray="${L}" stroke-dashoffset="${L}" data-len="${L}"/>` +
+      pts.map(y => `<circle class="dt" cx="${xs[k]}" cy="${y}" r="${M.mob ? 2.4 : 2.8}" fill="${e.col}" opacity="0"/>`).join('') + '</g>';
+  });
+  svg.setAttribute('width', G); svg.innerHTML = out;
+}
+
+/* ------------------------------------------------------------------ the master timeline */
+let tl = null, built = false, scrambles = [];
+const PANEL = '#10141A';
+function build() {
+  if (tl) { tl.kill(); tl = null; }
+  buildRows(); layout();
+  const { SH: sh, CH: chh, GH: gh, WH: wh, GAP } = M;
+  const sigY = i => gh + i * sh;
+  const top0 = n => gh + n * sh + GAP;            // first open case below n arrived signals
+  const yC = (top, j) => top + j * chh;
+  const r27 = CR['CASE-4127'], ring27 = r27.querySelector('.ring'), pri27 = q27('pri'), ttl27 = q27('ttl');
+  const grp = $('grp'), why = $('why'), scan = $('scan'), sel = $('sel'), rA = $('railsA'), rB = $('railsB');
+  drawRails(rA, ARR.map((s, i) => ({ y: sigY(i) + sh / 2, ents: s.ents })), 'A');
+  drawRails(rB, ATK.map((i, k) => ({ y: chh + wh + k * sh + sh / 2, ents: ARR[i].ents })), 'B');
+
+  // ---------- measure the fold target with the case row in its fold position, then rewind
+  ATK.forEach(i => gsap.set(SR[i], { y: sigY(i), x: 0, scaleX: 1, scaleY: 1, opacity: 1 }));
+  gsap.set(r27, { y: 0, opacity: 1 });
+  const target = r27.querySelector('.c-t');
+  const fit = {}; ATK.forEach(i => { const v = Flip.fit(SR[i], target, { getVars: true, scale: true }); fit[i] = { x: v.x, y: v.y, scaleX: v.scaleX, scaleY: v.scaleY }; });
+
+  // ---------- initial state
+  const init = () => {
+    gsap.set(grp, { y: 0, autoAlpha: 1 });
+    SR.forEach((r, i) => gsap.set(r, { y: sigY(i) - 8, x: 0, scaleX: 1, scaleY: 1, opacity: 0 }));
+    ORD.forEach((id, j) => gsap.set(CR[id], { y: yC(top0(0), j), opacity: 1, x: 0 }));
+    gsap.set(r27, { y: 0, autoAlpha: 0, backgroundColor: PANEL });
+    gsap.set(why, { y: chh, autoAlpha: 0 });
+    gsap.set(scan, { y: gh - 34, opacity: 0 });
+    gsap.set(sel, { y: 0, opacity: 0 });
+    gsap.set([rA, rB], { opacity: 1 });
+    [rA, rB].forEach(s => { s.querySelectorAll('.ln').forEach(l => gsap.set(l, { attr: { 'stroke-dashoffset': l.dataset.len } })); gsap.set(s.querySelectorAll('.dt'), { attr: { opacity: 0 } }); });
+    gsap.set(ring27, { '--conf': 0 });
+    NOISE.forEach(i => gsap.set(SR[i].querySelector('.ring'), { '--conf': 0 }));
+    gsap.set(pri27, { scale: 1 });
+    gsap.set(qbody, { opacity: 1 });
+  };
+  init();
+  tl = gsap.timeline({ paused: true, defaults: { ease: 'power2.out' } });
+
+  // ---------- 1. signals arrive; open cases are pushed down
+  ARR.forEach((s, i) => {
+    const t0 = T.arr0 + i * T.arrDt;
+    tl.to(SR[i], { y: sigY(i), opacity: 1, duration: 0.4, ease: 'back.out(1.5)' }, t0);
+    ORD.forEach((id, j) => tl.to(CR[id], { y: yC(top0(i + 1), j), duration: 0.4, ease: 'power3.out' }, t0));
+  });
+  // ---------- 2. Triage scans and draws rails along the four shared entities
+  tl.to(scan, { opacity: 1, duration: 0.15 }, T.scan)
+    .fromTo(scan, { y: gh - 34 }, { y: sigY(ARR.length) - 34, duration: 1.0, ease: 'power1.inOut', immediateRender: false }, T.scan)
+    .to(scan, { opacity: 0, duration: 0.25 }, T.scan + 0.9);
+  rA.querySelectorAll('.ln').forEach((l, k) => tl.to(l, { attr: { 'stroke-dashoffset': 0 }, duration: 0.75, ease: 'power2.inOut' }, T.scan + 0.35 + k * 0.16));
+  rA.querySelectorAll('.rl').forEach((g, k) => tl.to(g.querySelectorAll('.dt'), { attr: { opacity: 1 }, duration: 0.2, stagger: 0.04 }, T.scan + 0.4 + k * 0.16));
+  // ---------- 3. the fold: Flip.fit squeezes each signal row into the new case's title cell
+  tl.to(rA, { opacity: 0, duration: 0.25 }, T.fold);
+  ATK.forEach((i, k) => {
+    const d = Math.abs(4 - k) * 0.028;
+    tl.to(SR[i], { ...fit[i], duration: 0.74, ease: 'fold' }, T.fold + d);
+    tl.to(SR[i], { opacity: 0, duration: 0.18, ease: 'power1.in' }, T.fold + d + 0.58);
+  });
+  tl.to(grp, { y: chh, duration: 0.55, ease: 'power3.inOut' }, T.fold + 0.4);
+  NOISE.forEach((i, k) => tl.to(SR[i], { y: chh + gh + k * sh, duration: 0.55, ease: 'power3.inOut' }, T.fold + 0.42));
+  ORD.forEach((id, j) => tl.to(CR[id], { y: yC(chh + gh + NOISE.length * sh + GAP, j), duration: 0.55, ease: 'power3.inOut' }, T.fold + 0.42));
+  tl.fromTo(r27, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.3, immediateRender: false }, T.fold + 0.22);
+  tl.fromTo(r27, { backgroundColor: '#1C2614' }, { backgroundColor: PANEL, duration: 1.7, ease: 'power1.out', immediateRender: false }, T.fold + 0.5);
+  tl.to(ttl27, { duration: 1.6, ease: 'none', scrambleText: { text: TITLE1, chars: 'abcdefghijklmnopqrstuvwxyz0123456789-→./', revealDelay: 0.35, speed: 0.5 } }, T.fold + 0.6);
+  // ---------- 4. unscored, the case sorts down into "AI working"
+  const top1 = gh + NOISE.length * sh + GAP;
+  tl.to(r27, { y: yC(top1, ORD.length), duration: 0.62, ease: 'power3.inOut' }, T.sortDown);
+  tl.to(grp, { y: 0, duration: 0.55, ease: 'power3.inOut' }, T.sortDown + 0.04);
+  NOISE.forEach((i, k) => tl.to(SR[i], { y: gh + k * sh, duration: 0.55, ease: 'power3.inOut' }, T.sortDown + 0.04));
+  ORD.forEach((id, j) => tl.to(CR[id], { y: yC(top1, j), duration: 0.55, ease: 'power3.inOut' }, T.sortDown + 0.04));
+  // ---------- 5. benign noise closes itself, then the list compacts
+  NOISE.forEach((i, k) => tl.to(SR[i].querySelector('.ring'), { '--conf': ARR[i].close.conf, duration: 0.45 }, T.noise + k * 0.2 + 0.1));
+  NOISE.forEach((i, k) => tl.to(SR[i], { x: 40, opacity: 0, duration: 0.36, ease: 'power2.in' }, T.noiseOut + k * 0.07));
+  tl.to(grp, { autoAlpha: 0, duration: 0.3 }, T.noiseOut + 0.3);
+  ORD.forEach((id, j) => tl.to(CR[id], { y: j * chh, duration: 0.5, ease: 'power3.inOut' }, T.compact));
+  tl.to(r27, { y: ORD.length * chh, duration: 0.5, ease: 'power3.inOut' }, T.compact);
+  // ---------- 6. verdict: the typed --conf ring sweeps as the investigation lands
+  tl.fromTo(ring27, { '--conf': 0 }, { '--conf': 61, duration: 0.55, ease: 'power2.out', immediateRender: false }, T.v1)
+    .to(ring27, { '--conf': 97, duration: 0.6, ease: 'power3.out' }, T.v2);
+  // ---------- 7. P1 re-sorts to the top
+  tl.fromTo(pri27, { scale: 1 }, { scale: 1.35, duration: 0.14, immediateRender: false }, T.p1 - 0.15).to(pri27, { scale: 1, duration: 0.4, ease: 'pop' }, T.p1);
+  tl.to(r27, { y: 0, duration: 0.75, ease: 'power4.inOut' }, T.p1);
+  ORD.forEach((id, j) => tl.to(CR[id], { y: (j + 1) * chh, duration: 0.6, ease: 'power3.inOut' }, T.p1 + 0.08));
+  tl.to(r27, { backgroundColor: '#2A1512', duration: 0.4 }, T.p1).to(r27, { backgroundColor: '#16110F', duration: 1.4, ease: 'power1.out' }, T.p1 + 0.5);
+  // ---------- 8. select and unfold in place: the nine alerts come back out with their rails
+  tl.set(sel, { y: 0 }, T.sel).to(sel, { opacity: 1, duration: 0.2 }, T.sel);
+  ATK.forEach((i, k) => {
+    const d = k * 0.035;
+    tl.set(SR[i], { opacity: 0.01 }, T.unf + d);
+    tl.to(SR[i], { x: 0, y: chh + wh + k * sh, scaleX: 1, scaleY: 1, duration: 0.7, ease: 'power3.out' }, T.unf + d);
+    tl.to(SR[i], { opacity: 1, duration: 0.25 }, T.unf + d + 0.05);
+  });
+  tl.to(why, { autoAlpha: 1, duration: 0.3 }, T.unf + 0.45);
+  ORD.forEach((id, j) => tl.to(CR[id], { y: chh + wh + ATK.length * sh + GAP + j * chh, duration: 0.7, ease: 'power3.inOut' }, T.unf));
+  rB.querySelectorAll('.ln').forEach((l, k) => tl.to(l, { attr: { 'stroke-dashoffset': 0 }, duration: 0.6, ease: 'power2.inOut' }, T.unf + 0.75 + k * 0.1));
+  rB.querySelectorAll('.rl').forEach((g, k) => tl.to(g.querySelectorAll('.dt'), { attr: { opacity: 1 }, duration: 0.18, stagger: 0.03 }, T.unf + 0.8 + k * 0.1));
+  // ---------- 9. fold back
+  tl.to(why, { autoAlpha: 0, duration: 0.2 }, T.foldBack).to(rB, { opacity: 0, duration: 0.2 }, T.foldBack);
+  ATK.forEach((i, k) => {
+    const d = Math.abs(4 - k) * 0.02;
+    tl.to(SR[i], { ...fit[i], duration: 0.6, ease: 'power3.inOut' }, T.foldBack + d);
+    tl.to(SR[i], { opacity: 0, duration: 0.15 }, T.foldBack + d + 0.42);
+  });
+  ORD.forEach((id, j) => tl.to(CR[id], { y: (j + 1) * chh, duration: 0.6, ease: 'power3.inOut' }, T.foldBack + 0.15));
+  rB.querySelectorAll('.ln').forEach(l => tl.set(l, { attr: { 'stroke-dashoffset': l.dataset.len } }, FOLD_END - 0.02));
+  tl.set(rB.querySelectorAll('.dt'), { attr: { opacity: 0 } }, FOLD_END - 0.02).set(rB, { opacity: 1 }, FOLD_END - 0.02);
+  // ---------- 10. fade, reset, loop
+  tl.to(qbody, { opacity: 0, duration: 0.5, ease: 'power1.in' }, T.fade);
+  tl.set(grp, { y: 0, autoAlpha: 1 }, T.reset);
+  SR.forEach((r, i) => tl.set(r, { y: sigY(i) - 8, x: 0, scaleX: 1, scaleY: 1, opacity: 0 }, T.reset));
+  ORD.forEach((id, j) => tl.set(CR[id], { y: yC(top0(0), j), x: 0, opacity: 1 }, T.reset));
+  tl.set(r27, { y: 0, autoAlpha: 0, backgroundColor: PANEL }, T.reset).set(sel, { opacity: 0 }, T.reset).set(rA, { opacity: 1 }, T.reset);
+  rA.querySelectorAll('.ln').forEach(l => tl.set(l, { attr: { 'stroke-dashoffset': l.dataset.len } }, T.reset));
+  tl.set(rA.querySelectorAll('.dt'), { attr: { opacity: 0 } }, T.reset);
+  tl.set(ring27, { '--conf': 0 }, T.reset);
+  NOISE.forEach(i => tl.set(SR[i].querySelector('.ring'), { '--conf': 0 }, T.reset));
+  tl.to(ttl27, { duration: 0.02, ease: 'none', scrambleText: { text: TITLE0, chars: ' ' } }, T.reset);
+  tl.to(qbody, { opacity: 1, duration: 0.55, ease: 'power1.out' }, T.reset + 0.05);
+  tl.to({}, { duration: 0.001 }, P - 0.001);
+
+  // initialise every tween once, in order, with a fixed seed so scramble sets match on every load
+  window.__reseed(1402);
+  tl.time(P - 0.002, true); tl.time(0, true);
+  scrambles = [];
+  tl.getChildren(true, true, false).forEach(tw => { for (let pt = tw._pt; pt; pt = pt._next) if (pt.d && pt.d.charSet) scrambles.push(pt.d); });
+  built = true;
+}
+
+/* ------------------------------------------------------------------ discrete state, a pure function of t */
+const CAPS = [
+  [0.3, 4.6, 'Alerts pour in from Okta, CloudTrail, M365 and EDR. Most are noise; some are an attack.'],
+  [4.7, 6.5, "The Triage agent finds what they share: one user, one IP, one role, one bucket."],
+  [6.6, 9.9, 'Nine alerts from three tools fold into one case, and the case names itself.'],
+  [10.0, 12.45, 'Routine noise closes itself, with the reason on record: a planned change, a known proxy.'],
+  [12.5, 15.5, `The verdict lands: malicious, ${C27.conf}% calibrated. The case re-sorts to the top as P1.`],
+  [15.6, 23.45, 'Open it in place: the nine source alerts, and exactly why they belong together.'],
+  [23.5, 27.3, `Tonight: ${fmtN(M0.signals24h)} signals became ${fmtN(M0.cases24h)} cases. Only ${M0.needsDecision} need a human.`],
+];
+let mode = 'attract', playing = false, curT = 0, liveUnf = false, liveIso = null, lastCap = -2;
+const setT = (el, v) => { if (el.textContent !== v) el.textContent = v; };
+const setH = (el, v) => { if (el.__h !== v) { el.innerHTML = v; el.__h = v; } };
+const tog = (el, c, on) => { if (el.classList.contains(c) !== !!on) el.classList.toggle(c, !!on); };
+function syncDiscrete(t) {
+  const live = mode === 'live';
+  const before = x => t < x || t >= T.reset;          // "not yet happened in this loop"
+  const after = x => t >= x && t < T.reset;
+  // night counter: 14 signals arrive, 3 cases form, 1 more needs a human
+  const nArr = ARR.filter((s, i) => after(T.arr0 + i * T.arrDt + 0.15)).length;
+  const nCase = (after(T.fold + 0.45) ? 1 : 0) + (after(T.noiseOut + 0.1) ? 1 : 0) + (after(T.noiseOut + 0.3) ? 1 : 0);
+  const nHum = after(T.p1) ? 1 : 0;
+  setT($('n-sig'), fmtN(SIG0 + nArr)); setT($('n-case'), fmtN(CASE0 + nCase)); setT($('n-hum'), String(HUM0 + nHum));
+  tog($('nc-s'), 'bump', !live && t > T.arr0 && t < T.arr0 + ARR.length * T.arrDt + 0.4);
+  tog($('nc-c'), 'bump', !live && ((t > T.fold + 0.45 && t < T.fold + 1.4) || (t > T.noiseOut && t < T.noiseOut + 1.0)));
+  tog($('nc-h'), 'bump', !live && ((t > T.p1 && t < T.p1 + 1.4) || (t > T.night && t < T.night + 2.2)));
+  // group header
+  const grpAg = $('grp-ag');
+  if (after(T.noise) && t < T.noiseOut + 0.6) { grpAg.style.display = ''; setT($('grp-t'), 'Triage closing routine noise'); setT($('grp-n'), String(NOISE.length)); setT($('grp-s'), 'planned change CHG-88213 · corporate proxy egress'); }
+  else if (after(T.fold + 0.3)) { grpAg.style.display = 'none'; setT($('grp-t'), 'Incoming signals'); setT($('grp-n'), String(NOISE.length)); setT($('grp-s'), 'Triage folded 9 into CASE-4127'); }
+  else if (after(T.scan)) { grpAg.style.display = ''; setT($('grp-t'), 'Triage correlating'); setT($('grp-n'), '9 of 14'); setT($('grp-s'), 'share j.alvarez, 203.0.113.77, ops-admin or mf-finance-exports'); }
+  else { grpAg.style.display = 'none'; setT($('grp-t'), 'Incoming signals'); setT($('grp-n'), String(nArr)); setT($('grp-s'), 'Okta · AWS CloudTrail · Microsoft 365 · CrowdStrike EDR'); }
+  // signal rows: lit chips as the scan passes, correlating / closing states, nested evidence rows
+  const nested = live ? liveUnf || (t > T.unf && t < FOLD_END) : (t > T.unf && t < FOLD_END);
+  ARR.forEach((s, i) => {
+    const r = SR[i];
+    tog(r, 'lit', after(T.scan + 0.15 + i * 0.065));
+    tog(r, 'dim', !s.atk && after(T.scan + 0.4) && t < T.noise);
+    const vl = r.querySelector('.vl'), vc = r.querySelector('.vc'), rs = r.querySelector('.rs');
+    if (s.atk) {
+      tog(r, 'nested', nested && t >= T.unf);
+      if (nested && t >= T.unf) { setT(vl, TACTIC[s.n]); vl.className = 'vl lnk'; }
+      else if (after(T.scan)) { setT(vl, 'Correlating'); vl.className = 'vl run'; }
+      else { setT(vl, 'Untriaged'); vl.className = 'vl unk'; }
+    } else {
+      const k = NOISE.indexOf(i), closed = after(T.noise + k * 0.2 + 0.1);
+      tog(r, 'closed', closed);
+      if (closed) { setT(vl, 'Benign'); vl.className = 'vl ben'; setT(vc, s.close.conf + '%'); setT(rs, '→ ' + s.close.why); tog(rs, 'why-ok', true); }
+      else { setT(vl, after(T.scan) ? 'Queued' : 'Untriaged'); vl.className = 'vl unk'; setT(vc, ''); setT(rs, s.summary); tog(rs, 'why-ok', false); }
+    }
+  });
+  // CASE-4127
+  const r27 = CR['CASE-4127'], ring = r27.querySelector('.ring'), vl = q27('vl'), vc = q27('vc'), vx = q27('vx'), pri = q27('pri'), sub = q27('sub');
+  const step = clamp(Math.floor((t - (T.sortDown + 0.6)) / 0.3) + 1, 0, 11);
+  let v = ['run', 'Investigating'];
+  if (after(T.v2)) v = ['mal', 'Malicious']; else if (after(T.v1)) v = ['sus', 'Suspicious'];
+  if (ring.className !== 'ring ' + v[0]) ring.className = 'ring ' + v[0];
+  setT(vl, v[1]); vl.className = 'vl ' + v[0];
+  const conf = after(T.v2) ? Math.round(61 + 36 * sm(T.v2, T.v2 + 0.5, t)) : after(T.v1) ? Math.round(61 * sm(T.v1, T.v1 + 0.5, t)) : 0;
+  setT(vc, conf ? conf + '%' : '');
+  setH(vx, after(T.v2) ? '<span class="vcal">calibrated</span>' : after(T.sortDown + 0.6) && t < T.v1 ? progHTML(step) : '');
+  const isP1 = after(T.p1 - 0.12);
+  setT(pri, isP1 ? 'P1' : '—'); pri.className = 'pri ' + (isP1 ? 'p1' : 'p4');
+  setT(sub, after(T.v2) ? `Okta 4 · CloudTrail 4 · M365 1 · title v4, 02:41` : after(T.sortDown + 0.6) ? `Investigator step ${step} of 11` : 'new, created by Triage 02:36:40');
+  const wb = $('whyb');
+  tog(wb, 'press', !live && t >= T.press - 0.05 && t < T.press + 0.2);
+  wb.setAttribute('aria-expanded', String(nested));
+  // isolate one entity (demo: the attacker IP across Okta and CloudTrail)
+  const iso = live ? liveIso : (t >= T.iso0 && t < T.iso1 ? 'i' : null);
+  ['u', 'i', 'r', 'b'].forEach(k => tog(qbody, 'iso-' + k, iso === k));
+  tog(qbody, 'iso', !!iso);
+  // captions
+  let ci = -1, a = 0;
+  if (!live) CAPS.forEach(([a0, a1], i) => { if (t >= a0 && t < a1) { ci = i; a = Math.min(sm(a0, a0 + 0.3, t), 1 - sm(a1 - 0.3, a1, t)); } });
+  if (ci !== lastCap) { if (ci >= 0) setT($('cap-t'), CAPS[ci][2]); lastCap = ci; }
+  $('cap').style.opacity = ci >= 0 ? a.toFixed(3) : '0';
+}
+
+/* ------------------------------------------------------------------ SMIL + CSS clocks */
+// paused: every glyph is seeked to t. Playing: glyphs run on their own SMIL clock and are re-locked only on drift.
+function smilSync(t, run) {
+  const tt = ((t % P) + P) % P;
+  if (run && GLY[0]) { const d = Math.abs(GLY[0].getCurrentTime() % P - tt); if (d < 0.06 || d > P - 0.06) return; }
+  for (const s of GLY) { try { s.pauseAnimations(); s.setCurrentTime(tt); if (run) s.unpauseAnimations(); } catch (e) { } }
+}
+function cssSync(t, run) {
+  for (const a of document.getAnimations()) {
+    if (!(a instanceof CSSAnimation)) continue;
+    if (run) { if (a.playState !== 'running') a.play(); } else { a.currentTime = (t * 1000) % 60000; a.pause(); }
+  }
+}
+
+/* ------------------------------------------------------------------ playback */
+function frame(t, run) {
+  t = ((+t % P) + P) % P; curT = t;
+  const k = Math.floor(t * 12);
+  for (const d of scrambles) { d.prevScrambleTime = 0; d.setIndex = (k * 7 + 3) % 20; d.chars = d.charSet.sets[d.setIndex]; }
+  window.__reseed(0x9E37 + k);
+  tl.pause().seek(t, false);
+  syncDiscrete(t); smilSync(t, !!run);
+}
+let raf = 0, base = 0, t0 = 0;
+function loop(now) { frame(base + (now - t0) / 1000, true); raf = requestAnimationFrame(loop); }
+let posterMode = Q.has('t') || reduce;          // a still started from ?t= (or reduced motion) reads as the live widget
+function setStatus() {
+  const s = $('stt'), live = playing || posterMode;
+  s.className = 'stt' + (mode === 'live' ? ' inter' : live ? '' : ' paused');
+  setT($('stt-t'), mode === 'live' ? 'Interactive' : live ? 'Live' : 'Paused');
+  $('b-play').textContent = playing ? 'Pause' : 'Play';
+  $('b-play').setAttribute('aria-pressed', String(!playing));
+  $('hint').style.visibility = mode === 'live' ? 'visible' : 'hidden';
+}
+function play() {
+  if (!built) return;
+  posterMode = false;
+  if (mode === 'live') leaveLive();
+  if (playing) return;
+  playing = true; base = curT; t0 = performance.now();
+  for (const g of GLY) { try { g.setCurrentTime(curT); g.unpauseAnimations(); } catch (e) { } }
+  cssSync(curT, true); cancelAnimationFrame(raf); raf = requestAnimationFrame(loop); setStatus();
+}
+const sleepTicker = () => { try { gsap.ticker.sleep(); } catch (e) { } };     // GPU/CPU off while paused: GSAP's ticker would otherwise idle for ~120 frames
+function pause() { posterMode = false; playing = false; cancelAnimationFrame(raf); raf = 0; if (built) { frame(curT); cssSync(curT, false); sleepTicker(); } setStatus(); }
+window.__seek = t => { if (!built) { window.__pendingSeek = t; return; } leaveLive(); playing = false; cancelAnimationFrame(raf); cmp.classList.add('nt'); frame(+t || 0); void cmp.offsetWidth; cmp.classList.remove('nt'); cssSync(curT, false); sleepTicker(); setStatus(); };
+window.__play = () => play();
+window.__state = () => ({ t: +curT.toFixed(3), mode, playing, unfolded: liveUnf, iso: liveIso, nested: qbody.querySelectorAll('.qr.nested').length, sel: selIdx });
+
+/* ------------------------------------------------------------------ interactive mode (real input) */
+let idle = null, liveTw = null;
+function enterLive() {
+  if (!built) return;
+  if (mode !== 'live') {
+    posterMode = false; playing = false; cancelAnimationFrame(raf); raf = 0;
+    mode = 'live'; liveUnf = false; liveIso = null;
+    frame(LIVE_T); cssSync(LIVE_T, false);
+    gsap.fromTo(qbody, { opacity: 0.55 }, { opacity: 1, duration: 0.25, overwrite: true });
+    setStatus();
+  }
+  bumpIdle();
+}
+function leaveLive() {
+  if (mode !== 'live') return;
+  mode = 'attract'; clearTimeout(idle);
+  if (liveTw) { liveTw.kill(); liveTw = null; }
+  gsap.killTweensOf([qbody, $('sel')]);
+  liveUnf = false; liveIso = null;
+}
+function bumpIdle() {
+  clearTimeout(idle);
+  idle = setTimeout(() => {
+    gsap.to(cmp, { opacity: 0, duration: 0.45, ease: 'power1.in', onComplete: () => { leaveLive(); frame(0); gsap.to(cmp, { opacity: 1, duration: 0.6 }); play(); } });
+  }, 15000);
+}
+function liveSync() { syncDiscrete(tl.time()); }
+function setUnfold(on) {
+  if (on === liveUnf && !liveTw) return;
+  if (liveTw) liveTw.kill();
+  liveUnf = on;
+  liveTw = on ? tl.tweenFromTo(T.unf, UNF_END, { onUpdate: liveSync, onComplete: () => { liveTw = null; liveSync(); } })
+              : tl.tweenFromTo(T.foldBack, FOLD_END, { onUpdate: liveSync, onComplete: () => { liveTw = null; liveIso = null; liveSync(); } });
+  if (reduce) liveTw.progress(1);
+  liveSync();
+}
+function setIso(k) {
+  liveIso = liveIso === k ? null : k;
+  if (liveIso && !liveUnf) setUnfold(true);
+  liveSync();
+}
+// selection with J/K among case rows
+let selIdx = 0;
+const caseOrder = () => ['CASE-4127', ...ORD];
+function moveSel(d) {
+  selIdx = clamp(selIdx + d, 0, ORD.length);
+  const y = gsap.getProperty(CR[caseOrder()[selIdx]], 'y');
+  gsap.to('#sel', { y, opacity: 1, duration: 0.16, ease: 'power2.out' });
+}
+function bindRows() {
+  CR['CASE-4127'].addEventListener('click', e => { if (e.target.closest('[data-ent]')) return; enterLive(); selIdx = 0; gsap.to('#sel', { y: 0, opacity: 1, duration: 0.16 }); setUnfold(!liveUnf); });
+  qbody.querySelectorAll('[data-ent]').forEach(b => { if (b.tagName === 'BUTTON') b.addEventListener('click', e => { e.stopPropagation(); enterLive(); setIso(b.dataset.ent); }); });
+}
+$('lge').querySelectorAll('[data-ent]').forEach(b => b.addEventListener('click', () => { enterLive(); setIso(b.dataset.ent); }));
+$('b-play').addEventListener('click', () => { playing ? pause() : play(); });
+$('b-replay').addEventListener('click', () => { leaveLive(); playing = false; frame(0); play(); });
+cmp.addEventListener('pointerdown', e => { if (e.target.closest('.ctl')) return; enterLive(); }, true);
+cmp.addEventListener('wheel', () => enterLive(), { passive: true });
+addEventListener('keydown', e => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const k = e.key, onBtn = document.activeElement && document.activeElement.tagName === 'BUTTON';
+  if (k === ' ' && !onBtn) { e.preventDefault(); playing ? pause() : play(); return; }
+  if (['j', 'J', 'k', 'K', 'ArrowDown', 'ArrowUp', 'Enter', 'Escape', 'Tab'].includes(k)) {
+    enterLive();
+    if (k === 'j' || k === 'J' || k === 'ArrowDown') { e.preventDefault(); moveSel(1); }
+    else if (k === 'k' || k === 'K' || k === 'ArrowUp') { e.preventDefault(); moveSel(-1); }
+    else if (k === 'Enter' && !onBtn) { if (selIdx === 0) setUnfold(!liveUnf); }
+    else if (k === 'Escape') { liveIso = null; setUnfold(false); }
+  }
+});
+
+/* ------------------------------------------------------------------ embedding protocol */
+let extPaused = false, visPaused = false;
+addEventListener('message', e => {
+  const d = e.data; if (!d || typeof d !== 'object' || !d.corvid) return;
+  if (d.corvid === 'pause') { extPaused = true; if (mode === 'live') { clearTimeout(idle); } pause(); }
+  else if (d.corvid === 'play') { extPaused = false; if (mode === 'live') bumpIdle(); else play(); }
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { visPaused = playing; clearTimeout(idle); pause(); }
+  else if (visPaused && !extPaused) { visPaused = false; play(); }
+  else if (mode === 'live') bumpIdle();
+});
+
+/* ------------------------------------------------------------------ resize */
+let rz = null, lastW = 0, lastH = 0;
+new ResizeObserver(() => {
+  const w = innerWidth, h = innerHeight; if (w === lastW && h === lastH) return; lastW = w; lastH = h;
+  clearTimeout(rz);
+  rz = setTimeout(() => {
+    if (!built) return;
+    const t = mode === 'live' ? tl.time() : curT, wasLive = mode === 'live', u = liveUnf, iso = liveIso;
+    if (liveTw) { liveTw.kill(); liveTw = null; }
+    build();
+    if (wasLive) { mode = 'live'; liveUnf = u; liveIso = iso; frame(u ? UNF_END : LIVE_T); }
+    else frame(t);
+    if (playing) { base = curT; t0 = performance.now(); }
+  }, 140);
+}).observe(document.documentElement);
+
+/* ------------------------------------------------------------------ boot */
+(async function boot() {
+  if (!(window.gsap && window.Flip && window.ScrambleTextPlugin && window.CustomEase && D)) {
+    setT($('cap-t'), 'The animation library could not load. Showing a still queue.'); $('cap').style.opacity = 1;
+    window.__seek = () => {}; window.__play = () => {}; window.__ready = true; return;
+  }
+  gsap.registerPlugin(Flip, ScrambleTextPlugin, CustomEase);
+  CustomEase.create('fold', 'M0,0 C0.5,0 0.2,1 1,1');
+  CustomEase.create('pop', 'M0,0 C0.18,0.9 0.3,1.18 0.55,1.06 C0.72,0.99 0.86,1.005 1,1');
+  try {
+    const f = Promise.all(['400 13px "Geist"', '500 13px "Geist"', '600 15px "Geist"', '400 11px "Geist Mono"', '500 11px "Geist Mono"', '600 15px "Geist Mono"'].map(s => document.fonts.load(s))).then(() => document.fonts.ready);
+    await Promise.race([f, new Promise(r => setTimeout(r, 3000))]);
+  } catch (e) { }
+  lastW = innerWidth; lastH = innerHeight;
+  build();
+  window.__ready = true;
+  if (window.__pendingSeek != null) window.__seek(window.__pendingSeek);
+  else if (Q.has('t')) window.__seek(parseFloat(Q.get('t')) || 0);
+  else if (reduce) window.__seek(HERO);
+  else { frame(0); play(); }
+})();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1028 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Attack paths to crown jewels</title>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../shared/ui.css">
+<style>
+html,body{height:100%;overflow:hidden}
+body{min-height:0;background:var(--ground)}
+.cmp{position:fixed;inset:0;display:grid;grid-template-rows:auto minmax(0,1fr)}
+/* component header */
+.ch{display:flex;align-items:center;gap:10px;height:50px;padding:0 16px;border-bottom:1px solid #1C222B;min-width:0}
+.ci{flex:none;width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:linear-gradient(160deg,#2A1216,#160C0F);border:1px solid rgba(255,106,85,.38);color:#FF8A73}
+.ch h1{font-size:15px;font-weight:600;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.ctx{font:500 11px var(--mono);color:var(--text2);flex:none}
+.cs{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text2);white-space:nowrap;flex:none}
+.cs .dot{width:8px;height:8px}
+.cs .dot.solve{color:var(--sus)}
+.cs .dot.ok{color:var(--ben)}
+.eng{font:500 11px var(--mono);color:var(--text3);white-space:nowrap;padding-left:12px;border-left:1px solid var(--line);flex:none}
+/* body */
+.cb{position:relative;display:grid;grid-template-columns:minmax(0,1fr) clamp(304px,28.5vw,392px);gap:12px;padding:12px;min-height:0}
+.sw-wrap{position:relative;display:flex;flex-direction:column;min-height:0;border:1px solid var(--line);border-radius:12px;background:var(--ground);overflow:hidden}
+.stage{position:relative;flex:1;min-height:0;overflow:hidden}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#edges{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+.nodes{position:absolute;inset:0;pointer-events:none}
+.nd{position:absolute;left:0;top:0;transform:translate(-9999px,0);pointer-events:auto;white-space:nowrap;font-size:12px;line-height:1.3;color:var(--text2);cursor:default;padding:1px 6px;border-radius:5px;background:rgba(10,13,17,.74);transition:background .25s,color .25s}
+.nd.src{color:#FFD9A8} .nd.cj{color:var(--text);font-weight:500}
+.nd.hot{color:var(--text)}
+.nd.sel{background:rgba(60,40,8,.94);color:#FFE7B0;outline:1px solid rgba(255,211,107,.6)}
+.nd.cut{color:#9FDDF0}
+.colh{position:absolute;top:14px;font-size:10.5px;font-weight:500;letter-spacing:.09em;text-transform:uppercase;color:var(--text3);pointer-events:none}
+.colh.l{left:16px} .colh.r{right:16px}
+.rtag{position:absolute;left:0;top:0;z-index:3;pointer-events:none;opacity:0;transition:opacity .3s}
+.chip.gold{color:#FFE7B0;border-color:rgba(255,211,107,.55);background:rgba(60,40,8,.92)}
+.rtag .chip{box-shadow:0 4px 14px rgba(0,0,0,.5)}
+.rtag .v-mal{background:#2A1210}
+.maptip{position:absolute;left:0;top:0;z-index:5;max-width:280px;padding:8px 10px;border-radius:9px;background:rgba(16,20,26,.97);border:1px solid var(--line2);box-shadow:0 10px 30px rgba(0,0,0,.5);font-size:12px;pointer-events:none;opacity:0;transition:opacity .12s}
+.legend{flex:none;display:flex;align-items:center;flex-wrap:wrap;gap:4px 16px;min-height:32px;padding:6px 14px;border-top:1px solid #1C222B;font-size:11.5px;color:var(--text3);overflow:hidden}
+.legend i{display:inline-block;width:18px;height:4px;border-radius:2px;margin-right:7px;vertical-align:2px}
+.legend .r{margin-left:auto;font-family:var(--mono);font-size:10.5px}
+/* captions */
+.cap{position:absolute;left:50%;bottom:16px;z-index:6;transform:translateX(-50%);max-width:calc(100% - 32px);padding:9px 16px 10px;border-radius:12px;background:rgba(10,13,17,.82);border:1px solid rgba(255,255,255,.09);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:0 12px 34px rgba(0,0,0,.45);font-size:15.5px;line-height:1.35;font-weight:500;color:var(--text);text-align:center;white-space:nowrap;pointer-events:none;opacity:0}
+.cap .pg{position:absolute;left:14px;right:14px;bottom:3px;height:2px;border-radius:1px;background:rgba(255,255,255,.07);overflow:hidden}
+.cap .pg i{display:block;height:100%;width:0;background:rgba(232,235,239,.38)}
+.hint{position:absolute;left:50%;bottom:16px;z-index:6;transform:translateX(-50%);padding:6px 12px;border-radius:999px;background:rgba(10,13,17,.86);border:1px solid var(--line2);font-size:12px;color:var(--text2);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .4s}
+body.nocap .cap{display:none}
+/* rail */
+.rail{display:flex;flex-direction:column;gap:12px;min-height:0;min-width:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;min-width:0}
+.ph2{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid #1C222B;min-height:40px}
+.ph2 h2{font-size:13px;font-weight:600}
+.ph2 .s{font-size:11.5px;color:var(--text3);margin-left:auto;white-space:nowrap}
+/* exposure index */
+.ix{padding:12px 14px 13px;display:flex;flex-direction:column;gap:8px}
+.ix-top{display:flex;align-items:center;gap:8px}
+.ix-top .t3{margin-left:auto;font-size:11.5px}
+.ix-row{display:flex;align-items:flex-end;gap:12px;min-width:0}
+.ix-big{font:600 46px/0.95 var(--sans);letter-spacing:-.03em;font-variant-numeric:tabular-nums;min-width:2.3ch}
+.ix-d{font:600 13px var(--mono);padding:2px 7px;border-radius:6px;margin-bottom:5px;visibility:hidden}
+.ix-d.good{visibility:visible;color:var(--ben);background:rgba(76,201,166,.12);border:1px solid rgba(76,201,166,.38)}
+.ix-stats{margin-left:auto;text-align:right;font-size:12px;line-height:1.5;color:var(--text2);white-space:nowrap}
+.ix-stats b{font:600 12px var(--mono);color:var(--text)}
+.ix-bar{position:relative;height:6px;border-radius:3px;background:#1A2029}
+.ix-bar i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:linear-gradient(90deg,#7E1C2A,#FF6A55 60%,#FFD36B)}
+.ix-bar b{position:absolute;top:-3px;width:2px;height:12px;border-radius:1px;background:var(--text3);transform:translateX(-1px)}
+/* routes */
+.rts{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.routes{list-style:none;margin:0;padding:0;position:relative;flex:1;min-height:0;overflow:hidden}
+.rt{display:grid;grid-template-columns:20px minmax(0,1fr) auto;gap:2px 8px;padding:9px 14px 9px 12px;border-top:1px solid #1A2029;border-left:2px solid transparent;cursor:pointer;background:transparent}
+.rt:first-child{border-top:0}
+.rt:hover{background:#121821}
+.rt.sel{background:#16140E;border-left-color:#FFD36B}
+.rt.vanish{display:none}
+.rt .n{font:600 11.5px/1.55 var(--mono);color:var(--text3)}
+.rt.sel .n{color:#FFD36B}
+.hops{font-size:12.5px;line-height:1.5;color:var(--text2)}
+.hops b{font-weight:500;color:var(--text)}
+.hops .h{white-space:nowrap}
+.rt .rr{display:flex;flex-direction:column;align-items:flex-end;gap:2px;padding-top:1px}
+.rt .eff{font-size:11px;color:var(--text3);white-space:nowrap}
+.hops i{font-style:normal;color:var(--text3)}
+.rt .meta{grid-column:2/4;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:11.5px;color:var(--text3)}
+.rt .share{font:500 12px/1.55 var(--mono);color:var(--text2)}
+.routes.stale .rt{opacity:.38}
+.routes .empty{padding:14px;font-size:12.5px;color:var(--text3)}
+.sk{height:10px;border-radius:5px;background:#18202A;margin:6px 0}
+/* what-ifs */
+.wis{flex:none}
+.wis .rs{margin-left:auto}
+.wi{display:grid;grid-template-columns:30px minmax(0,1fr) auto;align-items:center;gap:0 10px;width:100%;padding:8px 14px;border:0;border-top:1px solid #1A2029;background:transparent;text-align:left;cursor:pointer;color:var(--text)}
+.wi:first-child{border-top:0}
+.wi:hover{background:#121821}
+.wi .sw{position:relative;width:30px;height:18px;border-radius:999px;background:var(--line2);transition:background .18s}
+.wi .sw::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--text);transition:transform .18s}
+.wi[aria-pressed="true"] .sw{background:#7FD6EE}
+.wi[aria-pressed="true"] .sw::after{transform:translateX(12px);background:#0A0D11}
+.wi .wn{font-size:12.5px;font-weight:500;line-height:1.3;min-width:0}
+.wi .wn small{display:block;font-size:11.5px;font-weight:400;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.imp{font:600 12px var(--mono);min-width:44px;text-align:center;padding:2px 6px;border-radius:6px;color:var(--text3)}
+.imp.cut{color:var(--ben)}
+.imp.best{color:#0A0D11;background:var(--ben)}
+.imp.on{color:#7FD6EE;font-weight:500}
+.imp.zero{color:var(--text3)}
+/* ghost cursor + fade */
+.ghost{position:fixed;left:0;top:0;z-index:40;pointer-events:none;opacity:0;will-change:transform}
+.ghost svg{display:block;transform:scale(1.12);transform-origin:2px 2px;filter:drop-shadow(0 3px 6px rgba(0,0,0,.6))}
+.ghost .rip{position:absolute;left:-14px;top:-14px;width:28px;height:28px;border-radius:50%;border:2px solid rgba(232,235,239,.9);opacity:0}
+.fade{position:absolute;inset:0;z-index:30;background:var(--ground);opacity:0;pointer-events:none}
+/* small heights */
+@media (max-height:700px){
+  .ch{height:44px}
+  .cb{padding:10px;gap:10px}
+  .ix{padding:9px 12px 10px;gap:6px}
+  .ix-big{font-size:38px}
+  .wi{padding:6px 12px}
+  .wi .wn small{display:none}
+  .rt{padding:7px 12px 7px 10px}
+  .ph2{min-height:34px;padding:7px 12px}
+  .cap{font-size:14px;bottom:12px}
+}
+@media (max-width:1100px){ .eng{display:none} }
+@media (max-width:1240px){ .legend .r{display:none} }
+/* phone */
+@media (max-width:720px){
+  .ch{height:44px;padding:0 12px;gap:8px}
+  .ch h1{font-size:13.5px}
+  .ch h1 .x, .cs .x{display:none}
+  .wi .wn small{display:none}
+  .colh{top:8px;font-size:9.5px}
+  .ctx{display:none}
+  .cb{grid-template-columns:1fr;grid-template-rows:minmax(0,41fr) minmax(0,59fr);padding:8px;gap:8px}
+  .legend{display:none}
+  .rail{gap:8px}
+  .ix{padding:8px 12px;gap:5px}
+  .ix-top{display:none}
+  .ix-row{align-items:center}
+  .ix-big{font-size:32px}
+  .ix-d{margin-bottom:0}
+  .ix-row::before{content:"Exposure index";font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--text3);width:62px;line-height:1.25}
+  .ixc{order:-2}
+  .wis{order:-1}
+  .wis .list{display:grid;grid-template-columns:1fr 1fr}
+  .wi{grid-template-columns:28px minmax(0,1fr);padding:7px 10px;border-top:1px solid #1A2029!important}
+  .wi:nth-child(odd){border-right:1px solid #1A2029}
+  .wi:nth-child(-n+2){border-top:0!important}
+  .wi .wn{font-size:11.5px}
+  .wi .imp{grid-column:2;justify-self:start;padding:0;min-width:0;margin-top:1px;font-size:11px;background:none!important}
+  .wi .imp.best{color:var(--ben)}
+  .hops{font-size:12px}
+  .cap{font-size:12.5px;white-space:normal;width:calc(100% - 20px);bottom:8px;padding:7px 10px 9px}
+  .nd{font-size:11px}
+}
+</style>
+</head>
+<body>
+<div class="cmp" id="cmp">
+  <header class="ch">
+    <span class="ci" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="2.6" cy="3.2" r="1.7" fill="currentColor"/><circle cx="2.6" cy="12.8" r="1.7" fill="currentColor" opacity=".55"/><circle cx="8" cy="8" r="1.5" fill="currentColor" opacity=".8"/><path d="M13.4 5.6l2 2.4-2 2.4-2-2.4z" fill="#FFF6E0"/><path d="M4 4l2.9 3M4 12l2.9-3M9.5 8h1.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+    <h1>Attack paths<span class="x"> to crown jewels</span></h1>
+    <span class="chip ctx">CASE-4127 · Meridian Freight</span>
+    <span class="cs" role="status"><span class="dot live solve" id="st-dot"></span><span><span id="st">Solving</span><span class="x" id="st2"></span></span></span>
+    <span class="eng" id="eng">starting…</span>
+  </header>
+  <main class="cb" id="cb">
+    <section class="sw-wrap" aria-label="Reachability graph">
+      <div class="stage" id="stage">
+        <canvas id="cv" role="img" aria-label="Reachability graph from five exposed entry points on the left to four crown jewels on the right. A physarum solver settles onto the easiest routes; the brightest runs from Okta push sign-in through j.alvarez, FinanceDataReadOnly and ops-admin to the mf-finance-exports bucket."></canvas>
+        <svg id="edges" aria-hidden="true"></svg>
+        <div class="nodes" id="nodes"></div>
+        <div class="colh l" aria-hidden="true">Exposed today</div><div class="colh r" aria-hidden="true">Crown jewels</div>
+        <div class="rtag" id="rtag"></div>
+        <div class="maptip" id="maptip" role="tooltip"></div>
+        <div class="cap" id="cap" aria-live="polite"><span id="cap-t"></span><span class="pg"><i id="cap-p"></i></span></div>
+        <div class="hint" id="hint">You're in control · the demo resumes after 15 s idle</div>
+      </div>
+      <div class="legend" aria-hidden="true">
+        <span><i style="background:linear-gradient(90deg,#7E1C2A,#FF6A55,#FFD36B)"></i>Likely route, brighter = more flow</span>
+        <span><i style="background:repeating-linear-gradient(90deg,#7FD6EE 0 4px,transparent 4px 7px)"></i>Cut by a fix</span>
+        <span><b style="color:var(--warn)">●</b> exposed today</span>
+        <span><b style="color:#FFF6E0">◆</b> crown jewel</span>
+        <span class="r">29 edges · IdP, IAM, CMDB, KEV · 02:40 UTC</span>
+      </div>
+    </section>
+    <aside class="rail">
+      <section class="card ixc" aria-label="Exposure index">
+        <div class="ix">
+          <div class="ix-top"><span class="eyebrow">Exposure index</span><span class="t3">today = 100 · lower is safer</span></div>
+          <div class="ix-row"><span class="ix-big" id="ix">100</span><span class="ix-d" id="ixd">−0</span>
+            <span class="ix-stats" id="ixs"><b>—</b> viable routes<br><b>4 of 4</b> crown jewels reachable</span></div>
+          <div class="ix-bar" aria-hidden="true"><i id="ixb" style="width:100%"></i><b style="left:100%"></b></div>
+        </div>
+      </section>
+      <section class="card rts" aria-labelledby="rt-h">
+        <div class="ph2"><h2 id="rt-h">Ranked routes</h2><span class="s" id="rt-s">solving…</span></div>
+        <ol class="routes" id="routes"></ol>
+      </section>
+      <section class="card wis" aria-labelledby="wi-h">
+        <div class="ph2"><h2 id="wi-h">What if we fix…</h2><span class="s" style="margin-left:6px">re-runs the solver</span><button class="btn sm gh rs" type="button" id="wi-reset">Reset</button></div>
+        <div class="list" id="whatifs"></div>
+      </section>
+    </aside>
+    <div class="fade" id="fade"></div>
+  </main>
+</div>
+<div class="ghost" id="ghost" aria-hidden="true"><svg width="20" height="24" viewBox="0 0 20 24"><path d="M2 1.5v18.2l4.7-4.4 3.1 7.1 3.3-1.5-3.1-6.9h6.6z" fill="#F4F6F8" stroke="#0A0D11" stroke-width="1.4" stroke-linejoin="round"/></svg><span class="rip" id="rip"></span></div>
+
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, t) => a + (b - a) * t;
+const smooth = t => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
+const easeIO = t => { t = clamp(t, 0, 1); return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; };
+const qs = new URLSearchParams(location.search);
+const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const IDLE_MS = 1000 * (+qs.get('idle') || 15);
+if (qs.get('captions') === '0') document.body.classList.add('nocap');
+
+/* =====================================================================
+   Reachability graph (exposure model snapshot) — from the verified demo
+   ===================================================================== */
+const NODES = [
+  { id: 's_okta', label: 'Okta sign-in (push MFA)', short: 'Okta push', kind: 'src', x: 0.04, y: 0.12, w: 1.0, info: 'Internet-facing IdP. Finance and Warehouse use push MFA.' },
+  { id: 's_mail', label: 'Inbound email', short: 'Email', kind: 'src', x: 0.04, y: 0.34, w: 0.8, info: 'Phishing and attachments reaching users.' },
+  { id: 's_f5', label: 'F5 BIG-IP APM', short: 'F5 BIG-IP', kind: 'src', x: 0.04, y: 0.56, w: 0.7, info: 'CVE-2026-94127 is on the KEV list and still open on 2 load balancers (8 days overdue).' },
+  { id: 's_ns', label: 'NetScaler gateway', short: 'NetScaler', kind: 'src', x: 0.04, y: 0.74, w: 0.6, info: 'CVE-2026-88771 is on the KEV list and still open on 2 gateways.' },
+  { id: 's_vpn', label: 'Contractor VPN', short: 'Contractor VPN', kind: 'src', x: 0.04, y: 0.92, w: 0.4, info: 'Password + TOTP for 31 contractor accounts.' },
+  { id: 'u_jal', label: 'j.alvarez', short: 'j.alvarez', kind: 'id', x: 0.27, y: 0.08, info: 'Finance analyst. Compromised in CASE-4127.' },
+  { id: 'u_fin', label: 'Finance users (42)', short: 'Finance users', kind: 'id', x: 0.27, y: 0.24, info: 'Push MFA, AWS SSO and SharePoint Finance access.' },
+  { id: 'u_mko', label: 'm.kowalski', short: 'm.kowalski', kind: 'id', x: 0.27, y: 0.40, info: 'Warehouse supervisor. 6 denied pushes then an approval on 09-28 (hunt H-77).' },
+  { id: 'h_dmz', label: 'DMZ web tier', short: 'DMZ web tier', kind: 'host', x: 0.27, y: 0.60, info: 'Behind the F5 BIG-IP. Holds a service-principal secret.' },
+  { id: 'h_vpn', label: 'VPN address pool', short: 'VPN pool', kind: 'host', x: 0.27, y: 0.84, info: 'RDP allowed onward to the admin jump host.' },
+  { id: 'h_finlt', label: 'FIN-LT-0442', short: 'FIN-LT-0442', kind: 'host', x: 0.49, y: 0.17, info: 'Finance laptop (CASE-4126). Cached Finance credentials.' },
+  { id: 'h_wh', label: 'WH-SCAN-07', short: 'WH-SCAN-07', kind: 'host', x: 0.49, y: 0.42, info: 'Warehouse scanner, no EDR, on flat VLAN 40.' },
+  { id: 'sp_etl', label: 'svc-etl', short: 'svc-etl', kind: 'id', x: 0.49, y: 0.62, info: 'Service principal that may assume ops-admin.' },
+  { id: 'h_jump', label: 'Jump host JMP-02', short: 'JMP-02', kind: 'host', x: 0.49, y: 0.82, info: 'Admin jump host. Cached admin credentials and a kubeconfig.' },
+  { id: 'r_fdro', label: 'FinanceDataReadOnly', short: 'FinanceDataReadOnly', kind: 'role', x: 0.71, y: 0.08, info: 'AWS SSO role for Finance.' },
+  { id: 'r_ops', label: 'ops-admin', short: 'ops-admin', kind: 'role', x: 0.71, y: 0.27, info: 'Privileged AWS role, used by 3 pipelines.' },
+  { id: 'r_spo', label: 'SharePoint Finance owners', short: 'SharePoint owners', kind: 'role', x: 0.71, y: 0.46, info: 'Owners of the vendor bank-change forms site.' },
+  { id: 'r_da', label: 'Domain Admins', short: 'Domain Admins', kind: 'role', x: 0.71, y: 0.66, info: 'AD privileged group.' },
+  { id: 'r_k8s', label: 'k8s cluster-admin', short: 'k8s admin', kind: 'role', x: 0.71, y: 0.86, info: 'prod-eu cluster.' },
+  { id: 'c_s3', label: 'mf-finance-exports', short: 'mf-finance-exports', kind: 'cj', x: 0.95, y: 0.14, w: 1.0, info: 'S3 bucket, Confidential. 2.3 GB already read in CASE-4127.' },
+  { id: 'c_bank', label: 'Vendor bank details', short: 'Vendor bank details', kind: 'cj', x: 0.95, y: 0.40, w: 0.9, info: 'ERP vendor master data. Target of invoice fraud.' },
+  { id: 'c_pay', label: 'Payroll DB', short: 'Payroll DB', kind: 'cj', x: 0.95, y: 0.62, w: 0.8, info: 'SQL Server with payroll records.' },
+  { id: 'c_dc', label: 'Domain controllers', short: 'Domain controllers', kind: 'cj', x: 0.95, y: 0.84, w: 0.7, info: 'DC-01, DC-02.' },
+];
+const E = (a, b, cost, why, tag = '', owner = '') => ({ a, b, cost, why, tag, owner });
+const EDGES = [
+  E('s_okta', 'u_jal', 2, 'Push MFA; approved after 14 denials in CASE-4127', 'fido', 'Identity team'),
+  E('s_okta', 'u_fin', 3, 'Push MFA on 42 Finance accounts', 'fido', 'Identity team'),
+  E('s_okta', 'u_mko', 3, 'Push MFA; 6 denials then an approval on 09-28 (H-77)', '', 'Identity team'),
+  E('s_mail', 'u_fin', 4, 'Credential phishing of Finance accounts (password + push)', 'fido', 'Messaging'),
+  E('s_mail', 'h_finlt', 4, 'Attachment execution on a Finance laptop (CASE-4126)', '', 'Endpoint'),
+  E('s_f5', 'h_dmz', 2, 'Open KEV entry on an internet-facing load balancer', 'f5', 'Network operations'),
+  E('s_ns', 'h_vpn', 3, 'Open KEV entry on the gateway', '', 'Network operations'),
+  E('s_vpn', 'h_vpn', 4, 'Contractor accounts, password + TOTP', '', 'IT'),
+  E('u_jal', 'r_fdro', 1, 'AWS SSO assignment', '', 'Cloud platform'),
+  E('u_fin', 'r_fdro', 2, 'AWS SSO assignment', '', 'Cloud platform'),
+  E('u_fin', 'r_spo', 2, 'SharePoint Finance membership', '', 'Collaboration'),
+  E('u_fin', 'c_bank', 3, 'ERP vendor maintenance role', '', 'Finance systems'),
+  E('u_mko', 'h_wh', 2, 'Warehouse scanner admin', '', 'Warehouse IT'),
+  E('h_finlt', 'u_fin', 3, 'Cached Finance credentials', '', 'Endpoint'),
+  E('h_finlt', 'r_spo', 3, 'Synced SharePoint session', '', 'Collaboration'),
+  E('h_dmz', 'sp_etl', 3, 'Service-principal secret on a DMZ host', '', 'Cloud platform'),
+  E('h_vpn', 'h_jump', 2, 'RDP allowed from the VPN pool', '', 'Network operations'),
+  E('h_wh', 'h_jump', 4, 'Flat VLAN 40 reaches the admin subnet', 'seg', 'Network operations'),
+  E('sp_etl', 'r_ops', 2, 'svc-etl may assume ops-admin', '', 'Cloud platform'),
+  E('r_fdro', 'r_ops', 1, 'Trust policy lets FinanceDataReadOnly assume ops-admin', 'trust', 'Cloud platform'),
+  E('r_fdro', 'c_s3', 4, 'Read on exports/summary/ only', '', 'Cloud platform'),
+  E('r_ops', 'c_s3', 1, 's3:GetObject on mf-finance-exports', '', 'Cloud platform'),
+  E('r_ops', 'c_pay', 3, 'RDS snapshot access', '', 'Cloud platform'),
+  E('r_spo', 'c_bank', 2, 'Vendor bank-change forms live in SharePoint', '', 'Finance systems'),
+  E('h_jump', 'r_da', 3, 'Admin credentials cached on the jump host', '', 'IT'),
+  E('h_jump', 'r_k8s', 3, 'kubeconfig on the jump host', '', 'Platform'),
+  E('r_da', 'c_dc', 1, 'Domain admin', '', 'IT'),
+  E('r_da', 'c_pay', 2, 'SQL sysadmin through an AD group', '', 'IT'),
+  E('r_k8s', 'c_pay', 3, 'Payroll job secrets in the cluster', '', 'Platform'),
+];
+const WHATIFS = [
+  { tag: 'fido', name: 'FIDO2 keys for Finance', d: 'Push approval and phished passwords stop working', key: '1' },
+  { tag: 'trust', name: 'Remove the ops-admin trust', d: 'FinanceDataReadOnly can no longer assume ops-admin', key: '2' },
+  { tag: 'f5', name: 'Patch F5 BIG-IP', d: 'CVE-2026-94127 · CISA KEV · 8 days overdue', key: '3' },
+  { tag: 'seg', name: 'Segment VLAN 40', d: 'Warehouse devices lose reach to the jump host', key: '4' },
+];
+const OBSERVED = new Set(['s_okta>u_jal', 'u_jal>r_fdro', 'r_fdro>r_ops', 'r_ops>c_s3']);
+const nIdx = Object.fromEntries(NODES.map((n, i) => [n.id, i]));
+EDGES.forEach(e => { e.ia = nIdx[e.a]; e.ib = nIdx[e.b]; e.key = e.a + '>' + e.b; });
+const NE = EDGES.length;
+const SRC = NODES.map((n, i) => n.kind === 'src' ? i : -1).filter(i => i >= 0);
+const SNK = NODES.map((n, i) => n.kind === 'cj' ? i : -1).filter(i => i >= 0);
+
+/* =====================================================================
+   Physarum solver on the graph (after Tero et al. 2007/2010)
+   Conductivity D grows with the flow an edge carries and decays otherwise.
+   ===================================================================== */
+function activeCost(e, fixes) { return fixes.has(e.tag) ? Infinity : e.cost; }
+function solveLU(A, B, n, m) {
+  for (let k = 0; k < n; k++) {
+    let p = k, mx = Math.abs(A[k * n + k]);
+    for (let i = k + 1; i < n; i++) { const v = Math.abs(A[i * n + k]); if (v > mx) { mx = v; p = i; } }
+    if (p !== k) { for (let j = 0; j < n; j++) { const t = A[k * n + j]; A[k * n + j] = A[p * n + j]; A[p * n + j] = t; } for (let j = 0; j < m; j++) { const t = B[k * m + j]; B[k * m + j] = B[p * m + j]; B[p * m + j] = t; } }
+    const piv = A[k * n + k] || 1e-12;
+    for (let i = k + 1; i < n; i++) {
+      const f = A[i * n + k] / piv; if (!f) continue;
+      for (let j = k; j < n; j++) A[i * n + j] -= f * A[k * n + j];
+      for (let j = 0; j < m; j++) B[i * m + j] -= f * B[k * m + j];
+    }
+  }
+  for (let k = n - 1; k >= 0; k--) {
+    const piv = A[k * n + k] || 1e-12;
+    for (let j = 0; j < m; j++) { let s = B[k * m + j]; for (let i = k + 1; i < n; i++) s -= A[k * n + i] * B[i * m + j]; B[k * m + j] = s / piv; }
+  }
+  return B;
+}
+function physarumStep(D, fixes, dt = 0.3, mu = 1.3) {
+  const n = NODES.length, Q = new Float64Array(NE);
+  const G = EDGES.map((e, k) => { const c = activeCost(e, fixes); return c === Infinity ? 0 : D[k] / c; });
+  for (const t of SNK) {
+    const A = new Float64Array(n * n), m = SRC.length, B = new Float64Array(n * m);
+    EDGES.forEach((e, k) => { const g = G[k]; if (!g) return; const i = e.ia, j = e.ib; A[i * n + i] += g; A[j * n + j] += g; A[i * n + j] -= g; A[j * n + i] -= g; });
+    for (let i = 0; i < n; i++) A[i * n + i] += 1e-7;
+    SRC.forEach((s, c) => { B[s * m + c] += NODES[s].w * NODES[t].w; });
+    for (let j = 0; j < n; j++) A[t * n + j] = 0; A[t * n + t] = 1; for (let c = 0; c < m; c++) B[t * m + c] = 0;
+    solveLU(A, B, n, m);
+    EDGES.forEach((e, k) => { const g = G[k]; if (!g) return; for (let c = 0; c < m; c++) { const q = g * (B[e.ia * m + c] - B[e.ib * m + c]); if (q > 0) Q[k] += q; } });
+  }
+  let change = 0;
+  for (let k = 0; k < NE; k++) {
+    const target = G[k] ? Math.pow(Q[k], mu) : 0;
+    const nd = D[k] + dt * (target - D[k]); change = Math.max(change, Math.abs(nd - D[k])); D[k] = Math.max(0, nd);
+  }
+  return { Q, change };
+}
+function converge(fixes, iters = 220) { const D = new Float64Array(NE).fill(1); for (let i = 0; i < iters; i++) if (physarumStep(D, fixes).change < 1e-5) break; return D; }
+function routesFrom(D, fixes) {
+  const n = NODES.length, maxD = Math.max(...D, 1e-9), out = [];
+  const adj = NODES.map(() => []);
+  EDGES.forEach((e, k) => { if (activeCost(e, fixes) !== Infinity && D[k] > maxD * 0.02) adj[e.ia].push(k); });
+  for (const s of SRC) for (const t of SNK) {
+    const dist = new Float64Array(n).fill(Infinity), prev = new Int32Array(n).fill(-1), done = new Uint8Array(n); dist[s] = 0;
+    for (;;) { let u = -1, best = Infinity; for (let i = 0; i < n; i++) if (!done[i] && dist[i] < best) { best = dist[i]; u = i; } if (u < 0 || u === t) break; done[u] = 1;
+      for (const k of adj[u]) { const e = EDGES[k], w = e.cost / (D[k] / maxD + 1e-3); if (dist[u] + w < dist[e.ib]) { dist[e.ib] = dist[u] + w; prev[e.ib] = k; } } }
+    if (dist[t] === Infinity) continue;
+    const ks = []; for (let v = t; v !== s; v = EDGES[prev[v]].ia) ks.unshift(prev[v]);
+    const bott = Math.min(...ks.map(k => D[k] / maxD)), effort = ks.reduce((a, k) => a + EDGES[k].cost, 0);
+    if (bott < 0.06) continue;
+    out.push({ s, t, ks, bott, effort, score: bott * NODES[s].w * NODES[t].w, observed: ks.every(k => OBSERVED.has(EDGES[k].key)), key: ks.join('-') });
+  }
+  out.sort((a, b) => b.score - a.score || a.effort - b.effort);
+  const tot = out.reduce((a, r) => a + r.score, 0) || 1; out.forEach(r => r.share = r.score / tot);
+  return out;
+}
+function metrics(routes) {
+  const cj = new Set(routes.map(r => r.t));
+  const idx = routes.reduce((a, r) => a + NODES[r.s].w * NODES[r.t].w / r.effort, 0);
+  return { idx, routes: routes.length, effort: routes.length ? Math.min(...routes.map(r => r.effort)) : null, cj: cj.size };
+}
+
+/* every fix combination, solved once from the uniform start (the answer must not depend on the order fixes were tried) */
+const TAGS = WHATIFS.map(w => w.tag);
+const keyOf = set => TAGS.filter(t => set.has(t)).join(',');
+const SOL = new Map();
+for (let m = 0; m < 16; m++) {
+  const f = new Set(TAGS.filter((t, i) => m >> i & 1)), D = converge(f), routes = routesFrom(D, f);
+  SOL.set(keyOf(f), { fixes: f, D, routes, m: metrics(routes) });
+}
+const BASE = SOL.get('');
+for (const s of SOL.values()) s.idx = Math.round(100 * s.m.idx / BASE.m.idx);
+const restartFrom = (D0, fixes) => { const D = new Float64Array(D0); for (let k = 0; k < NE; k++) D[k] = fixes.has(EDGES[k].tag) ? 0 : Math.max(D[k], 0.25); return D; };
+const UNIFORM = new Float64Array(NE).fill(1);
+
+/* =====================================================================
+   The attract loop: converge → FIDO2 → remove trust → reset
+   ===================================================================== */
+const L = 38;
+const PH = [
+  { t0: 1.2, t1: 7.6, prev: null, fx: [], iters: 172, pow: 2.6, label: 'Solving from today’s exposure' },
+  { t0: 14.0, t1: 17.4, prev: '', fx: ['fido'], iters: 48, pow: 1.15, label: 'Re-routing after FIDO2' },
+  { t0: 23.4, t1: 26.3, prev: 'fido', fx: ['fido', 'trust'], iters: 34, pow: 1.15, label: 'Re-routing without the trust' },
+  { t0: 33.0, t1: 36.3, prev: 'fido,trust', fx: [], iters: 190, pow: 1.25, label: 'Back to today' },
+];
+PH.forEach(p => { p.fixes = new Set(p.fx); p.key = keyOf(p.fixes); p.startD = p.prev === null ? UNIFORM : restartFrom(SOL.get(p.prev).D, p.fixes); });
+const CAPS = [
+  [0.25, 3.6, 'Every way in, mapped: 5 exposed entry points, 29 hops, 4 crown jewels.'],
+  [3.6, 8.6, 'The solver lets attacker effort flow through it. Easy routes thicken, the rest fade.'],
+  [8.6, 14.0, 'Route #1 is the exact path the CASE-4127 attacker took to the finance exports.'],
+  [14.0, 19.2, 'What if Finance had FIDO2 keys? The solver re-runs live: exposure drops to 68.'],
+  [19.2, 23.4, 'The next route surfaces: m.kowalski’s push MFA, via WH-SCAN-07, to Payroll DB.'],
+  [23.4, 29.4, 'Remove the ops-admin trust too: two changes cut exposure from 100 to 62.'],
+  [29.4, 33.0, 'Fix the route attackers will use next, before they use it.'],
+  [33.0, 37.3, 'Back to today. Try any fix yourself: every toggle re-runs the solver.'],
+];
+const GHOST = [
+  { t0: 12.7, click: 14.0, t1: 14.7, from: 'stage', to: '[data-fix="fido"] .sw' },
+  { t0: 22.2, click: 23.4, t1: 24.1, from: '[data-fix="fido"] .sw', to: '[data-fix="trust"] .sw' },
+  { t0: 31.8, click: 33.0, t1: 33.7, from: '[data-fix="trust"] .sw', to: '#wi-reset' },
+];
+const POSTER_T = 27.5;
+
+const cache = { ph: -1, n: 0, D: new Float64Array(NE), nextN: -1, next: new Float64Array(NE), out: new Float64Array(NE) };
+function solverAt(t) {
+  let i = -1; for (let k = 0; k < PH.length; k++) if (t >= PH[k].t0) i = k;
+  if (i < 0) return { D: UNIFORM, fixes: new Set(), key: '', prevKey: null, settled: false, p: 0, i, n: 0, pre: true };
+  const ph = PH[i], p = clamp((t - ph.t0) / (ph.t1 - ph.t0), 0, 1);
+  if (p >= 1) return { D: SOL.get(ph.key).D, fixes: ph.fixes, key: ph.key, prevKey: ph.prev, settled: true, p: 1, i, n: ph.iters };
+  const nf = ph.iters * Math.pow(p, ph.pow), n = Math.floor(nf), fr = nf - n;
+  if (cache.ph !== i || cache.n > n) { cache.ph = i; cache.n = 0; cache.nextN = -1; cache.D.set(ph.startD); }
+  while (cache.n < n) { if (cache.nextN === cache.n + 1) cache.D.set(cache.next); else physarumStep(cache.D, ph.fixes); cache.n++; }
+  let D = cache.D;
+  if (fr > 1e-3) {   // blend towards the next solver step so the network re-forms continuously, not in jumps
+    if (cache.nextN !== n + 1) { cache.next.set(cache.D); physarumStep(cache.next, ph.fixes); cache.nextN = n + 1; }
+    for (let k = 0; k < NE; k++) cache.out[k] = cache.D[k] + (cache.next[k] - cache.D[k]) * fr;
+    D = cache.out;
+  }
+  return { D, fixes: ph.fixes, key: ph.key, prevKey: ph.prev, settled: false, p, i, n };
+}
+
+/* =====================================================================
+   View state + layout + SVG/HTML overlay
+   ===================================================================== */
+const V = { D: new Float64Array(UNIFORM), fixes: new Set(), routes: [], routesKey: null, stale: false, sel: 0, showSel: false, idx: 100, settledKey: null, dash: 0 };
+let W = 1, H = 1, dpr = 1, narrow = false;
+const stage = $('stage');
+function layout() {
+  const r = stage.getBoundingClientRect(); W = Math.max(1, r.width); H = Math.max(1, r.height); dpr = Math.min(2, window.devicePixelRatio || 1) * Q.scale;
+  narrow = W < 560;
+  const mL = narrow ? 14 : 40, mR = narrow ? 14 : 42, mTop = narrow ? 34 : 44, mBot = narrow ? 70 : 26;
+  NODES.forEach(nd => { nd.px = mL + (nd.x - 0.04) / 0.91 * (W - mL - mR); nd.py = mTop + nd.y * (H - mTop - mBot); });
+}
+function buildNodes() {
+  const host = $('nodes'); host.innerHTML = '';
+  NODES.forEach((nd, i) => {
+    const el = document.createElement('div'); el.className = `nd ${nd.kind}`; el.dataset.i = i;
+    host.appendChild(el); nd.el = el;
+    el.addEventListener('pointerenter', () => showTip(i)); el.addEventListener('pointerleave', hideTip);
+  });
+}
+function placeNodes() {
+  NODES.forEach(nd => {
+    nd.el.textContent = narrow ? nd.short : nd.label;
+    const x = nd.px, y = nd.py - 9;
+    nd.el.style.transform = nd.kind === 'src' ? `translate(${x - 7}px,${y}px) translate(0,-100%)` : nd.kind === 'cj' ? `translate(${x + 7}px,${y}px) translate(-100%,-100%)` : `translate(${x}px,${y}px) translate(-50%,-100%)`;
+    nd.el.style.display = narrow && nd.kind !== 'src' && nd.kind !== 'cj' ? 'none' : '';
+  });
+  const sr = stage.getBoundingClientRect();
+  NODES.forEach(nd => { const r = nd.el.getBoundingClientRect(); nd.box = r.width ? [r.left - sr.left - 2, r.top - sr.top - 2, r.right - sr.left + 2, r.bottom - sr.top + 2] : null; });
+}
+const overlap = (b, x0, y0, x1, y1) => Math.max(0, Math.min(b[2], x1) - Math.max(b[0], x0)) * Math.max(0, Math.min(b[3], y1) - Math.max(b[1], y0));
+function labelHit(x0, y0, x1, y1) { let a = 0; for (const nd of NODES) if (nd.box) a += overlap(nd.box, x0, y0, x1, y1); return a; }
+function markerAt(sx, sy, ex, ey) {
+  let best = null, bestA = Infinity;
+  for (const t of [0.5, 0.44, 0.56, 0.38, 0.62, 0.32, 0.68, 0.26, 0.74, 0.2, 0.8, 0.85, 0.9]) {
+    const x = sx + (ex - sx) * t, y = sy + (ey - sy) * t;
+    if (NODES.some(nd => Math.hypot(nd.px - x, nd.py - y) < 13)) continue;
+    const a = labelHit(x - 9, y - 9, x + 9, y + 9) + Math.abs(t - 0.5) * 4;
+    if (a < bestA) { bestA = a; best = [x, y]; }
+    if (a < 3) break;
+  }
+  return best || [(sx + ex) / 2, (sy + ey) / 2];
+}
+function placeTag(r) {
+  const tag = $('rtag');
+  if (!r || narrow) { tag.style.opacity = 0; return; }
+  tag.innerHTML = r.observed ? '<span class="chip sm v-mal">observed in CASE-4127</span>' : `<span class="chip sm gold">route #${V.sel + 1} · effort ${r.effort}</span>`;
+  const w = tag.offsetWidth || 150, h = tag.offsetHeight || 20;
+  let best = null, bestA = Infinity;
+  for (const k of r.ks) {
+    const a = NODES[EDGES[k].ia], b = NODES[EDGES[k].ib], len = Math.hypot(b.px - a.px, b.py - a.py);
+    if (len < w * 0.8) continue;
+    for (const t of [0.5, 0.4, 0.6]) for (const off of [-16, 16]) {
+      const x = a.px + (b.px - a.px) * t, y = a.py + (b.py - a.py) * t + off, x0 = x - w / 2, y0 = y - h / 2;
+      if (x0 < 6 || x0 + w > W - 6 || y0 < 24) continue;
+      let cost = labelHit(x0 - 3, y0 - 3, x0 + w + 3, y0 + h + 3) * 2 + Math.abs(t - 0.5) * 40 + (off > 0 ? 10 : 0);
+      for (const nd of NODES) if (nd.px > x0 - 8 && nd.px < x0 + w + 8 && nd.py > y0 - 8 && nd.py < y0 + h + 8) cost += 400;
+      if (cost < bestA) { bestA = cost; best = [x0, y0]; }
+    }
+  }
+  if (!best) { tag.style.opacity = 0; return; }
+  tag.style.transform = `translate(${best[0].toFixed(1)}px,${best[1].toFixed(1)}px)`; tag.style.opacity = 1;
+}
+let selLines = [];
+function drawEdges() {
+  const svg = $('edges'), sel = V.showSel ? V.routes[V.sel] : null, selSet = new Set(sel ? sel.ks : []);
+  let h = '<defs><marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L8 4L0 8z" fill="#3A4656"/></marker>'
+    + '<marker id="ahs" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L8 4L0 8z" fill="#FFD36B"/></marker></defs>';
+  const maxD = Math.max(...V.D, 1e-9);
+  EDGES.forEach((e, k) => {
+    const a = NODES[e.ia], b = NODES[e.ib], cut = V.fixes.has(e.tag), on = selSet.has(k);
+    const x1 = a.px, y1 = a.py, x2 = b.px, y2 = b.py, len = Math.hypot(x2 - x1, y2 - y1) || 1, ux = (x2 - x1) / len, uy = (y2 - y1) / len;
+    const sx = x1 + ux * 7, sy = y1 + uy * 7, ex = x2 - ux * 9, ey = y2 - uy * 9;
+    if (cut) {
+      h += `<line x1="${sx}" y1="${sy}" x2="${ex}" y2="${ey}" stroke="#7FD6EE" stroke-width="1.7" stroke-dasharray="4 4" opacity=".95"/>`;
+      const [mx, my] = markerAt(sx, sy, ex, ey);
+      h += `<circle cx="${mx}" cy="${my}" r="7.5" fill="#0A0D11" stroke="#7FD6EE" stroke-width="1.2"/><path d="M${mx - 3.2} ${my - 3.2}L${mx + 3.2} ${my + 3.2}M${mx + 3.2} ${my - 3.2}L${mx - 3.2} ${my + 3.2}" stroke="#DDF6FF" stroke-width="1.7" stroke-linecap="round"/>`;
+      return;
+    }
+    const strength = V.D[k] / maxD;
+    if (on) h += `<line class="sl" x1="${sx}" y1="${sy}" x2="${ex}" y2="${ey}" stroke="#FFD36B" stroke-width="2.3" stroke-dasharray="7 5" marker-end="url(#ahs)"/>`;
+    else h += `<line x1="${sx}" y1="${sy}" x2="${ex}" y2="${ey}" stroke="#3A4656" stroke-width="1" opacity="${(0.3 + 0.38 * (1 - strength)).toFixed(2)}" marker-end="url(#ah)"/>`;
+  });
+  NODES.forEach(nd => {
+    if (nd.kind === 'cj') h += `<rect x="${nd.px - 5.5}" y="${nd.py - 5.5}" width="11" height="11" transform="rotate(45 ${nd.px} ${nd.py})" fill="#FFF6E0" stroke="#0A0D11" stroke-width="2"/>`;
+    else h += `<circle cx="${nd.px}" cy="${nd.py}" r="${nd.kind === 'src' ? 5.5 : 4.5}" fill="${nd.kind === 'src' ? '#F59A3D' : '#5A6472'}" stroke="#0A0D11" stroke-width="2"/>`;
+  });
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.innerHTML = h;
+  selLines = [...svg.querySelectorAll('.sl')]; setDash(V.dash);
+  const onNodes = new Set(sel ? [sel.s, ...sel.ks.map(k => EDGES[k].ib)] : []);
+  const hot = new Set(); EDGES.forEach((e, k) => { if (!V.fixes.has(e.tag) && V.D[k] / maxD > 0.25) { hot.add(e.ia); hot.add(e.ib); } });
+  const cutN = new Set(); EDGES.forEach(e => { if (V.fixes.has(e.tag)) cutN.add(e.ib); });
+  NODES.forEach((nd, i) => { nd.el.classList.toggle('sel', onNodes.has(i)); nd.el.classList.toggle('hot', hot.has(i)); });
+  placeTag(sel);
+}
+function setDash(d) { for (const l of selLines) l.setAttribute('stroke-dashoffset', (-d).toFixed(1)); }
+function showTip(i) {
+  if (CTRL.mode !== 'live') return;
+  const nd = NODES[i], tip = $('maptip');
+  const outE = EDGES.filter(e => e.ia === i && !V.fixes.has(e.tag)).map(e => `${esc(NODES[e.ib].label)} <span class="t3">(${esc(e.why)})</span>`);
+  tip.innerHTML = `<b>${esc(nd.label)}</b><div class="t3" style="margin:2px 0 4px">${{ src: 'Exposed entry point', cj: 'Crown jewel', id: 'Identity', host: 'Host', role: 'Privilege' }[nd.kind]}</div><div>${esc(nd.info)}</div>${outE.length ? `<div style="margin-top:5px" class="t2">Leads to: ${outE.slice(0, 3).join('; ')}</div>` : ''}`;
+  const x = Math.min(W - 290, Math.max(8, nd.px + 12)), y = nd.py + 14 > H - 130 ? nd.py - 120 : nd.py + 14;
+  tip.style.left = x + 'px'; tip.style.top = y + 'px'; tip.style.opacity = 1;
+}
+function hideTip() { $('maptip').style.opacity = 0; }
+
+/* =====================================================================
+   Rail: exposure index, ranked routes, what-ifs
+   ===================================================================== */
+const hop = i => NODES[i].short;
+function setStatus(a, b, ok) { $('st').textContent = a; $('st2').textContent = b; $('st-dot').className = ok ? 'dot ok' : 'dot live solve'; }
+function renderIndex(val, key) {
+  const v = Math.round(val);
+  $('ix').textContent = v;
+  const d = $('ixd'); if (v < 100) { d.className = 'ix-d good'; d.textContent = '−' + (100 - v); } else { d.className = 'ix-d'; d.textContent = '−0'; }
+  $('ixb').style.width = clamp(v, 0, 100) + '%';
+  const s = key == null ? null : SOL.get(key);
+  const h = s ? `<b>${s.m.routes}</b> viable routes<br><b>${s.m.cj} of 4</b> crown jewels reachable` : `<b>—</b> viable routes<br><b>4 of 4</b> crown jewels reachable`;
+  if (h !== renderIndex.h) { $('ixs').innerHTML = h; renderIndex.h = h; }
+}
+let rtMemo = '';
+function renderRoutes(animate) {
+  const list = $('routes'), memo = `${V.routesKey}|${V.stale}|${V.sel}|${V.showSel}|${V.routes.length}`;
+  if (memo === rtMemo) return; rtMemo = memo;
+  list.classList.toggle('stale', V.stale);
+  if (V.routesKey == null) {
+    list.innerHTML = '<li class="empty"><div class="sk" style="width:82%"></div><div class="sk" style="width:58%"></div><div class="sk" style="width:74%;margin-top:16px"></div><div class="sk" style="width:46%"></div></li>';
+    $('rt-s').textContent = 'solving…'; return;
+  }
+  const first = new Map(); if (animate) list.querySelectorAll('.rt').forEach(el => first.set(el.dataset.k, el.getBoundingClientRect().top));
+  const top = V.routes.slice(0, 6);
+  list.innerHTML = top.map((r, i) => {
+    const chain = [r.s, ...r.ks.map(k => EDGES[k].ib)].map((v, j, arr) => j === 0 || j === arr.length - 1 ? `<b class="h">${esc(hop(v))}</b>` : `<span class="h">${esc(hop(v))}</span>`).join(' <i>→</i> ');
+    return `<li class="rt${V.showSel && i === V.sel ? ' sel' : ''}" data-k="${r.key}" data-i="${i}"><span class="n">${i + 1}</span><span class="hops">${chain}</span><span class="rr"><span class="share">${Math.round(r.share * 100)}%</span><span class="eff">effort ${r.effort}</span></span>
+      ${r.observed ? '<span class="meta"><span class="chip sm v-mal">observed in CASE-4127</span></span>' : ''}</li>`;
+  }).join('') || '<li class="empty">No viable route under these fixes.</li>';
+  $('rt-s').textContent = V.stale ? 're-ranking…' : `${V.routes.length} viable · top ${Math.min(6, V.routes.length)}`;
+  fitRoutes();
+  if (animate && !RM) list.querySelectorAll('.rt').forEach((el, i) => {
+    const f = first.get(el.dataset.k), now = el.getBoundingClientRect().top;
+    if (f == null) el.animate([{ opacity: 0, transform: 'translateX(14px)' }, { opacity: 1, transform: 'none' }], { duration: 420, delay: 40 * i, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'backwards' });
+    else if (Math.abs(f - now) > 1) el.animate([{ transform: `translateY(${f - now}px)` }, { transform: 'none' }], { duration: 520, easing: 'cubic-bezier(.2,.7,.2,1)' });
+  });
+}
+function fitRoutes() {
+  const list = $('routes'), lim = list.getBoundingClientRect().bottom + 1;
+  list.querySelectorAll('.rt').forEach(el => el.classList.remove('vanish'));
+  let over = false; list.querySelectorAll('.rt').forEach(el => { if (over || el.getBoundingClientRect().bottom > lim) { over = true; el.classList.add('vanish'); } });
+}
+let wiMemo = '';
+function renderWhatifs(fixes, impactKey) {
+  const memo = keyOf(fixes) + '|' + impactKey; if (memo === wiMemo) return; wiMemo = memo;
+  const base = impactKey == null ? null : SOL.get(impactKey);
+  let best = 0; const imp = {};
+  if (base) for (const w of WHATIFS) if (!fixes.has(w.tag)) { const nf = new Set(fixes); nf.add(w.tag); imp[w.tag] = SOL.get(keyOf(nf)).idx - base.idx; best = Math.min(best, imp[w.tag]); }
+  $('whatifs').innerHTML = WHATIFS.map(w => {
+    const on = fixes.has(w.tag), d = imp[w.tag];
+    const chip = on ? '<span class="imp on">on</span>' : d == null ? '<span class="imp">··</span>' : d === 0 ? '<span class="imp zero">0</span>' : `<span class="imp cut${d === best ? ' best' : ''}" title="exposure index change if applied now">−${-d}</span>`;
+    return `<button class="wi" type="button" data-fix="${w.tag}" aria-pressed="${on}"><span class="sw" aria-hidden="true"></span><span class="wn">${esc(w.name)}<small>${esc(w.d)}</small></span>${chip}</button>`;
+  }).join('');
+  $('wi-reset').disabled = !fixes.size;
+}
+
+/* =====================================================================
+   Agents (Jones 2010) foraging along conducting edges — WGSL compute
+   ===================================================================== */
+const Q = { scale: 1, slow: 0, ok: 0 };
+let CELL = 3, TW = 1, TH = 1, field = new Float32Array(1), backend = null, nAgents = 0;
+function rasterField() {
+  const maxD = Math.max(...V.D, 1e-9); field.fill(0);
+  const put = (cx, cy, v) => { if (cx < 0 || cy < 0 || cx >= TW || cy >= TH) return; const i = cy * TW + cx; if (v > field[i]) field[i] = v; };
+  const halfW = 6.5 * clamp(Math.min(W / 880, H / 680), 1, 1.45) / CELL;
+  EDGES.forEach((e, k) => {
+    if (V.fixes.has(e.tag)) return; const v = Math.pow(V.D[k] / maxD, 0.8); if (v < 0.01) return;
+    const a = NODES[e.ia], b = NODES[e.ib], ax = a.px / CELL, ay = a.py / CELL, bx = b.px / CELL, by = b.py / CELL;
+    const x0 = Math.floor(Math.min(ax, bx) - halfW - 1), x1 = Math.ceil(Math.max(ax, bx) + halfW + 1), y0 = Math.floor(Math.min(ay, by) - halfW - 1), y1 = Math.ceil(Math.max(ay, by) + halfW + 1);
+    const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy || 1;
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const t = clamp(((x + 0.5 - ax) * dx + (y + 0.5 - ay) * dy) / l2, 0, 1), qx = ax + t * dx - x - 0.5, qy = ay + t * dy - y - 0.5, d = Math.sqrt(qx * qx + qy * qy);
+      if (d < halfW) put(x, y, v * (1 - 0.55 * d / halfW));
+    }
+  });
+  NODES.forEach(nd => { const r = 9 / CELL, cx = nd.px / CELL, cy = nd.py / CELL;
+    for (let y = Math.floor(cy - r); y <= Math.ceil(cy + r); y++) for (let x = Math.floor(cx - r); x <= Math.ceil(cx + r); x++) { const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy); if (d < r) put(x, y, 0.06 + 0.2 * (1 - d / r)); } });
+}
+function srcTable() { const tot = SRC.reduce((a, s) => a + NODES[s].w, 0); let c = 0; return SRC.map(s => { c += NODES[s].w / tot; return [NODES[s].px / CELL, NODES[s].py / CELL, c]; }); }
+function snkTable() { return SNK.map(t => [NODES[t].px / CELL, NODES[t].py / CELL, 10 / CELL]); }
+/* deterministic agent seeding along conducting edges (so a seek shows the settled swarm, not a cold start) */
+function seedAgents(N, stride) {
+  const maxD = Math.max(...V.D, 1e-9), segs = []; let tot = 0;
+  EDGES.forEach((e, k) => { if (V.fixes.has(e.tag)) return; const v = Math.pow(V.D[k] / maxD, 0.8); if (v < 0.02) return;
+    const a = NODES[e.ia], b = NODES[e.ib], len = Math.hypot(b.px - a.px, b.py - a.py) / CELL; tot += v * len; segs.push([tot, a.px / CELL, a.py / CELL, b.px / CELL, b.py / CELL]); });
+  const st = srcTable(), out = new Float32Array(N * stride); let seed = 0x51A7;
+  const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+  for (let i = 0; i < N; i++) {
+    const o = i * stride;
+    if (!segs.length || rnd() < 0.08) { const r = rnd(), s = st.find(x => r <= x[2]) || st[st.length - 1], a = rnd() * 6.2832; out[o] = s[0] + Math.cos(a) * 2; out[o + 1] = s[1] + Math.sin(a) * 2; out[o + 2] = a; continue; }
+    const r = rnd() * tot; let lo = 0, hi = segs.length - 1; while (lo < hi) { const m = (lo + hi) >> 1; if (segs[m][0] < r) lo = m + 1; else hi = m; }
+    const g = segs[lo], t = rnd(), ang = Math.atan2(g[4] - g[2], g[3] - g[1]), j = (rnd() - 0.5) * 2.4;
+    out[o] = g[1] + (g[3] - g[1]) * t - Math.sin(ang) * j; out[o + 1] = g[2] + (g[4] - g[2]) * t + Math.cos(ang) * j; out[o + 2] = ang + (rnd() - 0.5) * 0.6;
+  }
+  return out;
+}
+const TUNE = { sd: 4.2, sa: 0.55, ra: 0.42, step: 1.0, decay: 0.86, diffuse: 0.22, gain: 6.0 };
+const SIM_WGSL = /* wgsl */`
+struct Params {
+  tw: u32, th: u32, n: u32, frame: u32,
+  sd: f32, sa: f32, ra: f32, stepLen: f32,
+  decay: f32, diffuse: f32, gain: f32, depScale: f32,
+  nSrc: u32, nSnk: u32, p0: f32, p1: f32,
+  src: array<vec4f, 8>,
+  snk: array<vec4f, 8>,
+};
+@group(0) @binding(0) var<uniform> P: Params;
+@group(0) @binding(1) var<storage, read_write> agents: array<vec4f>;
+@group(0) @binding(2) var<storage, read> trailIn: array<f32>;
+@group(0) @binding(3) var<storage, read_write> trailOut: array<f32>;
+@group(0) @binding(4) var<storage, read_write> dep: array<atomic<u32>>;
+@group(0) @binding(5) var<storage, read> field: array<f32>;
+const TAU = 6.28318531;
+fn pcg(v: u32) -> u32 { let s = v * 747796405u + 2891336453u; let w = ((s >> ((s >> 28u) + 4u)) ^ s) * 277803737u; return (w >> 22u) ^ w; }
+fn u01(v: u32) -> f32 { return f32(pcg(v) >> 8u) * (1.0 / 16777216.0); }
+fn inside(p: vec2f) -> bool { return p.x >= 0.0 && p.y >= 0.0 && p.x < f32(P.tw) && p.y < f32(P.th); }
+fn fieldAt(p: vec2f) -> f32 { if (!inside(p)) { return 0.0; } return field[u32(p.y) * P.tw + u32(p.x)]; }
+fn trailAt(p: vec2f) -> f32 { if (!inside(p)) { return 0.0; } return trailIn[u32(p.y) * P.tw + u32(p.x)]; }
+fn sense(p: vec2f) -> f32 { let f = fieldAt(p); if (f < 0.012) { return -1000.0; } return trailAt(p) + P.gain * f; }
+fn spawn(h: u32) -> vec4f {
+  let r = u01(h);
+  var k = 0u;
+  for (var j = 0u; j < P.nSrc; j++) { if (r <= P.src[j].z) { k = j; break; } k = j; }
+  let s = P.src[k];
+  let a = u01(h ^ 0x68E31DA4u) * TAU;
+  let rr = 1.5 * u01(h ^ 0x1B56C4E9u);
+  return vec4f(s.xy + vec2f(cos(a), sin(a)) * rr, a, 0.0);
+}
+@compute @workgroup_size(256)
+fn stepAgents(@builtin(global_invocation_id) gid: vec3u) {
+  let i = gid.x;
+  if (i >= P.n) { return; }
+  var a = agents[i];
+  let h = pcg(i ^ pcg(P.frame * 0x2545F491u + 0x9E37u));
+  let F = sense(a.xy + P.sd * vec2f(cos(a.z), sin(a.z)));
+  let L = sense(a.xy + P.sd * vec2f(cos(a.z + P.sa), sin(a.z + P.sa)));
+  let R = sense(a.xy + P.sd * vec2f(cos(a.z - P.sa), sin(a.z - P.sa)));
+  let rnd = u01(h);
+  var turn = (rnd - 0.5) * 0.25;
+  if (F > L && F > R) { } else if (F < L && F < R) { turn += select(-P.ra, P.ra, rnd > 0.5); } else if (L > R) { turn += P.ra; } else if (R > L) { turn -= P.ra; }
+  var ang = a.z + turn;
+  var p = a.xy + P.stepLen * vec2f(cos(ang), sin(ang));
+  var f = fieldAt(p);
+  var respawn = f < 0.012 || u01(h ^ 0x5BD1E995u) < 0.0015;
+  for (var j = 0u; j < P.nSnk; j++) { let s = P.snk[j]; if (distance(p, s.xy) < s.z && u01(h ^ (j * 977u + 13u)) < 0.12) { respawn = true; } }
+  if (respawn) { let s = spawn(h ^ 0xA511E9B3u); p = s.xy; ang = s.z; f = fieldAt(p); }
+  ang = ang - TAU * floor(ang / TAU);
+  agents[i] = vec4f(p, ang, 0.0);
+  if (inside(p)) { atomicAdd(&dep[u32(p.y) * P.tw + u32(p.x)], u32(P.depScale * clamp(f, 0.0, 1.0))); }
+}
+@compute @workgroup_size(16, 16)
+fn diffuse(@builtin(global_invocation_id) gid: vec3u) {
+  if (gid.x >= P.tw || gid.y >= P.th) { return; }
+  let x = i32(gid.x); let y = i32(gid.y); let mx = i32(P.tw) - 1; let my = i32(P.th) - 1;
+  var s = 0.0;
+  for (var dy = -1; dy <= 1; dy++) { let row = u32(clamp(y + dy, 0, my)) * P.tw; for (var dx = -1; dx <= 1; dx++) { s += trailIn[row + u32(clamp(x + dx, 0, mx))]; } }
+  let idx = gid.y * P.tw + gid.x;
+  let d = f32(atomicExchange(&dep[idx], 0u)) * (1.0 / 1024.0);
+  trailOut[idx] = min(mix(trailIn[idx], s / 9.0, P.diffuse) * P.decay + d, 4096.0);
+}
+`;
+const RENDER_WGSL = /* wgsl */`
+struct RU { res: vec4f, k: vec4f, };
+@group(0) @binding(0) var<uniform> U: RU;
+@group(0) @binding(1) var<storage, read> trail: array<f32>;
+@group(0) @binding(2) var<storage, read> fieldR: array<f32>;
+@vertex fn vs(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f { let p = vec2f(f32((i << 1u) & 2u), f32(i & 2u)); return vec4f(p * 2.0 - 1.0, 0.0, 1.0); }
+fn tr(x: i32, y: i32) -> f32 { let tw = i32(U.k.y); let th = i32(U.k.z); return trail[u32(clamp(y, 0, th - 1) * tw + clamp(x, 0, tw - 1))]; }
+fn fl(x: i32, y: i32) -> f32 { let tw = i32(U.k.y); let th = i32(U.k.z); return fieldR[u32(clamp(y, 0, th - 1) * tw + clamp(x, 0, tw - 1))]; }
+fn bil(c: vec2f) -> f32 { let p = c - 0.5; let f0 = floor(p); let f = p - f0; let i = vec2i(f0);
+  return mix(mix(tr(i.x, i.y), tr(i.x + 1, i.y), f.x), mix(tr(i.x, i.y + 1), tr(i.x + 1, i.y + 1), f.x), f.y); }
+fn hotRamp(x: f32) -> vec3f {
+  let s = clamp(x, 0.0, 1.0) * 4.0;
+  if (s < 1.0) { return mix(vec3f(0.08, 0.04, 0.05), vec3f(0.494, 0.110, 0.165), s); }
+  if (s < 2.0) { return mix(vec3f(0.494, 0.110, 0.165), vec3f(1.0, 0.416, 0.333), s - 1.0); }
+  if (s < 3.0) { return mix(vec3f(1.0, 0.416, 0.333), vec3f(1.0, 0.827, 0.420), s - 2.0); }
+  return mix(vec3f(1.0, 0.827, 0.420), vec3f(1.0, 0.965, 0.878), s - 3.0);
+}
+@fragment fn fs(@builtin(position) fc: vec4f) -> @location(0) vec4f {
+  let css = fc.xy / U.res.z;
+  let c = css / U.k.x;
+  let v = bil(c);
+  var g = 0.0;
+  for (var k = 0; k < 8; k++) { let a = f32(k) * 0.785398; g += bil(c + vec2f(cos(a), sin(a)) * 3.0); }
+  g = g / 8.0;
+  var col = vec3f(0.039, 0.051, 0.067);
+  let gq = abs(fract(css / 32.0 + 0.5) - 0.5) * 32.0;
+  col += vec3f(0.133, 0.161, 0.200) * (1.0 - smoothstep(0.6, 1.6, length(gq))) * 0.5;
+  let fv = fl(i32(c.x), i32(c.y));
+  col += vec3f(0.10, 0.12, 0.15) * smoothstep(0.0, 0.2, fv) * 0.35;
+  let x = 1.0 - exp(-v * U.k.w);
+  let gx = 1.0 - exp(-g * U.k.w * 0.6);
+  col = mix(col, hotRamp(0.15 + 0.85 * x), smoothstep(0.02, 0.35, x));
+  col += vec3f(0.55, 0.16, 0.10) * gx * 0.16;
+  let uv = fc.xy / U.res.xy - 0.5;
+  col *= 1.0 - 0.28 * dot(uv, uv);
+  return vec4f(col, 1.0);
+}
+`;
+async function createWebGPU(canvas) {
+  if (!navigator.gpu || qs.has('cpu')) return null;
+  const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' }); if (!adapter) return null;
+  const device = await adapter.requestDevice(); const ctx = canvas.getContext('webgpu'); if (!ctx) return null;
+  const format = navigator.gpu.getPreferredCanvasFormat(); ctx.configure({ device, format, alphaMode: 'opaque' });
+  const info = adapter.info || {}; const soft = !!info.isFallbackAdapter || /swiftshader/i.test(`${info.vendor} ${info.architecture} ${info.device} ${info.description}`);
+  const sm = device.createShaderModule({ code: SIM_WGSL }), rm = device.createShaderModule({ code: RENDER_WGSL });
+  for (const m of [sm, rm]) { const ci = await m.getCompilationInfo(); if (ci.messages.some(x => x.type === 'error')) { ci.messages.forEach(x => console.warn('wgsl', x.lineNum, x.message)); return null; } }
+  const [pStep, pDiff, pRen] = await Promise.all([
+    device.createComputePipelineAsync({ layout: 'auto', compute: { module: sm, entryPoint: 'stepAgents' } }),
+    device.createComputePipelineAsync({ layout: 'auto', compute: { module: sm, entryPoint: 'diffuse' } }),
+    device.createRenderPipelineAsync({ layout: 'auto', vertex: { module: rm, entryPoint: 'vs' }, fragment: { module: rm, entryPoint: 'fs', targets: [{ format }] }, primitive: { topology: 'triangle-list' } }),
+  ]);
+  const SU = GPUBufferUsage, pBuf = device.createBuffer({ size: 320, usage: SU.UNIFORM | SU.COPY_DST }), rBuf = device.createBuffer({ size: 32, usage: SU.UNIFORM | SU.COPY_DST });
+  let B = null, parity = 0, frame = 0;
+  return {
+    kind: 'webgpu', soft, stride: 4,
+    configure(N, init) {
+      const cells = TW * TH;
+      if (!B || B.N !== N || B.cells !== cells) {
+        if (B) for (const k of ['agents', 'tA', 'tB', 'dep', 'field']) B[k].destroy();
+        B = { N, cells, agents: device.createBuffer({ size: N * 16, usage: SU.STORAGE | SU.COPY_DST }), tA: device.createBuffer({ size: cells * 4, usage: SU.STORAGE | SU.COPY_DST }),
+          tB: device.createBuffer({ size: cells * 4, usage: SU.STORAGE | SU.COPY_DST }), dep: device.createBuffer({ size: cells * 4, usage: SU.STORAGE | SU.COPY_DST }),
+          field: device.createBuffer({ size: cells * 4, usage: SU.STORAGE | SU.COPY_DST }) };
+        const bg = (p, ents) => device.createBindGroup({ layout: p.getBindGroupLayout(0), entries: ents.map(([binding, buffer]) => ({ binding, resource: { buffer } })) });
+        const tr = [B.tA, B.tB];
+        B.bgStep = [0, 1].map(i => bg(pStep, [[0, pBuf], [1, B.agents], [2, tr[i]], [4, B.dep], [5, B.field]]));
+        B.bgDiff = [0, 1].map(i => bg(pDiff, [[0, pBuf], [2, tr[i]], [3, tr[1 - i]], [4, B.dep]]));
+        B.bgRen = [0, 1].map(i => bg(pRen, [[0, rBuf], [1, tr[i]], [2, B.field]]));
+      } else {
+        const enc = device.createCommandEncoder(); enc.clearBuffer(B.tA); enc.clearBuffer(B.tB); enc.clearBuffer(B.dep); device.queue.submit([enc.finish()]);
+      }
+      device.queue.writeBuffer(B.agents, 0, init); parity = 0; frame = 0;
+    },
+    uploadField() { device.queue.writeBuffer(B.field, 0, field); },
+    step(n) {
+      const ab = new ArrayBuffer(320), u = new Uint32Array(ab), f = new Float32Array(ab);
+      const st = srcTable(), sk = snkTable();
+      u[0] = TW; u[1] = TH; u[2] = B.N; f[4] = TUNE.sd; f[5] = TUNE.sa; f[6] = TUNE.ra; f[7] = TUNE.step;
+      f[8] = TUNE.decay; f[9] = TUNE.diffuse; f[10] = TUNE.gain; f[11] = 1024 * 0.6 * Math.max(1, 220000 / B.N) * (CELL * CELL / 9);
+      u[12] = st.length; u[13] = sk.length;
+      st.forEach((s, j) => f.set([s[0], s[1], s[2], 0], 16 + j * 4)); sk.forEach((s, j) => f.set([s[0], s[1], s[2], 0], 48 + j * 4));
+      for (let k = 0; k < n; k++) {
+        u[3] = frame++; device.queue.writeBuffer(pBuf, 0, ab);
+        const enc = device.createCommandEncoder(), p = enc.beginComputePass();
+        p.setPipeline(pStep); p.setBindGroup(0, B.bgStep[parity]); p.dispatchWorkgroups(Math.ceil(B.N / 256));
+        p.setPipeline(pDiff); p.setBindGroup(0, B.bgDiff[parity]); p.dispatchWorkgroups(Math.ceil(TW / 16), Math.ceil(TH / 16));
+        p.end(); device.queue.submit([enc.finish()]); parity = 1 - parity;
+      }
+    },
+    render() {
+      device.queue.writeBuffer(rBuf, 0, new Float32Array([canvas.width, canvas.height, canvas.width / W, 0, CELL, TW, TH, 0.028]));
+      const enc = device.createCommandEncoder();
+      const rp = enc.beginRenderPass({ colorAttachments: [{ view: ctx.getCurrentTexture().createView(), loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 1 } }] });
+      rp.setPipeline(pRen); rp.setBindGroup(0, B.bgRen[parity]); rp.draw(3); rp.end(); device.queue.submit([enc.finish()]);
+    },
+  };
+}
+function createCPU(canvas) {
+  const ctx = canvas.getContext('2d'); if (!ctx) return null;
+  let N = 0, ag = null, tA = null, tB = null, dep = null, img = null, rng = 0x77;
+  const rnd = () => { rng = (rng * 1664525 + 1013904223) >>> 0; return rng / 4294967296; };
+  const fieldAt = (x, y) => (x < 0 || y < 0 || x >= TW || y >= TH) ? 0 : field[(y | 0) * TW + (x | 0)];
+  const sense = (x, y) => { const f = fieldAt(x, y); return f < 0.012 ? -1000 : tA[(clamp(y | 0, 0, TH - 1)) * TW + clamp(x | 0, 0, TW - 1)] + TUNE.gain * f; };
+  function spawn(i) { const st = srcTable(), r = rnd(), s = st.find(x => r <= x[2]) || st[st.length - 1], a = rnd() * 6.2832; ag[i * 3] = s[0] + Math.cos(a) * 1.5; ag[i * 3 + 1] = s[1] + Math.sin(a) * 1.5; ag[i * 3 + 2] = a; }
+  const hot = [[20, 10, 13], [126, 28, 42], [255, 106, 85], [255, 211, 107], [255, 246, 224]];
+  const ramp = x => { const s = clamp(x, 0, 1) * 4, k = Math.min(3, Math.floor(s)), f = s - k; return [0, 1, 2].map(c => hot[k][c] + (hot[k + 1][c] - hot[k][c]) * f); };
+  const LUT = new Uint8Array(256 * 3); for (let i = 0; i < 256; i++) { const c = ramp(0.15 + 0.85 * i / 255); LUT[i * 3] = c[0]; LUT[i * 3 + 1] = c[1]; LUT[i * 3 + 2] = c[2]; }
+  return {
+    kind: 'cpu', soft: true, stride: 3,
+    configure(n, init) { N = n; ag = new Float32Array(init); tA = new Float32Array(TW * TH); tB = new Float32Array(TW * TH); dep = new Float32Array(TW * TH); rng = 0x77;
+      canvas.width = TW; canvas.height = TH; img = ctx.createImageData(TW, TH); },
+    uploadField() {},
+    step(n) {
+      const sk = snkTable(), dsc = 0.6 * Math.max(1, 220000 / N) * 0.35;
+      for (let s = 0; s < n; s++) {
+        for (let i = 0; i < N; i++) {
+          const o = i * 3; let x = ag[o], y = ag[o + 1], a = ag[o + 2];
+          const F = sense(x + TUNE.sd * Math.cos(a), y + TUNE.sd * Math.sin(a)), Lf = sense(x + TUNE.sd * Math.cos(a + TUNE.sa), y + TUNE.sd * Math.sin(a + TUNE.sa)), R = sense(x + TUNE.sd * Math.cos(a - TUNE.sa), y + TUNE.sd * Math.sin(a - TUNE.sa));
+          const r = rnd(); let turn = (r - 0.5) * 0.25;
+          if (F > Lf && F > R) {} else if (F < Lf && F < R) turn += r > 0.5 ? TUNE.ra : -TUNE.ra; else if (Lf > R) turn += TUNE.ra; else if (R > Lf) turn -= TUNE.ra;
+          a += turn; x += Math.cos(a) * TUNE.step; y += Math.sin(a) * TUNE.step;
+          const f = fieldAt(x, y); let re = f < 0.012 || rnd() < 0.0015;
+          for (const t of sk) if (Math.hypot(x - t[0], y - t[1]) < t[2] && rnd() < 0.12) re = true;
+          if (re) { spawn(i); continue; }
+          ag[o] = x; ag[o + 1] = y; ag[o + 2] = a; dep[(y | 0) * TW + (x | 0)] += dsc * f;
+        }
+        for (let y = 0; y < TH; y++) for (let x = 0; x < TW; x++) {
+          let s9 = 0; for (let dy = -1; dy <= 1; dy++) { const row = clamp(y + dy, 0, TH - 1) * TW; for (let dx = -1; dx <= 1; dx++) s9 += tA[row + clamp(x + dx, 0, TW - 1)]; }
+          const i = y * TW + x; tB[i] = Math.min(4096, (tA[i] + (s9 / 9 - tA[i]) * TUNE.diffuse) * TUNE.decay + dep[i]); dep[i] = 0;
+        }
+        const t = tA; tA = tB; tB = t;
+      }
+    },
+    render() {
+      const d = img.data;
+      for (let i = 0; i < TW * TH; i++) {
+        const v = 1 - Math.exp(-tA[i] * 0.028), m = clamp((v - 0.02) / 0.33, 0, 1), li = Math.min(255, (v * 255) | 0) * 3, o = i * 4;
+        const bg = 10 + (field[i] > 0.02 ? 5 : 0);
+        d[o] = bg + (LUT[li] - bg) * m; d[o + 1] = bg + 3 + (LUT[li + 1] - bg - 3) * m; d[o + 2] = bg + 7 + (LUT[li + 2] - bg - 7) * m; d[o + 3] = 255;
+      }
+      ctx.putImageData(img, 0, 0);
+    },
+  };
+}
+
+/* =====================================================================
+   Frame application (pure function of loop time) + live interaction
+   ===================================================================== */
+let canvas = $('cv'), fieldDirty = true, lastRaster = 0, lastDraw = 0;
+function setupGrid() {
+  layout();
+  TW = Math.max(16, Math.ceil(W / CELL)); TH = Math.max(16, Math.ceil(H / CELL)); field = new Float32Array(TW * TH);
+  if (backend && backend.kind === 'webgpu') { canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr); }
+  placeNodes(); drawEdges();
+}
+function reseed(warm) {
+  rasterField(); backend.configure(nAgents, seedAgents(nAgents, backend.stride)); backend.uploadField();
+  backend.step(warm); backend.render(); lastRaster = performance.now(); fieldDirty = false;
+}
+function captionAt(t) {
+  for (const [a, b, s] of CAPS) if (t >= a && t < b) {
+    const k = Math.min(1, (t - a) / 0.35, (b - t) / 0.35);
+    return { s, o: clamp(k, 0, 1), p: (t - a) / (b - a) };
+  }
+  return { s: '', o: 0, p: 0 };
+}
+let capMemo = '';
+function renderCaption(t) {
+  const c = captionAt(t), cap = $('cap');
+  if (c.s !== capMemo) { $('cap-t').textContent = c.s; capMemo = c.s; }
+  cap.style.opacity = c.o.toFixed(3); cap.style.transform = `translateX(-50%) translateY(${((1 - c.o) * 6).toFixed(1)}px)`;
+  $('cap-p').style.width = (t / L * 100).toFixed(2) + '%';
+}
+const centerOf = sel => { if (sel === 'stage') { const r = stage.getBoundingClientRect(); return [r.left + r.width * 0.6, r.top + r.height * 0.55]; } const el = document.querySelector(sel); if (!el) return [0, 0]; const r = el.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; };
+function renderGhost(t) {
+  const g = $('ghost'), rip = $('rip');
+  const seg = GHOST.find(s => t >= s.t0 && t < s.t1);
+  if (!seg || CTRL.mode !== 'loop') { g.style.opacity = 0; return; }
+  const a = centerOf(seg.from), b = centerOf(seg.to), ma = seg.t0 + 0.2, mb = seg.click - 0.14;
+  const p = easeIO((t - ma) / (mb - ma));
+  const x = lerp(a[0] + (seg.from === 'stage' ? 0 : 26), b[0], p), y = lerp(a[1] + (seg.from === 'stage' ? 0 : -18), b[1], p);
+  const o = Math.min(1, (t - seg.t0) / 0.25, (seg.t1 - t) / 0.3);
+  const press = t >= seg.click - 0.08 && t < seg.click + 0.12 ? 0.86 : 1;
+  g.style.opacity = clamp(o, 0, 1).toFixed(3); g.style.transform = `translate(${x - 3}px,${y - 2}px) scale(${press})`;
+  const rk = (t - seg.click) / 0.5;
+  if (rk >= 0 && rk < 1) { rip.style.opacity = (1 - rk).toFixed(3); rip.style.transform = `scale(${0.5 + rk * 1.4})`; } else rip.style.opacity = 0;
+}
+function fadeAt(t) { return t < 0.6 ? 1 - t / 0.6 : t > L - 0.55 ? (t - (L - 0.55)) / 0.55 : 0; }
+let routesAnimKey = null;
+function applyFrame(t, exact) {
+  const s = solverAt(t);
+  V.D = s.D; V.fixes = s.fixes;
+  // routes: settled → that solution; re-converging → previous solution, dimmed
+  let rk = null, stale = false;
+  if (s.settled) rk = s.key; else if (s.prevKey != null) { rk = s.prevKey; stale = true; }
+  const reveal = rk != null && rk !== V.routesKey;
+  V.routesKey = rk; V.routes = rk == null ? [] : SOL.get(rk).routes; V.stale = stale;
+  V.sel = 0; V.showSel = s.settled && t >= (PH[s.i] ? PH[s.i].t1 + 0.15 : 0);
+  // index tween
+  const from = s.prevKey == null ? 100 : SOL.get(s.prevKey).idx, to = SOL.get(s.key).idx;
+  V.idx = s.pre ? 100 : lerp(from, to, smooth(s.p));
+  // status
+  const st = $('st'), dot = $('st-dot');
+  if (s.settled) { setStatus('Converged', ` · ${SOL.get(s.key).m.routes} viable routes`, true); }
+  else { setStatus(s.pre ? 'Solving' : PH[s.i].label, s.pre ? '' : ` · step ${s.n}`, false); }
+  renderIndex(V.idx, s.settled ? s.key : (s.prevKey != null ? s.prevKey : null));
+  renderRoutes(reveal && !exact);
+  renderWhatifs(s.fixes, s.settled ? s.key : null);
+  const now = performance.now(), dk = s.settled ? `${s.key}|${V.showSel}` : null;
+  if (exact || (dk == null && now - lastDraw > 80) || dk !== V._dk) { drawEdges(); lastDraw = now; V._dk = dk; }
+  V.dash = t * 16; setDash(V.dash);
+  fieldDirty = true;
+  renderCaption(t); renderGhost(t);
+  $('fade').style.opacity = fadeAt(t).toFixed(3);
+}
+
+/* live mode: the real solver, re-run on every toggle (same code path as the loop) */
+const LIVE = { converging: false, iter: 0, from: 100, to: 100, tStart: 0, key: '' };
+function liveToggle(tag) {
+  const f = new Set(V.fixes); f.has(tag) ? f.delete(tag) : f.add(tag); liveSet(f);
+}
+function liveSet(f, fromUniform) {
+  const prevKey = keyOf(V.fixes);
+  V.fixes = f; const D = fromUniform ? new Float64Array(UNIFORM) : restartFrom(V.D, f); V.D = D;
+  LIVE.converging = true; LIVE.iter = 0; LIVE.from = V.idx; LIVE.to = SOL.get(keyOf(f)).idx; LIVE.tStart = performance.now(); LIVE.key = keyOf(f);
+  V.routesKey = prevKey; V.routes = SOL.get(prevKey).routes; V.stale = true; V.showSel = false; rtMemo = '';
+  renderRoutes(false); renderWhatifs(f, null); drawEdges(); hideTip();
+  setStatus(fromUniform ? 'Solving from scratch' : 'Re-converging', fromUniform ? '' : ' after the what-if', false);
+}
+function liveStep(dt) {
+  if (!LIVE.converging) return;
+  // steps scale with frame time, so re-convergence takes the same wall time on slow machines
+  const n = Math.max(2, Math.min(24, Math.round((dt || 0.016) * 120)));
+  let ch = 0; for (let k = 0; k < n; k++) { ch = physarumStep(V.D, V.fixes).change; LIVE.iter++; }
+  const p = clamp((performance.now() - LIVE.tStart) / 1400, 0, 1);
+  V.idx = lerp(LIVE.from, LIVE.to, smooth(p)); renderIndex(V.idx, null);
+  fieldDirty = true;
+  if ((ch < 2e-4 || LIVE.iter > 260) && p >= 1) {
+    const sol = SOL.get(LIVE.key); V.D = new Float64Array(sol.D); LIVE.converging = false;
+    V.routesKey = LIVE.key; V.routes = sol.routes; V.stale = false; V.sel = 0; V.showSel = true; V.idx = sol.idx; rtMemo = '';
+    renderIndex(V.idx, LIVE.key); renderRoutes(true); renderWhatifs(V.fixes, LIVE.key); drawEdges();
+    setStatus('Converged', ` · ${sol.m.routes} viable routes`, true);
+  } else if (performance.now() - lastDraw > 90) { drawEdges(); lastDraw = performance.now(); }
+}
+
+/* =====================================================================
+   Loop controller: attract loop, take-over, idle resume, embedding
+   ===================================================================== */
+const CTRL = { t: 0, mode: 'loop', playing: !RM, ext: false, hidden: document.hidden, raf: 0, last: 0, lastInput: 0, resumeAt: 0, ready: false };
+function running() { return CTRL.ready && !CTRL.ext && !CTRL.hidden && (CTRL.mode === 'live' || CTRL.playing || CTRL.resumeAt); }
+function schedule(fromTick) { if (!CTRL.raf && running()) { if (!fromTick) CTRL.last = performance.now(); CTRL.raf = requestAnimationFrame(tick); } }
+function stop() { if (CTRL.raf) cancelAnimationFrame(CTRL.raf); CTRL.raf = 0; }
+function tick() {
+  CTRL.raf = 0; const now = performance.now();
+  const dt = Math.min(0.1, Math.max(0, (now - CTRL.last) / 1000)); CTRL.last = now;
+  adapt(dt);
+  if (CTRL.mode === 'loop' && CTRL.playing) {
+    let t = CTRL.t + dt; let wrapped = false; if (t >= L) { t -= L; wrapped = true; }
+    CTRL.t = t; applyFrame(t, false); if (wrapped) reseed(40);
+  } else if (CTRL.mode === 'live') {
+    liveStep(dt); V.dash += dt * 16; setDash(V.dash);
+    if (CTRL.resumeAt) { const k = (now - CTRL.resumeAt) / 500; $('fade').style.opacity = clamp(k, 0, 1).toFixed(3); if (k >= 1) { CTRL.resumeAt = 0; CTRL.mode = 'loop'; CTRL.playing = true; seekCore(0); } }
+    else if (!RM && now - CTRL.lastInput > IDLE_MS) CTRL.resumeAt = now;
+  }
+  if (fieldDirty && now - lastRaster > 90) { rasterField(); backend.uploadField(); lastRaster = now; fieldDirty = false; }
+  backend.step(backend.kind === 'webgpu' ? 2 : 1); backend.render();
+  schedule(true);
+}
+function seekCore(t) {
+  CTRL.t = clamp(+t || 0, 0, L - 1e-6); cache.ph = -1;
+  rtMemo = ''; wiMemo = ''; V.routesKey = '__';
+  applyFrame(CTRL.t, true); reseed(backend.kind === 'webgpu' ? 70 : 45);
+}
+function enterLive() {
+  if (CTRL.mode === 'live') return;
+  CTRL.mode = 'live'; CTRL.resumeAt = 0;
+  $('cap').style.opacity = 0; $('ghost').style.opacity = 0; $('fade').style.opacity = 0;
+  // continue from what is on screen: finish any in-flight convergence live
+  const s = solverAt(CTRL.t);
+  if (!s.settled && !s.pre) { LIVE.converging = true; LIVE.iter = s.n; LIVE.from = V.idx; LIVE.to = SOL.get(s.key).idx; LIVE.tStart = performance.now() - 700; LIVE.key = s.key; V.D = new Float64Array(s.D); }
+  else if (s.pre || !s.settled) { liveSet(new Set(s.fixes), true); }
+  else { V.D = new Float64Array(s.D); V.showSel = true; rtMemo = ''; renderRoutes(false); drawEdges(); }
+  const h = $('hint'); h.style.opacity = 1; clearTimeout(enterLive.t); enterLive.t = setTimeout(() => { h.style.opacity = 0; }, 2600);
+  schedule();
+}
+function input() { CTRL.lastInput = performance.now(); if (CTRL.resumeAt) { CTRL.resumeAt = 0; $('fade').style.opacity = 0; } if (CTRL.mode !== 'live' && CTRL.ready) enterLive(); }
+for (const ev of ['pointerdown', 'wheel', 'keydown', 'touchstart']) addEventListener(ev, input, { capture: true, passive: true });
+let lastPM = null;
+addEventListener('pointermove', e => { if (lastPM && Math.hypot(e.clientX - lastPM[0], e.clientY - lastPM[1]) > 3) input(); lastPM = [e.clientX, e.clientY]; }, { capture: true, passive: true });
+addEventListener('message', e => { const d = e.data; if (!d || typeof d !== 'object') return;
+  if (d.corvid === 'pause') { CTRL.ext = true; stop(); }
+  else if (d.corvid === 'play') { CTRL.ext = false; if (CTRL.mode === 'loop' && !RM) CTRL.playing = true; schedule(); } });
+document.addEventListener('visibilitychange', () => { CTRL.hidden = document.hidden; if (CTRL.hidden) stop(); else schedule(); });
+window.__seek = t => { if (!CTRL.ready) { CTRL.pendingSeek = t; return; } stop(); CTRL.mode = 'loop'; CTRL.playing = false; CTRL.resumeAt = 0; seekCore(t); };
+window.__play = () => { CTRL.ext = false; if (CTRL.mode !== 'loop') { CTRL.mode = 'loop'; seekCore(CTRL.t); } CTRL.playing = true; schedule(); };
+window.__state = () => ({ t: CTRL.t, mode: CTRL.mode, playing: CTRL.playing, running: !!CTRL.raf, ext: CTRL.ext, idx: Math.round(V.idx), fixes: keyOf(V.fixes), routes: V.routes.map(r => [r.s, ...r.ks.map(k => EDGES[k].ib)].map(hop).join(' > ')), observed: V.routes[0] ? V.routes[0].observed : false, engine: backend && backend.kind, agents: nAgents, converging: LIVE.converging });
+
+/* controls */
+document.addEventListener('click', e => {
+  const f = e.target.closest('[data-fix]'); if (f) { liveToggle(f.dataset.fix); return; }
+  if (e.target.closest('#wi-reset')) { if (V.fixes.size) liveSet(new Set()); return; }
+  const rt = e.target.closest('.rt'); if (rt && !V.stale) { V.sel = +rt.dataset.i; V.showSel = true; rtMemo = ''; renderRoutes(false); drawEdges(); }
+});
+document.addEventListener('keydown', e => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const w = WHATIFS.find(x => x.key === e.key); if (w) { liveToggle(w.tag); return; }
+  if (e.key === 'r') liveSet(new Set(V.fixes), true);
+  if (e.key === 'Escape' && V.fixes.size) liveSet(new Set());
+});
+
+/* adaptive quality: drop render resolution if frames run long */
+function adapt(dt) {
+  if (!backend || backend.kind !== 'webgpu' || dt <= 0) return;
+  if (dt > 0.026) Q.slow++; else Q.slow = Math.max(0, Q.slow - 1);
+  if (Q.slow > 90 && Q.scale > 0.5) { Q.scale = Math.max(0.5, Q.scale - 0.25); Q.slow = 0; layout(); canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr); }
+}
+
+/* boot */
+(async () => {
+  buildNodes(); layout();
+  try { backend = await createWebGPU(canvas); } catch (err) { console.warn('webgpu unavailable:', err && err.message); backend = null; }
+  if (!backend) { const fresh = canvas.cloneNode(false); canvas.replaceWith(fresh); canvas = fresh; CELL = 4; backend = createCPU(canvas); }
+  nAgents = backend.kind === 'webgpu' ? (backend.soft || qs.get('q') === 'low' ? 60000 : 262144) : 9000;
+  $('eng').textContent = backend.kind === 'webgpu' ? `WebGPU · ${Math.round(nAgents / 1000)}k agents` : `CPU fallback · ${Math.round(nAgents / 1000)}k agents`;
+  setupGrid();
+  CTRL.ready = true;
+  const t0 = qs.has('t') ? +qs.get('t') : CTRL.pendingSeek != null ? CTRL.pendingSeek : RM ? POSTER_T : 0;
+  if (qs.has('t') || CTRL.pendingSeek != null || RM) window.__seek(t0); else { seekCore(0); schedule(); }
+  let rt = 0; new ResizeObserver(() => { clearTimeout(rt); rt = setTimeout(() => {
+    setupGrid(); rtMemo = ''; renderRoutes(false);
+    if (CTRL.mode === 'loop') { applyFrame(CTRL.t, true); reseed(40); } else { reseed(40); }
+  }, 120); }).observe(stage);
+  window.__ready = true;
+})();
+})();
+</script>
+</body>
+</html>

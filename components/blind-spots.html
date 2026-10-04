@@ -1,0 +1,1367 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Telemetry blind spots</title>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../shared/ui.css">
+<style>
+:root{--rail:clamp(300px,29vw,404px);--gut:12px}
+html,body{height:100%;overflow:hidden}
+body{min-height:0}
+.bs{position:fixed;inset:0;display:grid;grid-template-rows:auto minmax(0,1fr) auto;background:var(--ground)}
+.nt *,.nt *::before,.nt *::after{transition:none!important}
+.is-paused *,.is-paused *::before,.is-paused *::after{animation-play-state:paused!important}
+
+/* ---------- header ---------- */
+.hd{display:flex;align-items:center;gap:10px;height:50px;padding:0 16px;border-bottom:1px solid #1A2028;min-width:0}
+.hd .ico{flex:none;width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:radial-gradient(circle at 50% 50%,rgba(127,214,238,.20),rgba(127,214,238,.03) 72%);border:1px solid #1E3A46}
+.hd h1{font-size:15px;font-weight:600;white-space:nowrap;letter-spacing:-.01em}
+.hd .ctx{font:500 11.5px var(--mono);color:var(--text2)}
+.hd .br{display:none}
+.hd .lg{margin-left:auto;display:flex;align-items:center;gap:14px;font-size:11.5px;color:var(--text2);white-space:nowrap}
+.hd .lg span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:9px;height:9px;border-radius:50%;flex:none;display:inline-block}
+.hd .st{display:inline-flex;align-items:center;gap:7px;padding-left:14px;border-left:1px solid var(--line);font-size:12px;color:var(--text2);white-space:nowrap}
+.hd .st .dot{color:var(--ben);box-shadow:0 0 0 3px rgba(76,201,166,.14)}
+.is-paused .hd .st .dot{color:#5A6472;box-shadow:none}
+
+/* ---------- main ---------- */
+.mn{display:grid;grid-template-columns:minmax(0,1fr) var(--rail);gap:var(--gut);padding:var(--gut);min-height:0;min-width:0}
+.stage{position:relative;min-width:0;min-height:0;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#080A0E}
+#gl{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:pan-y}
+#ov{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+#ov text{font-family:var(--sans)}
+#ov .mono{font-family:var(--mono)}
+.callout{position:absolute;left:0;top:0;z-index:4;display:flex;align-items:center;gap:7px;padding:5px 10px;border-radius:8px;background:rgba(16,20,26,.94);border:1px solid rgba(255,106,85,.55);box-shadow:0 6px 22px rgba(0,0,0,.5);font-size:12px;font-weight:500;white-space:nowrap;pointer-events:none;opacity:0}
+.callout .mono{color:#FF9C8A;font-size:11.5px;font-weight:500}
+.maptip{position:absolute;left:0;top:0;z-index:6;width:262px;padding:9px 11px;border-radius:9px;background:rgba(16,20,26,.96);border:1px solid var(--line2);box-shadow:0 10px 30px rgba(0,0,0,.5);font-size:12px;pointer-events:none;opacity:0;transition:opacity .12s}
+.maptip h3{font-size:12.5px;margin-bottom:4px}
+.maptip ul{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:3px}
+.fallback{position:absolute;left:12px;bottom:10px;z-index:3;font-size:11.5px;color:var(--text3)}
+
+/* ---------- rail ---------- */
+.rail{display:flex;flex-direction:column;gap:10px;min-height:0;min-width:0;overflow:hidden}
+.card{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:12px 14px;min-width:0;transition:border-color .45s,box-shadow .45s}
+.card.focus{border-color:#3A4656;box-shadow:0 0 0 3px rgba(127,214,238,.05),0 12px 30px rgba(0,0,0,.28)}
+.card.decide.focus{border-color:rgba(198,243,107,.55);box-shadow:0 0 0 3px rgba(198,243,107,.08),0 12px 30px rgba(0,0,0,.28)}
+.ch{display:flex;align-items:center;gap:8px;min-height:22px;margin-bottom:9px;min-width:0}
+.ch b{font-size:13px;font-weight:600;white-space:nowrap}
+.ch .chip{margin-left:auto}
+.eyebrow{font-size:10.5px}
+
+.kpis{display:grid;grid-template-columns:1.12fr 1fr;gap:16px}
+.kpi{display:flex;flex-direction:column;gap:2px;min-width:0}
+.kv{display:flex;align-items:baseline;gap:7px;white-space:nowrap;margin-top:3px}
+.kv b{font:600 30px/1.05 var(--mono);letter-spacing:-.04em;font-feature-settings:"zero" 1,"tnum" 1}
+.kv b.warn{color:var(--warn)}
+.kv .of{font:500 11.5px var(--mono);color:var(--text3)}
+.kbar{position:relative;height:5px;border-radius:3px;background:var(--line2);margin:6px 0 4px}
+.kbar i{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:3px;background:linear-gradient(90deg,#2F93B5,#7FD6EE);box-shadow:0 0 10px rgba(127,214,238,.35)}
+.kbar s{position:absolute;top:-3px;bottom:-3px;left:81%;width:2px;margin-left:-1px;border-radius:1px;background:#C2CAD6;opacity:0}
+.ks{font-size:11.5px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ks.wrap2{white-space:normal;margin-top:5px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+
+.srcs .ch .t3{margin-left:auto;font:500 11px var(--mono)}
+.srcs ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.srcs li{display:grid;grid-template-columns:8px minmax(0,1.3fr) minmax(36px,1fr) 66px;align-items:center;gap:9px;height:22px;font-size:12.5px;color:var(--text2)}
+.srcs li.xl{display:none}
+.srcs li .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text)}
+.srcs li .lag{font:500 11.5px var(--mono);text-align:right;color:var(--text3);white-space:nowrap}
+.srcs li .lane{width:100%;height:12px;display:block;overflow:visible}
+.srcs li .dot{color:#7FD6EE;box-shadow:0 0 8px rgba(127,214,238,.55)}
+.srcs li.late .nm,.srcs li.late .lag{color:var(--warn)}
+.srcs li.late .dot{color:var(--warn);box-shadow:0 0 6px rgba(245,154,61,.45)}
+.srcs li.off .nm{color:var(--text3)}
+.srcs li.off .dot{background:transparent;border:1px dashed #6A7482;box-shadow:none}
+
+.decide p{font-size:12.5px;color:var(--text2);line-height:1.5}
+.decide p b{color:var(--text);font-weight:500}
+.decide .acts{display:flex;align-items:center;gap:10px;margin-top:11px;flex-wrap:wrap}
+.decide .btn{height:34px;padding:0 14px;transition:transform .12s,filter .12s,background .2s}
+.decide .btn.press{transform:scale(.95);filter:brightness(.9)}
+.decide .meta{font-size:11.5px;color:var(--text3)}
+.flash{animation:flash 1.1s ease-out}
+@keyframes flash{0%{box-shadow:0 0 0 0 rgba(198,243,107,.55)}100%{box-shadow:0 0 0 14px rgba(198,243,107,0)}}
+
+.case .ch .mono{font-size:12px}
+.case h3{font-size:13px;line-height:1.4;margin-bottom:7px;font-weight:600}
+.case .ev{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:var(--text2);line-height:1.5}
+.case .ev .ag{margin-top:1px}
+.cf{display:flex;align-items:center;gap:10px;margin-top:10px}
+.cf .eyebrow{flex:none}
+.cbar{flex:1;height:5px;border-radius:3px;background:var(--line2);position:relative;overflow:hidden}
+.cbar i{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:3px;background:var(--sus)}
+.cbar.none{background:repeating-linear-gradient(90deg,#3A4656 0 4px,transparent 4px 8px)}
+.cbar.run i{background:linear-gradient(90deg,transparent,var(--agent),transparent)}
+.cf .v{font:600 12px var(--mono);min-width:34px;text-align:right;color:var(--text3)}
+.cf .v.sus{color:var(--sus)}
+
+/* ---------- footer: captions + tour control ---------- */
+.ft{position:relative;display:flex;align-items:center;gap:12px;height:50px;padding:0 16px;border-top:1px solid #1A2028;min-width:0}
+.prog{position:absolute;left:0;right:0;top:-7px;height:14px;cursor:pointer;z-index:2}
+.prog .fl{position:absolute;left:0;top:6px;height:2px;width:0;background:linear-gradient(90deg,rgba(127,214,238,.15),#7FD6EE)}
+.prog .tk{position:absolute;top:4px;width:2px;height:6px;margin-left:-1px;border-radius:1px;background:#3A4656}
+.prog.dim{opacity:.3}
+.play{flex:none;width:30px;height:30px;border-radius:50%;border:1px solid var(--line2);background:var(--raised);color:var(--text);display:grid;place-items:center;cursor:pointer;padding:0}
+.play:hover{border-color:var(--line3);background:#1B222C}
+.play svg{display:block}
+.cap{flex:1;min-width:0;display:flex;align-items:baseline;gap:12px;white-space:nowrap;overflow:hidden}
+.cap .n{font:500 11px var(--mono);color:var(--text3);flex:none}
+.cap .tx{font-size:15.5px;line-height:1.3;color:var(--text);overflow:hidden;text-overflow:ellipsis;letter-spacing:-.005em}
+.cap.hint .tx{color:var(--text3);font-size:13px}
+.cap.off{visibility:hidden}
+
+/* scripted pointer for the tour */
+.fcur{position:fixed;left:0;top:0;z-index:50;pointer-events:none;opacity:0;will-change:transform}
+.fcur svg{display:block;filter:drop-shadow(0 2px 5px rgba(0,0,0,.65))}
+.fcur i{position:absolute;left:-15px;top:-15px;width:30px;height:30px;border-radius:50%;border:2px solid #E8EBEF;opacity:0}
+
+.sw2{display:none}
+/* ---------- sizes ---------- */
+@media (min-width:1440px) and (min-height:900px){
+  :root{--gut:14px}
+  .hd{height:56px} .hd h1{font-size:16px} .hd .ctx{font-size:12px}
+  .card{padding:16px 18px}
+  .rail{gap:14px}
+  .ch{margin-bottom:12px} .ch b{font-size:14.5px}
+  .eyebrow{font-size:11.5px}
+  .kv b{font-size:40px} .kv .of{font-size:12.5px}
+  .ks{font-size:12.5px}
+  .srcs li{height:30px;font-size:14px} .srcs li.xl{display:grid} .srcs li .lag{font-size:12.5px} .srcs li{grid-template-columns:8px minmax(0,1.3fr) minmax(36px,1fr) 76px}
+  .decide p,.case .ev{font-size:14px} .case h3{font-size:15px} .case .ch .mono{font-size:13px}
+  .decide .btn{height:38px;font-size:14px} .decide .meta{font-size:12.5px}
+  .cf .v{font-size:13px}
+  .ft{height:58px} .cap .tx{font-size:18px}
+  .callout{font-size:13.5px;padding:6px 12px} .callout .mono{font-size:13px}
+}
+@media (max-width:1150px){ .lw{display:none} .sw2{display:inline} }
+@media (min-width:1500px) and (min-height:900px){
+  .kv b{font-size:36px}
+  .srcs li{height:26px;font-size:13px}
+  .decide p,.case .ev{font-size:13.5px}
+  .case h3,.ch b{font-size:14px}
+  .card{padding:14px 16px}
+  .rail{gap:12px}
+  .cap .tx{font-size:17px}
+}
+@media (max-width:900px){ .hd .lg{display:none} .hd .st{margin-left:auto} }
+@media (max-height:680px) and (min-width:641px){ .srcs li.hm{display:none} }
+@media (max-height:720px) and (min-width:641px){
+  .hd{height:44px}
+  .ft{height:44px}
+  .card{padding:10px 12px}
+  .rail{gap:8px}
+  .ch{margin-bottom:6px}
+  .kv b{font-size:26px}
+  .srcs li{height:20px;font-size:12px}
+  .srcs li.hx{display:none}
+  .decide p,.case .x{display:none}
+  .decide .acts{margin-top:8px}
+  .decide .btn{height:30px}
+  .cf{margin-top:7px}
+  .cap .tx{font-size:14px}
+}
+@media (max-width:640px){
+  html,body{overflow:hidden auto}
+  .bs{position:relative;inset:auto;min-height:100%;display:flex;flex-direction:column}
+  .hd{height:auto;flex-wrap:wrap;padding:10px 12px;row-gap:6px}
+  .hd h1{font-size:14px}
+  .hd .ctx{font-size:10.5px;height:20px;padding:0 7px}
+  .hd .ctx-l,#liveTxt{display:none}
+  .hd .st{margin-left:auto;padding-left:0;border:0}
+  .callout{display:none}
+  .decide p{display:none}
+  .mn{display:flex;flex-direction:column;padding:10px 12px;gap:10px}
+  .stage{aspect-ratio:1/1;flex:none;width:100%}
+  .rail{overflow:visible;gap:8px}
+  .card{padding:10px 12px}
+  .srcs,.decide .x,.case .x,.case .cf{display:none}
+  .kv b{font-size:26px}
+  .decide .acts{margin-top:8px}
+  .ft{height:auto;min-height:56px;padding:10px 12px;align-items:center}
+  .cap{white-space:normal;align-items:flex-start}
+  .cap .tx{font-size:13.5px}
+  .cap .n{display:none}
+}
+</style>
+</head>
+<body>
+<svg class="smil" width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <filter id="haze" x="-10%" y="-200%" width="120%" height="500%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.05 0.4" numOctaves="2" seed="3" result="n">
+        <animate attributeName="seed" dur="1.2s" repeatCount="indefinite" calcMode="discrete" values="3;17;8;29;41;12;5;33"/>
+      </feTurbulence>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="4" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <filter id="pkg" x="-80%" y="-300%" width="260%" height="700%"><feGaussianBlur stdDeviation="1.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <linearGradient id="tailC" x1="0" x2="1"><stop offset="0" stop-color="#7FD6EE" stop-opacity="0"/><stop offset="1" stop-color="#DDF6FF"/></linearGradient>
+    <linearGradient id="tailW" x1="0" x2="1"><stop offset="0" stop-color="#F59A3D" stop-opacity="0"/><stop offset="1" stop-color="#FFD9A8"/></linearGradient>
+    <g id="pkc"><rect x="-11" y="-1.3" width="12" height="2.6" rx="1.3" fill="url(#tailC)"/><circle r="1.8" fill="#DDF6FF"/></g>
+    <g id="pkw"><rect x="-11" y="-1.3" width="12" height="2.6" rx="1.3" fill="url(#tailW)"/><circle r="1.8" fill="#FFD9A8"/></g>
+  </defs>
+</svg>
+
+<div class="bs" id="app">
+  <header class="hd">
+    <span class="ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.5" fill="#DDF6FF"/><g stroke="#7FD6EE" stroke-width="1.4" stroke-linecap="round"><path d="M8 1.5v2.1M8 12.4v2.1M1.5 8h2.1M12.4 8h2.1M3.4 3.4l1.5 1.5M11.1 11.1l1.5 1.5M3.4 12.6l1.5-1.5"/></g><path d="M11.1 4.9l1.5-1.5" stroke="#4A5664" stroke-width="1.4" stroke-linecap="round" stroke-dasharray="0.6 1.6"/></svg></span>
+    <h1>Telemetry blind spots</h1>
+    <span class="br"></span>
+    <span class="chip ctx">CASE-4125<span class="ctx-l"> · Meridian Freight</span></span>
+    <div class="lg" aria-hidden="true">
+      <span><i class="sw" style="background:#7FD6EE;box-shadow:0 0 8px #7FD6EE"></i>Telemetry</span>
+      <span><i class="sw" style="background:#F59A3D"></i>Late</span>
+      <span><i class="sw" style="background:#0A0D11;border:1px dashed #6A7482"></i>Blind</span>
+      <span><i class="sw" style="background:#FF6A55;box-shadow:0 0 8px rgba(255,106,85,.7)"></i>Hostile traffic</span>
+    </div>
+    <span class="st" role="status"><span class="dot live"></span><span id="liveTxt">Live</span></span>
+  </header>
+
+  <main class="mn">
+    <section class="stage" id="stage" aria-label="Meridian Freight floor plan lit by telemetry">
+      <canvas id="gl" aria-label="Floor plan of Meridian Freight, lit only where the SOC receives telemetry. The Laredo warehouse, VLAN 40, has no sensor and stays dark."></canvas>
+      <svg id="ov" aria-hidden="true"></svg>
+      <div class="callout" id="callout" aria-hidden="true"><span class="dot mal"></span>SMB beacon every 61 s<span class="mono">→ 198.51.100.23</span></div>
+      <div class="maptip" id="maptip" role="tooltip"></div>
+      <p class="fallback" id="fallback" hidden>Plain view: this browser has no WebGL2 with float render targets.</p>
+    </section>
+
+    <aside class="rail" id="rail" aria-label="Coverage readout and decision">
+      <section class="card kpis-card" id="cKpi">
+        <div class="kpis">
+          <div class="kpi">
+            <span class="eyebrow">Coverage</span>
+            <span class="kv"><b id="kCov">—</b><span class="of" id="kCovFrom"></span></span>
+            <div class="kbar" aria-hidden="true"><i id="kCovBar"></i><s id="kCovGhost"></s></div>
+            <span class="ks" id="kCovSub">0 of 6 segments lit</span>
+          </div>
+          <div class="kpi">
+            <span class="eyebrow">Blind detections</span>
+            <span class="kv"><b class="warn" id="kBlind">—</b><span class="of" id="kBlindOf">of 412</span></span>
+            <span class="ks wrap2" id="kBlindSub">checking 61 sources…</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="card srcs" id="cSrcs" aria-label="Source lag">
+        <div class="ch"><span class="eyebrow">Sources · lag</span><span class="t3" id="srcSum">61 total · 2 late</span></div>
+        <ul id="srcList"></ul>
+      </section>
+
+      <section class="card decide" id="cDecide">
+        <div class="ch"><span class="ag">DS</span><b>Data Steward<span class="lw"> suggests</span></b><span class="chip sm c-agent" id="dChip">restores 2 detections</span></div>
+        <p id="dTxt"><b>Enable Zeek on VLAN 40.</b><span class="x"> The WH-SW-40 span port is already mirrored: +6.4k events/min, ≈ $0.42 a day.</span></p>
+        <div class="acts"><button type="button" class="btn pri-ai" id="zBtn" aria-pressed="false">Enable Zeek on VLAN 40</button><span class="meta" id="dMeta">Reversible · change DS-90</span></div>
+      </section>
+
+      <section class="card case" id="cCase">
+        <div class="ch"><span class="mono t2">CASE-4125 · P2</span><span class="chip v-inc" id="cChip">Inconclusive</span></div>
+        <h3 id="cTitle">Unusual outbound SMB from WH-SCAN-07 to 198.51.100.23</h3>
+        <div class="ev"><span class="ag">IN</span><p id="cTxt">No EDR on WH-SCAN-07, no sensor on VLAN 40.<span class="x"> One NetFlow sample (01:52) can’t decide it, so it asks instead of closing.</span></p></div>
+        <div class="cf"><span class="eyebrow">Confidence</span><div class="cbar none" id="cBar"><i></i></div><span class="v" id="cVal">—</span></div>
+      </section>
+    </aside>
+  </main>
+
+  <footer class="ft">
+    <div class="prog" id="prog" role="slider" aria-label="Tour position" aria-valuemin="0" aria-valuemax="34" aria-valuenow="0" tabindex="-1"><div class="fl" id="progFill"></div></div>
+    <button type="button" class="play" id="playBtn" aria-label="Pause tour"></button>
+    <p class="cap" id="cap" aria-live="polite"><span class="n" id="capN">1/8</span><span class="tx" id="capTx"></span></p>
+  </footer>
+  <div class="fcur" id="fcur" aria-hidden="true"><svg width="22" height="24" viewBox="0 0 22 24"><path d="M3 2v16.5l4.4-3.9 3.1 6.9 2.9-1.3-3.1-6.8h5.9z" fill="#F2F4F7" stroke="#0A0D11" stroke-width="1.3" stroke-linejoin="round"/></svg><i id="fcurR"></i></div>
+</div>
+
+<script src="../shared/data.js"></script>
+
+<!-- 2D radiance cascades: jump-flood distance field + bilinear-fix cascades (engine from pages/17-telemetry-blind-spots.html) -->
+<script id="vs-full" type="x-shader/x-vertex">#version 300 es
+void main(){
+  vec2 p = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2));
+  gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);
+}
+</script>
+<script id="vs-inst" type="x-shader/x-vertex">#version 300 es
+layout(location=0) in vec4 aRect;
+layout(location=1) in vec4 aEm;
+layout(location=2) in vec4 aAlb;
+layout(location=3) in vec4 aP;
+uniform vec3 uXf;
+uniform vec2 uTgt;
+uniform float uPad;
+out vec2 vLocal;
+flat out vec4 vRect;
+flat out vec4 vEm;
+flat out vec4 vAlb;
+flat out vec4 vP;
+const vec2 C[6] = vec2[6](vec2(-1.,-1.), vec2(1.,-1.), vec2(1.,1.), vec2(-1.,-1.), vec2(1.,1.), vec2(-1.,1.));
+void main(){
+  vec2 c = C[gl_VertexID];
+  vec2 hw = aRect.zw + uPad / uXf.x;
+  vec2 w = aRect.xy + c * hw;
+  vec2 px = w * uXf.x + uXf.yz;
+  gl_Position = vec4(px.x / uTgt.x * 2.0 - 1.0, 1.0 - px.y / uTgt.y * 2.0, 0.0, 1.0);
+  vLocal = c * hw;
+  vRect = aRect; vEm = aEm; vAlb = aAlb; vP = aP;
+}
+</script>
+<script id="fs-inst" type="x-shader/x-fragment">#version 300 es
+precision highp float;
+uniform int uMode;
+uniform float uPx;
+in vec2 vLocal;
+flat in vec4 vRect;
+flat in vec4 vEm;
+flat in vec4 vAlb;
+flat in vec4 vP;
+layout(location=0) out vec4 o0;
+layout(location=1) out vec4 o1;
+layout(location=2) out vec4 o2;
+float sdBox(vec2 p, vec2 b){ vec2 d = abs(p) - b; return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0); }
+void mat(vec3 alb, vec3 em, float top, float cov){ o0 = vec4(alb, cov); o1 = vec4(em, cov); o2 = vec4(top, 0.0, 0.0, cov); }
+void main(){
+  int kind = int(vAlb.w + 0.5);
+  vec2 hw = vRect.zw;
+  vec3 em = vEm.rgb * vEm.a;
+  if (kind <= 1){
+    float d = sdBox(vLocal, hw);
+    if (uMode == 0){ if (d > 0.0) discard; o0 = vec4(em, 1.0); return; }
+    float cov = clamp(0.5 - d / uPx, 0.0, 1.0);
+    if (cov <= 0.0) discard;
+    if (kind == 0){ mat(vAlb.rgb, em, vP.x, cov); return; }
+    vec3 alb = vAlb.rgb;
+    float inside = -d;
+    float bw = max(uPx * 1.3, 1.6);
+    alb = mix(alb, alb * 2.2 + 0.035, (1.0 - smoothstep(bw * 0.5, bw * 1.6, inside)) * 0.85);
+    if (vP.y > 0.0){
+      float along = hw.x > hw.y ? vLocal.x : vLocal.y;
+      float s = abs(fract(along / vP.y) - 0.5);
+      alb *= mix(0.62, 1.0, smoothstep(0.07, 0.07 + uPx / vP.y, s));
+    }
+    if (vP.z > 0.0){
+      vec2 lp = vLocal - vec2(hw.x - min(hw.x, hw.y) * 0.55, 0.0);
+      float led = 1.0 - smoothstep(min(hw.x, hw.y) * 0.22, min(hw.x, hw.y) * 0.22 + uPx, length(lp));
+      em += vec3(0.25, 0.75, 0.95) * vP.z * led;
+    }
+    mat(alb, em, vP.x, cov);
+    return;
+  }
+  if (kind == 5){
+    float r = length(vLocal);
+    float d = r - hw.x;
+    if (uMode == 0){ if (d > 0.0) discard; o0 = vec4(em, 1.0); return; }
+    float cov = clamp(0.5 - d / uPx, 0.0, 1.0);
+    if (cov <= 0.0) discard;
+    float core = 1.0 - smoothstep(0.0, hw.x, r);
+    mat(vAlb.rgb, em * (0.5 + 0.9 * core * core), vP.x, cov);
+    return;
+  }
+  float r = length(vLocal);
+  float d = abs(r - hw.x * 0.78) - vP.y;
+  if (uMode == 0){ if (d > 0.0) discard; o0 = vec4(em, 1.0); return; }
+  float cov = clamp(0.5 - d / uPx, 0.0, 1.0);
+  if (cov <= 0.0) discard;
+  mat(vAlb.rgb, em, 0.0, cov);
+}
+</script>
+<script id="fs-seed" type="x-shader/x-fragment">#version 300 es
+precision highp float;
+uniform sampler2D uScene;
+out vec4 o;
+void main(){
+  float a = texelFetch(uScene, ivec2(gl_FragCoord.xy), 0).a;
+  o = a > 0.5 ? vec4(gl_FragCoord.xy, 0.0, 1.0) : vec4(-1e5, -1e5, 0.0, 1.0);
+}
+</script>
+<script id="fs-jfa" type="x-shader/x-fragment">#version 300 es
+precision highp float;
+uniform sampler2D uJ;
+uniform float uStep;
+uniform vec2 uSize;
+out vec4 o;
+void main(){
+  vec2 p = gl_FragCoord.xy;
+  vec2 best = vec2(-1e5);
+  float bd = 1e20;
+  for (int y = -1; y <= 1; y++){
+    for (int x = -1; x <= 1; x++){
+      vec2 q = p + vec2(float(x), float(y)) * uStep;
+      if (q.x < 0.0 || q.y < 0.0 || q.x >= uSize.x || q.y >= uSize.y) continue;
+      vec2 s = texelFetch(uJ, ivec2(q), 0).xy;
+      if (s.x < -1e4) continue;
+      vec2 dv = s - p;
+      float d = dot(dv, dv);
+      if (d < bd){ bd = d; best = s; }
+    }
+  }
+  o = vec4(best, 0.0, 1.0);
+}
+</script>
+<script id="fs-df" type="x-shader/x-fragment">#version 300 es
+precision highp float;
+uniform sampler2D uJ;
+uniform sampler2D uScene;
+out vec4 o;
+void main(){
+  vec2 p = gl_FragCoord.xy;
+  vec2 s = texelFetch(uJ, ivec2(p), 0).xy;
+  if (s.x < -1e4){ o = vec4(0.0, 0.0, 0.0, 1e4); return; }
+  o = vec4(texelFetch(uScene, ivec2(s), 0).rgb, length(s - p));
+}
+</script>
+<script id="fs-rc" type="x-shader/x-fragment">#version 300 es
+precision highp float;
+uniform sampler2D uDF;
+uniform sampler2D uUp;
+uniform vec2 uSize;
+uniform float uC;
+uniform float uN;
+uniform float uS0;
+uniform float uB0;
+uniform float uI0;
+uniform int uFix;
+out vec4 o;
+const float TAU = 6.28318530718;
+vec4 march(vec2 p0, vec2 d, float len){
+  float t = 0.0;
+  for (int i = 0; i < 48; i++){
+    vec2 p = p0 + d * t;
+    if (p.x < 0.0 || p.y < 0.0 || p.x > uSize.x || p.y > uSize.y) return vec4(0.0, 0.0, 0.0, 1.0);
+    vec4 s = textureLod(uDF, p / uSize, 0.0);
+    if (s.a < 0.9) return vec4(s.rgb, 1.0);
+    t += s.a;
+    if (t >= len) break;
+  }
+  return vec4(0.0);
+}
+void main(){
+  float s = uS0 * exp2(uC);
+  float b = uB0 * exp2(uC);
+  vec2 pg = uSize / s;
+  vec2 fc = floor(gl_FragCoord.xy);
+  vec2 blk = floor(fc / pg);
+  vec2 pr = fc - blk * pg;
+  float bin = blk.x + blk.y * b;
+  vec2 P = (pr + 0.5) * s;
+  float nr = 4.0 * b * b;
+  float t0 = uI0 * (exp2(2.0 * uC) - 1.0) / 3.0;
+  float t1 = uI0 * (exp2(2.0 * uC + 2.0) - 1.0) / 3.0;
+  bool topLevel = uC > uN - 1.5;
+  float s2 = s * 2.0;
+  float b2 = b * 2.0;
+  vec2 pg2 = pg * 0.5;
+  vec2 f = P / s2 - 0.5;
+  vec2 bq = floor(f);
+  vec2 w = f - bq;
+  vec3 acc = vec3(0.0);
+  for (int i = 0; i < 4; i++){
+    float k = bin * 4.0 + float(i);
+    float ang = TAU * (k + 0.5) / nr;
+    vec2 d = vec2(cos(ang), sin(ang));
+    vec2 ub = vec2(mod(k, b2), floor(k / b2)) * pg2;
+    if (topLevel){
+      acc += march(P + d * t0, d, t1 - t0).rgb;
+    } else if (uFix == 0){
+      vec4 r = march(P + d * t0, d, t1 - t0);
+      if (r.a < 0.5){
+        vec2 q = clamp(P / s2, vec2(0.5), pg2 - 0.5);
+        r.rgb += textureLod(uUp, (ub + q) / uSize, 0.0).rgb;
+      }
+      acc += r.rgb;
+    } else {
+      vec3 sum = vec3(0.0);
+      for (int j = 0; j < 4; j++){
+        vec2 off = vec2(float(j & 1), float(j >> 1));
+        vec2 q = clamp(bq + off, vec2(0.0), pg2 - 1.0);
+        vec2 Q = (q + 0.5) * s2;
+        vec2 a = P + d * t0;
+        vec2 e = Q + d * t1;
+        vec2 dd = e - a;
+        float L = max(length(dd), 1e-3);
+        vec4 r = march(a, dd / L, L);
+        if (r.a < 0.5) r.rgb += texelFetch(uUp, ivec2(ub + q), 0).rgb;
+        float wj = mix(1.0 - w.x, w.x, off.x) * mix(1.0 - w.y, w.y, off.y);
+        sum += r.rgb * wj;
+      }
+      acc += sum;
+    }
+  }
+  o = vec4(acc * 0.25, 1.0);
+}
+</script>
+<script id="fs-irr" type="x-shader/x-fragment">#version 300 es
+precision highp float;
+uniform sampler2D uC0;
+uniform vec2 uPG;
+uniform float uB0;
+out vec4 o;
+void main(){
+  vec2 p = floor(gl_FragCoord.xy);
+  vec3 s = vec3(0.0);
+  int nb = int(uB0 + 0.5);
+  for (int y = 0; y < 4; y++){
+    if (y >= nb) break;
+    for (int x = 0; x < 4; x++){
+      if (x >= nb) break;
+      s += texelFetch(uC0, ivec2(vec2(float(x), float(y)) * uPG + p), 0).rgb;
+    }
+  }
+  o = vec4(s / (uB0 * uB0), 1.0);
+}
+</script>
+<script id="fs-comp" type="x-shader/x-fragment">#version 300 es
+precision highp float;
+uniform sampler2D uT0;
+uniform sampler2D uT1;
+uniform sampler2D uT2;
+uniform sampler2D uIrr;
+uniform vec2 uCanvas;
+uniform float uDpr;
+uniform vec2 uGI;
+uniform float uG;
+uniform vec3 uXf;
+uniform float uTime;
+uniform float uAmb;
+out vec4 o;
+float hash12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+vec3 irr(vec2 uv){ return textureLod(uIrr, uv, 0.0).rgb; }
+vec3 rimTap(vec2 uv, vec2 e){
+  return max(max(irr(uv + vec2(e.x, 0.0)), irr(uv - vec2(e.x, 0.0))), max(irr(uv + vec2(0.0, e.y)), irr(uv - vec2(0.0, e.y))));
+}
+void main(){
+  vec2 fc = gl_FragCoord.xy;
+  vec2 uv = fc / uCanvas;
+  vec4 a = texture(uT0, uv);
+  vec4 e = texture(uT1, uv);
+  vec4 f = texture(uT2, uv);
+  vec2 sp = vec2(fc.x, uCanvas.y - fc.y) / uDpr;
+  vec2 gp = sp * uG;
+  vec2 iuv = vec2(gp.x / uGI.x, 1.0 - gp.y / uGI.y);
+  vec2 w = (sp - uXf.yz) / uXf.x;
+  float pxw = 1.0 / (uXf.x * uDpr);
+  vec2 m = abs(fract(w / 40.0 + 0.5) - 0.5) * 40.0;
+  float gline = 1.0 - smoothstep(0.35, 0.35 + pxw * 1.3, min(m.x, m.y));
+  vec2 m2 = abs(fract(w / 8.0 + 0.5) - 0.5) * 8.0;
+  float tick = (1.0 - smoothstep(0.3, 0.3 + pxw, length(m2))) * 0.55;
+  vec3 floorAlb = vec3(0.085, 0.10, 0.12) + vec3(0.09, 0.115, 0.14) * max(gline, tick);
+  vec3 alb = a.rgb + floorAlb * (1.0 - a.a);
+  float top = clamp(f.r, 0.0, 1.0);
+  vec3 L0 = irr(iuv);
+  vec2 px = 1.0 / uGI;
+  vec3 r1 = rimTap(iuv, px * 2.0);
+  vec3 r2 = rimTap(iuv, px * 5.0);
+  vec3 amb = textureLod(uIrr, iuv, 3.2).rgb;
+  vec3 Lt = max(r1 * 0.75, r2 * 0.3) + amb * 0.12;
+  vec3 L = mix(L0, Lt, top);
+  vec3 col = alb * (L + mix(0.002, 0.01, top) + uAmb) + e.rgb;
+  col = 1.0 - exp(-col * 1.05);
+  col = pow(col, vec3(1.0 / 2.2));
+  vec3 ground = vec3(10.0, 13.0, 17.0) / 255.0;
+  col = 1.0 - (1.0 - ground) * (1.0 - col);
+  col += (hash12(fc + fract(uTime * 7.31) * 113.0) - 0.5) * 0.018;
+  o = vec4(col, 1.0);
+}
+</script>
+
+<script>
+(() => {
+'use strict';
+const D = window.CORVID || {};
+const $ = id => document.getElementById(id);
+const app = $('app'), canvas = $('gl'), stage = $('stage'), ov = $('ov');
+const QS = new URLSearchParams(location.search);
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const LOW = QS.get('q') === 'low';
+const SHOW_CAPS = QS.get('captions') !== '0';
+const LOOP = 34, IDLE = +QS.get('idle') || 15, REDUCED_T = 26;
+
+/* ------------------------------------------------------------------ helpers */
+const clamp = (x, a, b) => x < a ? a : x > b ? b : x;
+const sat = x => clamp(x, 0, 1);
+const sstep = (a, b, x) => { const u = sat((x - a) / (b - a)); return u * u * (3 - 2 * u); };
+const easeIO = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const easeOut = x => 1 - Math.pow(1 - sat(x), 3);
+const lin = v => Math.pow(v / 255, 2.2);
+const hexl = h => [1, 3, 5].map(i => lin(parseInt(h.slice(i, i + 2), 16)));
+const mixc = (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k];
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function hash1(n){ const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); }
+const COLD = hexl('#8FDDF2'), COLDW = hexl('#DDF6FF'), HOT = hexl('#FF6A55'), HOTW = hexl('#FFB36B'), AMBER = hexl('#F59A3D');
+const LATEC = mixc(COLD, AMBER, 0.55);
+
+/* ------------------------------------------------------------------ scenario (data.js, with the page's own fallbacks) */
+const SRC = {}; (D.sources || []).forEach(s => { SRC[s.id] = s; });
+const lagOf = (id, d) => (SRC[id] && SRC[id].lagSec != null) ? SRC[id].lagSec : d;
+const fmtLag = s => s >= 3600 ? `${Math.floor(s / 3600)} h ${Math.round(s % 3600 / 60)} m` : s >= 60 ? `${Math.round(s / 60)} min` : `${Math.max(1, Math.round(s))} s`;
+const LAG = { okta: lagOf('okta', 4), edr: lagOf('edr', 6), netflow: lagOf('netflow', 12), cloudtrail: lagOf('cloudtrail', 38), m365: lagOf('m365', 41), zscaler: lagOf('zscaler', 840), workday: lagOf('workday', 7800) };
+const CASE = (D.cases || []).find(c => c.id === 'CASE-4125');
+if (CASE) $('cTitle').textContent = CASE.title;
+const BLINDS = { zscaler: (SRC.zscaler && SRC.zscaler.blinds) || [], workday: (SRC.workday && SRC.workday.blinds) || [], vlan40: (SRC.vlan40 && SRC.vlan40.blinds) || [] };
+
+/* ------------------------------------------------------------------ the story: one deterministic f(t) */
+const CAPS = [
+  [0.0,  'Every light is a telemetry source. The AI agents only see what the light reaches.'],
+  [5.6,  'One room stays dark: the Laredo warehouse, VLAN 40. 38 devices, no EDR, no sensor.'],
+  [9.2,  'Late feeds dim instead of looking healthy: Workday is 2 h 10 m behind, Zscaler 14 min.'],
+  [13.4, 'No sensor, no verdict: the Investigator marks CASE-4125 Inconclusive, not clean.'],
+  [17.6, 'The Data Steward proposes one fix: turn on Zeek. The span port is already mirrored.'],
+  [20.2, 'Zeek lights the warehouse, and an SMB beacon to 198.51.100.23 comes out of the dark.'],
+  [23.8, 'CASE-4125 re-runs on the new evidence: Inconclusive becomes Suspicious, 78%.'],
+  [27.8, 'Coverage 81% → 93%. Blind detections 6 → 4. One reversible change.'],
+];
+const B = {
+  okta: .6, m365: 1.0, workday: 1.4, cloudtrail: 1.9, netflow: 2.5, zscaler: 3.0, fin: 3.5, eng: 4.3,
+  blind: 5.9, n2: 6.2, noEdr: 7.0, wdLate: 9.6, n4: 10.2, zsLate: 11.0, n6: 11.8,
+  s07: 13.6, sample: 13.8, curIn: 18.2, mv0: 18.4, mv1: 19.7, press: 19.85, zeek: 20.0, curOut: 20.45,
+  beacon: 20.7, cov0: 20.6, cov1: 21.8, n4b: 21.4, reinv: 21.2, callout: 21.6, sus: 23.8, end: LOOP - 1.6,
+};
+const SEG_AT = { saas: B.okta, aws: B.cloudtrail, core: B.netflow, fin: B.fin, eng: B.eng };
+function revAt(t, t0){ const k = sstep(t0, t0 + .55, t); return k * (1 + 0.9 * k * Math.exp(-Math.pow((t - t0 - .35) / .22, 2))); }
+function captionAt(t){
+  let i = 0; while (i + 1 < CAPS.length && t >= CAPS[i + 1][0]) i++;
+  const s = CAPS[i][0], e = i + 1 < CAPS.length ? CAPS[i + 1][0] : B.end + .6;
+  return { n: i + 1, txt: CAPS[i][1], op: sstep(s, s + .35, t) * (1 - sstep(e - .3, e, t)) };
+}
+function focusAt(t){
+  if (t < 1 || t >= B.end) return '';
+  if (t < 5.6) return 'srcs kpi';
+  if (t < 9.2) return 'kpi';
+  if (t < 13.4) return 'srcs kpi';
+  if (t < 17.6) return 'case';
+  if (t < 21.2) return 'decide';
+  if (t < 27.8) return 'case';
+  return 'kpi';
+}
+function loopFS(t){
+  const z = sstep(B.zeek, B.zeek + 1.2, t);
+  const fade = 1 - sstep(B.end, B.end + 1.2, t);
+  const fs = {
+    mode: 'loop', t, tt: t, fade, z, zAge: t >= B.zeek ? t - B.zeek : -1,
+    rev: t0 => revAt(t, t0), revK: t0 => sstep(t0, t0 + .55, t),
+    zsLate: sstep(B.zsLate, B.zsLate + 1.4, t), wdLate: sstep(B.wdLate, B.wdLate + 1.2, t),
+    beacon: sat((t - B.beacon) / 1.1), blindTag: sstep(B.blind, B.blind + .5, t), noEdr: sstep(B.noEdr, B.noEdr + .5, t),
+    sample: sstep(B.sample, B.sample + .7, t), s07: sstep(B.s07, B.s07 + .5, t), callout: sstep(B.callout, B.callout + .5, t),
+    zeekRow: sstep(B.blind, B.blind + .5, t),
+  };
+  fs.segs = Object.values(SEG_AT).filter(x => t >= x + .25).length + (z > .5 ? 1 : 0);
+  fs.cov = t < B.okta ? null : t < B.cov0 ? 81 * easeOut((t - B.okta) / (B.eng + .7 - B.okta)) : 81 + 12 * easeIO(sat((t - B.cov0) / (B.cov1 - B.cov0)));
+  fs.covFrom = t >= B.cov0 + .2 ? 81 : null;
+  fs.blindN = t < B.n2 ? null : t < B.n4 ? 2 : t < B.n6 ? 4 : t < B.n4b ? 6 : 4;
+  fs.parts = { vlan: t >= B.n2 && t < B.n4b, wd: t >= B.n4, zs: t >= B.n6 };
+  fs.blindFrom = t >= B.n4b ? 6 : null;
+  fs.caseState = t < B.reinv ? 'inc' : t < B.sus ? 'reinv' : 'sus';
+  fs.zeekOn = t >= B.zeek; fs.press = t >= B.press && t < B.press + .22;
+  fs.focus = focusAt(t); fs.cap = captionAt(t);
+  fs.cursor = (t >= B.curIn && t < B.curOut + .4) ? {
+    op: sstep(B.curIn, B.curIn + .25, t) * (1 - sstep(B.curOut, B.curOut + .35, t)),
+    k: easeIO(sat((t - B.mv0) / (B.mv1 - B.mv0))), press: fs.press, ripple: sat((t - B.press) / .6) } : null;
+  fs.railDim = Math.min(fade, sstep(0, .6, t));
+  return fs;
+}
+
+/* live (the viewer drives): same fields, from the viewer's decision */
+const LV = { zeek: false, zFrom: 0, zAt: -99, sweep: false, snap: null, takeAt: -99, covFrom: 81, covAt: -99, reinvAt: 0, susAt: 0 };
+function liveFS(c){
+  const zk = sstep(0, LV.zeek ? 1.2 : .8, c - LV.zAt), z = LV.zFrom + ((LV.zeek ? 1 : 0) - LV.zFrom) * zk;
+  const s = LV.snap, kb = s ? sstep(0, .6, c - LV.takeAt) : 1, mx = (a, b) => a + (b - a) * kb;
+  const fs = {
+    mode: 'live', t: c, tt: c, fade: 1, z, zAge: LV.sweep ? c - LV.zAt : -1,
+    rev: t0 => s ? mx(s.rev(t0), 1) : 1, revK: t0 => s ? mx(s.revK(t0), 1) : 1,
+    zsLate: s ? mx(s.zsLate, 1) : 1, wdLate: s ? mx(s.wdLate, 1) : 1,
+    beacon: LV.zeek ? (LV.sweep ? sat((c - LV.zAt - .7) / 1.1) : (s ? mx(s.beacon, 1) : 1)) : z,
+    blindTag: s ? mx(s.blindTag, 1) : 1, noEdr: s ? mx(s.noEdr, 1) : 1, sample: s ? mx(s.sample, 1) : 1, s07: s ? mx(s.s07, 1) : 1,
+    callout: LV.zeek ? (LV.sweep ? sstep(1.6, 2.1, c - LV.zAt) : (s ? mx(s.callout, 1) : 1)) : z,
+    zeekRow: s ? mx(s.zeekRow, 1) : 1,
+  };
+  const covTo = LV.zeek ? 93 : 81;
+  fs.cov = LV.covFrom + (covTo - LV.covFrom) * easeIO(sat((c - LV.covAt - .6) / 1.2));
+  fs.covFrom = LV.zeek ? 81 : null;
+  fs.segs = z > .5 ? 6 : 5;
+  const restored = LV.zeek && (!LV.sweep || c - LV.zAt > 1.4);
+  fs.blindN = restored ? 4 : 6; fs.blindFrom = restored ? 6 : null;
+  fs.parts = { vlan: !restored, wd: true, zs: true };
+  fs.caseState = !LV.zeek ? 'inc' : c < LV.reinvAt ? 'inc' : c < LV.susAt ? 'reinv' : 'sus';
+  fs.zeekOn = LV.zeek; fs.press = false; fs.focus = ''; fs.cursor = null; fs.railDim = 1;
+  fs.cap = { hint: true, txt: 'You’re driving. Hover a room, or try the decision. The tour resumes after 15 s idle.', op: 1 };
+  return fs;
+}
+
+/* ------------------------------------------------------------------ the estate as floor plans (world units) */
+const SPECS = {
+  land: { W: 1600, H: 1200, bld: [20, 20, 1560, 1160], wt: 8, f: { title: 30, sub: 21, host: 20 },
+    rooms: {
+      fin:  { r: [40, 40, 440, 500],  doors: [['R', .62, .78], ['B', .66, .82]], lap: [4, 3, 0.14, 0.86, 0.38, 0.86] },
+      eng:  { r: [40, 660, 440, 500], doors: [['R', .08, .24], ['T', .66, .82]], lap: [5, 3, 0.12, 0.88, 0.36, 0.86] },
+      core: { r: [560, 40, 440, 480], doors: [['L', .40, .56], ['B', .62, .78], ['R', .30, .46]] },
+      aws:  { r: [1080, 40, 480, 250], doors: [['L', .44, .70], ['B', .16, .32]] },
+      saas: { r: [1080, 320, 480, 200], doors: [['L', .28, .62]] },
+      wh:   { r: [560, 620, 1000, 540], doors: [['T', .06, .12]], egress: [.84, .94] },
+    } },
+  port: { W: 1000, H: 1000, bld: [20, 20, 960, 960], wt: 7, f: { title: 36, sub: 26, host: 27 },
+    rooms: {
+      fin:  { r: [40, 40, 300, 330],  doors: [['R', .55, .75], ['B', .6, .8]], lap: [3, 3, 0.18, 0.82, 0.44, 0.86] },
+      core: { r: [380, 40, 290, 330], doors: [['L', .3, .5], ['B', .62, .82], ['R', .3, .5]] },
+      aws:  { r: [710, 40, 250, 170], doors: [['L', .4, .7], ['B', .3, .5]] },
+      saas: { r: [710, 240, 250, 130], doors: [['L', .3, .7]] },
+      wh:   { r: [40, 450, 920, 510], doors: [['T', .06, .13]], egress: [.84, .94] },
+    } },
+};
+const ROOM_SHORT = { fin: 'Finance', eng: 'Engineering', core: 'Core', aws: 'AWS', saas: 'SaaS', wh: 'Warehouse · VLAN 40' };
+const ROOM_TXT = {
+  fin: ['HQ 3F · Finance', 'VLAN 12 · 12 endpoints · EDR'], eng: ['HQ 2F · Engineering', 'VLAN 20 · 15 endpoints · EDR on 14'],
+  core: ['Core · data center', 'NetFlow · Zscaler connector'], aws: ['AWS · mf-prod-data', 'CloudTrail · 3 VPCs'],
+  saas: ['SaaS · identity and HR', ''], wh: ['Warehouse Laredo · VLAN 40', '38 devices · no sensor'],
+};
+function roomInfo(k, z){
+  return {
+    fin: { cov: '100%', srcs: [['CrowdStrike EDR on 12 laptops', 'ok', fmtLag(LAG.edr)]], note: '' },
+    eng: { cov: '93%', srcs: [['CrowdStrike EDR on 14 of 15 laptops', 'ok', fmtLag(LAG.edr)]], note: 'ENG-LT-0213 has no EDR agent: the dark desk. Ticket DS-87 is open.' },
+    core: { cov: '88%', srcs: [['NetFlow collector', 'ok', fmtLag(LAG.netflow)], ['Zscaler connector', 'late', fmtLag(LAG.zscaler)]], note: 'Zscaler is catching up after a connector restart at 02:31.' },
+    aws: { cov: '100%', srcs: [['AWS CloudTrail, 3 VPCs', 'ok', fmtLag(LAG.cloudtrail)]], note: 'Schema drift on 09-30 was remapped by the Data Steward (DS-88).' },
+    saas: { cov: '100%', srcs: [['Okta System Log', 'ok', fmtLag(LAG.okta)], ['Microsoft 365 audit', 'ok', fmtLag(LAG.m365)], ['Workday HR', 'late', fmtLag(LAG.workday)]], note: 'Workday’s connector token expired at 00:37: leaver context is stale.' },
+    wh: z ? { cov: '96%', srcs: [['Zeek on the WH-SW-40 span port', 'ok', '3 s']], note: '38 devices. Scanners have no EDR; Zeek sees their traffic.' }
+          : { cov: '0%', srcs: [['No sensor', 'blind', '']], note: '38 devices with no EDR. NetFlow sees only the uplink at the core, so traffic inside VLAN 40 is invisible.' },
+  }[k];
+}
+
+let S = null, Wd = null, boost = 1;
+function wallsOf(x, y, w, h, doors, wt, out){
+  const sides = [['T', x, x + w, y, true], ['B', x, x + w, y + h, true], ['L', y, y + h, x, false], ['R', y, y + h, x + w, false]];
+  for (const [sd, a0, a1, fx, horiz] of sides){
+    const gaps = doors.filter(d => d[0] === sd).map(d => [d[1], d[2]]).sort((p, q) => p[0] - q[0]);
+    let cur = a0;
+    const seg = (s0, s1) => { if (s1 - s0 <= 0) return; if (horiz) out.push([s0 - wt / 2, fx - wt / 2, s1 - s0 + wt, wt]); else out.push([fx - wt / 2, s0 - wt / 2, wt, s1 - s0 + wt]); };
+    for (const [g0, g1] of gaps){ seg(cur, g0); cur = g1; }
+    seg(cur, a1);
+  }
+}
+function absDoors(r, doors){ return doors.map(([sd, f0, f1]) => { const along = sd === 'T' || sd === 'B' ? [r[0] + f0 * r[2], r[0] + f1 * r[2]] : [r[1] + f0 * r[3], r[1] + f1 * r[3]]; return [sd, along[0], along[1]]; }); }
+function deriveWorld(){
+  const W = { walls: [], outside: [], laps: [], racks: [], discs: [], shelves: [], scanners: [], blocks: [] };
+  const R = S.rooms, [bx, by, bw, bh] = S.bld, wh = R.wh.r, compact = S === SPECS.port;
+  const eg0 = wh[1] + R.wh.egress[0] * wh[3], eg1 = wh[1] + R.wh.egress[1] * wh[3];
+  wallsOf(bx, by, bw, bh, [['R', eg0, eg1]], S.wt * 1.4, W.walls);
+  for (const k in R) wallsOf(...R[k].r, absDoors(R[k].r, R[k].doors.concat(k === 'wh' ? [['R', R.wh.egress[0], R.wh.egress[1]]] : [])), S.wt, W.walls);
+  const BIG = 4000;
+  W.outside = [[-BIG, -BIG, 2 * BIG + S.W, BIG + by], [-BIG, by + bh, 2 * BIG + S.W, BIG], [-BIG, by - 1, BIG + bx, bh + 2], [bx + bw, by - 1, BIG, eg0 - by + 1], [bx + bw, eg1, BIG, by + bh - eg1 + 1]];
+  const at = (room, u, v) => [room[0] + u * room[2], room[1] + v * room[3]];
+  for (const k of ['fin', 'eng']){
+    if (!R[k]) continue;
+    const r = R[k].r, [cols, rows, u0, u1, v0, v1] = R[k].lap, lw = Math.min(30, r[2] * 0.075), lh = lw * 0.62;
+    let n = 0;
+    for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++){
+      const [x, y] = at(r, u0 + (u1 - u0) * (cols === 1 ? 0.5 : i / (cols - 1)), v0 + (v1 - v0) * (rows === 1 ? 0.5 : j / (rows - 1)));
+      W.laps.push({ x, y, w: lw, h: lh, seed: n + (k === 'eng' ? 40 : 0), room: k, t0: (k === 'fin' ? B.fin : B.eng) + n * (k === 'fin' ? .045 : .04), noAgent: k === 'eng' && j === 2 && i === 4 });
+      n++;
+    }
+  }
+  W.noAgent = W.laps.find(l => l.noAgent);
+  { const r = R.core.r;
+    for (const u of [0.40, 0.53, 0.66]){ const [x, y] = at(r, u, 0.22); W.racks.push({ x, y, w: r[2] * 0.06, h: r[3] * 0.4 }); }
+    const nf = at(r, 0.17, 0.3), zs = at(r, 0.8, 0.78);
+    W.discs.push({ id: 'netflow', x: nf[0], y: nf[1], r: Math.min(r[2], r[3]) * 0.04, I: 15, t0: B.netflow });
+    W.discs.push({ id: 'zscaler', x: zs[0], y: zs[1], r: Math.min(r[2], r[3]) * 0.036, I: 13, t0: B.zscaler, late: 'zsLate', ph: 0 });
+  }
+  { const r = R.aws.r;
+    const ct = at(r, 0.13, 0.46); W.discs.push({ id: 'cloudtrail', x: ct[0], y: ct[1], r: Math.min(r[2], r[3]) * 0.07, I: 13, t0: B.cloudtrail });
+    const b = at(r, 0.52, 0.3); W.blocks.push({ x: b[0], y: b[1], w: r[2] * 0.36, h: r[3] * 0.32, alb: [0.10, 0.11, 0.13] });
+    const e1 = at(r, 0.52, 0.72); W.blocks.push({ x: e1[0], y: e1[1], w: r[2] * 0.15, h: r[3] * 0.15, alb: [0.09, 0.10, 0.12] });
+    const e2 = at(r, 0.73, 0.72); W.blocks.push({ x: e2[0], y: e2[1], w: r[2] * 0.15, h: r[3] * 0.15, alb: [0.09, 0.10, 0.12] });
+  }
+  { const r = R.saas.r, rr = Math.min(r[2], r[3]) * (compact ? 0.09 : 0.085), v = compact ? 0.6 : 0.56;
+    const ok = at(r, compact ? 0.25 : 0.14, v); W.discs.push({ id: 'okta', x: ok[0], y: ok[1], r: rr, I: 11, t0: B.okta });
+    if (!compact){ const ms = at(r, 0.46, v); W.discs.push({ id: 'm365', x: ms[0], y: ms[1], r: rr * 0.92, I: 9, t0: B.m365 }); }
+    const wd = at(r, compact ? 0.72 : 0.78, v); W.discs.push({ id: 'workday', x: wd[0], y: wd[1], r: rr * 0.92, I: 10, t0: B.workday, late: 'wdLate', ph: 0.37 });
+  }
+  { const r = wh, th = r[3] * 0.055;
+    for (const v of [0.25, 0.5, 0.75]) for (const [u0, u1] of [[0.06, 0.42], [0.52, 0.84]]){ const [x, y] = at(r, u0, v - 0.0275); W.shelves.push({ x, y, w: (u1 - u0) * r[2], h: th }); }
+    const SC = [[0.12, 0.125], [0.30, 0.125], [0.62, 0.125], [0.76, 0.125], [0.2, 0.375], [0.33, 0.375], [0.64, 0.375], [0.3, 0.625], [0.7, 0.625], [0.15, 0.875], [0.42, 0.875], [0.62, 0.875]];
+    const sw = Math.min(26, r[2] * 0.026), sh = sw * 0.7;
+    SC.forEach(([u, v], i) => { const [x, y] = at(r, u, v); W.scanners.push({ id: 'WH-SCAN-' + String(i + 1).padStart(2, '0'), x: x - sw / 2, y: y - sh / 2, w: sw, h: sh }); });
+    W.s07 = W.scanners[6];
+    const swp = at(r, 0.9, 0.9); W.switch = { x: swp[0] - 20, y: swp[1] - 13, w: 40, h: 26 };
+    const zk = at(r, 0.875, 0.56); W.zeek = { x: zk[0], y: zk[1], r: Math.min(r[2], r[3]) * 0.03 };
+    const p0 = at(r, 0.64, 0.375), p1 = at(r, 0.9, 0.375), p2 = at(r, 0.9, 0.9), p3 = [r[0] + r[2] + S.wt * 4, at(r, 1, 0.9)[1]];
+    W.beacon = [[p0[0] + sw * 0.6, p0[1]], p1, p2, p3];
+    let L = 0; W.beaconLen = [0];
+    for (let i = 1; i < W.beacon.length; i++){ L += Math.hypot(W.beacon[i][0] - W.beacon[i - 1][0], W.beacon[i][1] - W.beacon[i - 1][1]); W.beaconLen.push(L); }
+  }
+  Wd = W; buildOverlay();
+}
+
+/* ------------------------------------------------------------------ SVG overlay: names on the plan (and the whole plan without WebGL2) */
+const SVGNS = 'http://www.w3.org/2000/svg';
+const el = (tag, attrs, parent, text) => { const e = document.createElementNS(SVGNS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; if (parent) parent.appendChild(e); return e; };
+const setA = (e, k, v) => { if (!e) return; const c = e.__a || (e.__a = {}); if (c[k] !== v){ c[k] = v; e.setAttribute(k, v); } };
+const op = x => String(Math.round(clamp(x, 0, 1) * 1000) / 1000);
+let O = {};
+function buildOverlay(){
+  ov.textContent = ''; O = { disc: {} };
+  ov.setAttribute('viewBox', `0 0 ${S.W} ${S.H}`); ov.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  const compact = S === SPECS.port, tb = 1 + (boost - 1) * .5;
+  const F = { title: S.f.title * tb, sub: S.f.sub * boost, host: S.f.host * boost };
+  const R = S.rooms, g = el('g', {}, ov);
+  const halo = w => ({ stroke: '#07090C', 'stroke-width': w, 'stroke-opacity': .85, 'stroke-linejoin': 'round', 'paint-order': 'stroke' });
+  if (!GLOK){
+    O.fb = { rooms: {}, discs: {}, laps: [] };
+    for (const k in R){ const r = R[k].r; O.fb.rooms[k] = el('rect', { x: r[0], y: r[1], width: r[2], height: r[3], rx: 6, fill: '#0A0D11', stroke: '#2C3540', 'stroke-width': 3 }, g); }
+    for (const l of Wd.laps) O.fb.laps.push(el('rect', { x: l.x - l.w / 2, y: l.y - l.h / 2, width: l.w, height: l.h, rx: 2, fill: l.noAgent ? '#2A3038' : '#7FD6EE', opacity: 0 }, g));
+    for (const s of Wd.scanners) el('rect', { x: s.x, y: s.y, width: s.w, height: s.h, rx: 2, fill: '#3A4350' }, g);
+    for (const d of Wd.discs) O.fb.discs[d.id] = el('circle', { cx: d.x, cy: d.y, r: d.r * 1.3, fill: '#7FD6EE', opacity: 0 }, g);
+    O.fb.beacon = el('polyline', { points: Wd.beacon.map(p => p.join(',')).join(' '), fill: 'none', stroke: '#FF6A55', 'stroke-width': 5, 'stroke-dasharray': '14 12', opacity: 0 }, g);
+  }
+  for (const k in R){
+    const r = R[k].r, [nm0, sub] = ROOM_TXT[k], nm = compact ? ROOM_SHORT[k] : nm0, blind = k === 'wh';
+    const t = el('text', Object.assign({ x: r[0] + 16, y: r[1] + F.title + 10, 'font-size': F.title, 'font-weight': 600, fill: blind ? '#AAB3BF' : '#E8EBEF', opacity: 0.94 }, halo(F.title * .18)), g, nm);
+    if (blind) O.whTitle = t;
+    if ((!compact && sub) || blind){
+      let sx = r[0] + 16, sy = r[1] + F.title + 12 + F.sub * 1.32;
+      if (blind){ let tw = 0; try { tw = t.getComputedTextLength(); } catch (e){} if (!tw) tw = nm.length * F.title * .55; sx = r[0] + 16 + tw + F.sub * .9; sy = r[1] + F.title + 10; }
+      const st = el('text', Object.assign({ x: sx, y: sy, 'font-size': F.sub, fill: blind ? '#C2CAD6' : '#AAB3BF', opacity: 0.88 }, halo(F.sub * .2)), g, compact ? 'no sensor' : sub);
+      if (blind) O.whSub = st;
+    }
+    if (blind){
+      O.blindRect = el('rect', { x: r[0] + 4, y: r[1] + 4, width: r[2] - 8, height: r[3] - 8, rx: 6, fill: 'none', stroke: '#6A7482', 'stroke-width': 2, 'stroke-dasharray': '12 9', opacity: 0 }, g);
+      const tw = F.sub * 7.4, bx = r[0] + r[2] - 16 - tw, ty = r[1] + 14;
+      O.blindTag = el('g', { opacity: 0 }, g);
+      el('rect', { x: bx, y: ty, width: tw, height: F.sub * 1.75, rx: F.sub * .875, fill: '#0A0D11', stroke: '#6A7482', 'stroke-width': 1.5, 'stroke-dasharray': '5 4' }, O.blindTag);
+      el('text', { x: bx + tw / 2, y: ty + F.sub * 1.22, 'font-size': F.sub, 'font-weight': 500, 'text-anchor': 'middle', fill: '#D5DBE3' }, O.blindTag, 'Blind segment');
+    }
+  }
+  const lab = (x, y, s, col, anchor, size, extra) => el('text', Object.assign({ x, y, 'font-size': size || F.host, fill: col || '#AAB3BF', 'text-anchor': anchor || 'start', class: 'mono' }, halo((size || F.host) * .22), extra || {}), g, s);
+  const NAMES = compact ? { netflow: 'NetFlow', zscaler: 'Zscaler', cloudtrail: 'CloudTrail', okta: 'Okta', workday: 'Workday' }
+                        : { netflow: 'NetFlow collector', zscaler: 'Zscaler connector', cloudtrail: 'CloudTrail', okta: 'Okta', m365: 'M365 audit', workday: 'Workday HR' };
+  for (const d of Wd.discs){
+    const o = { d, name: lab(d.x, d.y + d.r + F.host * 1.4, NAMES[d.id], '#BFE9F5', 'middle', null, { opacity: 0 }) };
+    if (d.late) o.late = lab(d.x, d.y + d.r + F.host * 2.5, compact ? fmtLag(LAG[d.id]) : fmtLag(LAG[d.id]) + ' behind', '#F59A3D', 'middle', F.host * .85, { opacity: 0 });
+    O.disc[d.id] = o;
+  }
+  if (Wd.noAgent && !compact){ const l = Wd.noAgent; O.noEdr = lab(l.x, l.y + l.h / 2 + F.host * 1.35, 'ENG-LT-0213 · no EDR', '#AAB3BF', 'middle', F.host * .82, { opacity: 0 }); }
+  const s07 = Wd.s07;
+  O.s07 = lab(s07.x + s07.w / 2, s07.y - F.host * 0.7, 'WH-SCAN-07', '#808A97', 'middle');
+  O.sw = lab(Wd.switch.x - 10, Wd.switch.y + Wd.switch.h / 2 + F.host * .3, 'WH-SW-40', '#808A97', 'end', F.host * 0.85);
+  O.zeek = lab(Wd.zeek.x - Wd.zeek.r - 10, Wd.zeek.y + F.host * 0.35, 'Zeek sensor', '#BFE9F5', 'end', null, { opacity: 0 });
+  O.egress = lab(S.bld[0] + S.bld[2] - 12, Wd.beacon[3][1] + F.host * 1.9, '→ 198.51.100.23:445', '#FF8A75', 'end', F.host * 0.92, { opacity: 0 });
+  const nf = Wd.discs.find(d => d.id === 'netflow');
+  O.sample = el('g', { opacity: 0 }, g);
+  const cy = (S.rooms.core.r[1] + S.rooms.core.r[3] + S.rooms.wh.r[1]) / 2;
+  el('path', { d: `M${Wd.switch.x + Wd.switch.w / 2},${Wd.switch.y - F.host * 1.5} L${Wd.switch.x + Wd.switch.w / 2},${cy} L${nf.x},${cy} L${nf.x},${nf.y + nf.r + F.host * 2.4}`, fill: 'none', stroke: '#9A7A48', 'stroke-width': 2, 'stroke-dasharray': '6 7' }, O.sample);
+  if (!compact) O.sample.appendChild(lab(nf.x + 16, cy - 12, '1 NetFlow sample · 01:52 · SMB to 198.51.100.23', '#D2AC72', 'start', F.host * 0.82));
+  O.scanLabels = Wd.scanners.filter((s, i) => i !== 6).map(s => lab(s.x + s.w / 2, s.y + s.h + F.host * 1.2, s.id.slice(3), '#808A97', 'middle', F.host * 0.78, { opacity: 0 }));
+}
+function applyOverlay(fs){
+  if (!O.s07) return;
+  const z = fs.z, F = fs.fade;
+  setA(O.blindRect, 'opacity', op(fs.blindTag * (1 - z) * .9 * F));
+  setA(O.blindRect, 'stroke-dashoffset', (-(fs.tt * 14) % 21).toFixed(1));
+  setA(O.blindTag, 'opacity', op(fs.blindTag * (1 - z) * F));
+  if (O.whSub){
+    const on = z > .5, compact = S === SPECS.port;
+    if (O.whSub.textContent !== (on ? (compact ? 'Zeek on' : '38 devices · Zeek sensor on') : (compact ? 'no sensor' : '38 devices · no sensor'))) O.whSub.textContent = on ? (compact ? 'Zeek on' : '38 devices · Zeek sensor on') : (compact ? 'no sensor' : '38 devices · no sensor');
+    setA(O.whSub, 'fill', on ? '#AAB3BF' : (fs.blindTag > .5 ? '#E8EBEF' : '#AAB3BF'));
+    setA(O.whTitle, 'fill', on ? '#E8EBEF' : '#AAB3BF');
+  }
+  for (const id in O.disc){
+    const o = O.disc[id], d = o.d, lk = d.late ? fs[d.late] : 0, vis = fs.revK(d.t0) * F;
+    setA(o.name, 'opacity', op(vis));
+    setA(o.name, 'fill', lk > .5 ? '#F59A3D' : '#BFE9F5');
+    if (o.late) setA(o.late, 'opacity', op(lk * vis));
+  }
+  setA(O.noEdr, 'opacity', op(fs.noEdr * F));
+  const em = Math.max(fs.s07, z);
+  setA(O.s07, 'fill', z > .5 ? '#FF8A75' : fs.s07 > .5 ? '#E8EBEF' : '#808A97');
+  setA(O.s07, 'font-weight', em > .5 ? '600' : '400');
+  setA(O.s07, 'opacity', op((.55 + .45 * em) * Math.max(F, .0)));
+  setA(O.sw, 'opacity', op((.5 + .5 * Math.max(fs.s07, z)) * F));
+  setA(O.zeek, 'opacity', op(z * F));
+  setA(O.egress, 'opacity', op(fs.beacon * F));
+  setA(O.sample, 'opacity', op(fs.sample * (1 - z) * F));
+  const sl = op(z * .9 * F); for (const e of O.scanLabels) setA(e, 'opacity', sl);
+  if (O.fb){
+    const roomRev = { fin: fs.revK(B.fin), eng: fs.revK(B.eng), core: fs.revK(B.netflow), aws: fs.revK(B.cloudtrail), saas: fs.revK(B.okta) };
+    for (const k in O.fb.rooms) setA(O.fb.rooms[k], 'fill', k === 'wh' ? (z > .02 ? `rgba(127,214,238,${(.14 * z * F).toFixed(3)})` : '#07090C') : `rgba(127,214,238,${(.15 * roomRev[k] * F).toFixed(3)})`);
+    Wd.laps.forEach((l, i) => setA(O.fb.laps[i], 'opacity', op(l.noAgent ? F : fs.revK(l.t0) * F)));
+    for (const d of Wd.discs){ const lk = d.late ? fs[d.late] : 0; setA(O.fb.discs[d.id], 'opacity', op(fs.revK(d.t0) * F * (1 - .5 * lk))); setA(O.fb.discs[d.id], 'fill', lk > .5 ? '#F59A3D' : '#7FD6EE'); }
+    setA(O.fb.beacon, 'opacity', op(fs.beacon * z * F));
+  }
+}
+
+/* ------------------------------------------------------------------ WebGL2: 2D radiance cascades (engine from the telemetry page) */
+const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, depth: false, stencil: false, premultipliedAlpha: false, preserveDrawingBuffer: true, powerPreference: 'high-performance' });
+const extF32 = gl && gl.getExtension('EXT_color_buffer_float');
+const extF16 = gl && !extF32 && gl.getExtension('EXT_color_buffer_half_float');
+let GLOK = !!(gl && (extF32 || extF16)) && QS.get('gl') !== '0';
+function compile(type, src){ const s = gl.createShader(type); gl.shaderSource(s, src.trim()); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; }
+function program(vsId, fsId){
+  const p = gl.createProgram();
+  gl.attachShader(p, compile(gl.VERTEX_SHADER, $(vsId).textContent)); gl.attachShader(p, compile(gl.FRAGMENT_SHADER, $(fsId).textContent));
+  gl.linkProgram(p); if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+  const u = {}; const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+  for (let i = 0; i < n; i++){ const a = gl.getActiveUniform(p, i); u[a.name] = gl.getUniformLocation(p, a.name); }
+  return { p, u };
+}
+let P = null, emptyVao = null, instVbo = null, instVao = null, H16, JF;
+const IF = 16;
+const makeBuf = () => ({ a: new Float32Array(IF * 512), n: 0 });
+const GIB = makeBuf(), MTB = makeBuf();
+function put(Bf, cx, cy, hw, hh, er, eg, eb, ei, ar, ag, ab, kind, p0, p1, p2, p3){
+  if ((Bf.n + 1) * IF > Bf.a.length){ const na = new Float32Array(Bf.a.length * 2); na.set(Bf.a); Bf.a = na; }
+  const a = Bf.a, o = Bf.n * IF;
+  a[o] = cx; a[o + 1] = cy; a[o + 2] = hw; a[o + 3] = hh; a[o + 4] = er; a[o + 5] = eg; a[o + 6] = eb; a[o + 7] = ei;
+  a[o + 8] = ar; a[o + 9] = ag; a[o + 10] = ab; a[o + 11] = kind; a[o + 12] = p0; a[o + 13] = p1; a[o + 14] = p2; a[o + 15] = p3; Bf.n++;
+}
+function mkTex(w, h, ifmt, fmt, type, filter, mip){
+  const tx = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tx);
+  gl.texImage2D(gl.TEXTURE_2D, 0, ifmt, w, h, 0, fmt, type, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, mip ? gl.LINEAR_MIPMAP_LINEAR : filter); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  if (mip) gl.generateMipmap(gl.TEXTURE_2D);
+  return tx;
+}
+function mkFbo(texs){
+  const f = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+  texs.forEach((tx, i) => gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + i, gl.TEXTURE_2D, tx, 0));
+  gl.drawBuffers(texs.map((_, i) => gl.COLOR_ATTACHMENT0 + i));
+  const st = gl.checkFramebufferStatus(gl.FRAMEBUFFER); gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  if (st !== gl.FRAMEBUFFER_COMPLETE) throw new Error('framebuffer incomplete ' + st);
+  return f;
+}
+if (GLOK){
+  try {
+    P = { inst: program('vs-inst', 'fs-inst'), seed: program('vs-full', 'fs-seed'), jfa: program('vs-full', 'fs-jfa'), df: program('vs-full', 'fs-df'), rc: program('vs-full', 'fs-rc'), irr: program('vs-full', 'fs-irr'), comp: program('vs-full', 'fs-comp') };
+    emptyVao = gl.createVertexArray(); instVbo = gl.createBuffer(); instVao = gl.createVertexArray();
+    gl.bindVertexArray(instVao); gl.bindBuffer(gl.ARRAY_BUFFER, instVbo);
+    for (let i = 0; i < 4; i++){ gl.enableVertexAttribArray(i); gl.vertexAttribPointer(i, 4, gl.FLOAT, false, IF * 4, i * 16); gl.vertexAttribDivisor(i, 1); }
+    gl.bindVertexArray(null);
+    H16 = [gl.RGBA16F, gl.RGBA, gl.HALF_FLOAT]; JF = extF32 ? [gl.RG32F, gl.RG, gl.FLOAT] : H16;
+  } catch (err){ console.warn('Blind spots: falling back to the plain plan.', err.message); GLOK = false; }
+}
+if (!GLOK){ $('fallback').hidden = false; canvas.style.display = 'none'; }
+
+const S0 = 2, B0 = 2, I0 = 4, BUDGETS = [140000, 200000, 270000, 350000, 440000, 560000];
+let tier = 3;
+const GI = { W: 0, H: 0, N: 0, g: 0.5, tex: {}, fb: {} };
+function freeGI(){ for (const k in GI.tex) gl.deleteTexture(GI.tex[k]); for (const k in GI.fb) gl.deleteFramebuffer(GI.fb[k]); GI.tex = {}; GI.fb = {}; }
+function allocGI(cssW, cssH){
+  const budget = LOW ? 90000 : BUDGETS[tier];
+  const g = clamp(Math.sqrt(budget / (cssW * cssH)), 0.22, 1.0);
+  const w = Math.ceil(cssW * g), h = Math.ceil(cssH * g);
+  const N = Math.max(3, Math.ceil(Math.log(3 * Math.hypot(w, h) / I0 + 1) / Math.log(4)));
+  const m = S0 * (1 << (N - 1)), W = Math.ceil(w / m) * m, H = Math.ceil(h / m) * m;
+  if (W === GI.W && H === GI.H && N === GI.N && Math.abs(g - GI.g) < 1e-6) return;
+  freeGI(); GI.W = W; GI.H = H; GI.N = N; GI.g = g;
+  const T = GI.tex, F = GI.fb;
+  T.scene = mkTex(W, H, ...H16, gl.NEAREST); T.ja = mkTex(W, H, ...JF, gl.NEAREST); T.jb = mkTex(W, H, ...JF, gl.NEAREST);
+  T.df = mkTex(W, H, ...H16, gl.LINEAR); T.ca = mkTex(W, H, ...H16, gl.LINEAR); T.cb = mkTex(W, H, ...H16, gl.LINEAR);
+  T.irr = mkTex(W / S0, H / S0, ...H16, gl.LINEAR, true);
+  for (const k of ['scene', 'ja', 'jb', 'df', 'ca', 'cb', 'irr']) F[k] = mkFbo([T[k]]);
+}
+const MT = { W: 0, H: 0, tex: [], fb: null };
+function allocMat(W, H){
+  if (W === MT.W && H === MT.H) return;
+  MT.tex.forEach(tx => gl.deleteTexture(tx)); if (MT.fb) gl.deleteFramebuffer(MT.fb);
+  MT.W = W; MT.H = H;
+  MT.tex = [mkTex(W, H, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, gl.NEAREST), mkTex(W, H, ...H16, gl.NEAREST), mkTex(W, H, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, gl.NEAREST)];
+  MT.fb = mkFbo(MT.tex);
+}
+const view = { sc: 1, ox: 0, oy: 0, cssW: 1, cssH: 1, dpr: 1 };
+function fitView(){
+  const cssW = stage.clientWidth || 1, cssH = stage.clientHeight || 1;
+  const want = cssW / cssH < 1.15 ? SPECS.port : SPECS.land;
+  const sc = Math.min(cssW / want.W, cssH / want.H);
+  const nb = clamp(10.5 / (want.f.host * sc), 1, 1.4);
+  if (want !== S){ S = want; boost = nb; deriveWorld(); }
+  else if (Math.abs(nb - boost) > .03){ boost = nb; buildOverlay(); }
+  view.sc = sc; view.ox = (cssW - S.W * sc) / 2; view.oy = (cssH - S.H * sc) / 2; view.cssW = cssW; view.cssH = cssH;
+}
+
+/* ------------------------------------------------------------------ scene: every light is a telemetry source */
+function buildScene(fs){
+  GIB.n = 0; MTB.n = 0;
+  const tt = fs.tt, z = fs.z, F = fs.fade;
+  for (const w of Wd.outside) put(GIB, w[0] + w[2] / 2, w[1] + w[3] / 2, w[2] / 2, w[3] / 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+  for (const w of Wd.walls){ const cx = w[0] + w[2] / 2, cy = w[1] + w[3] / 2; put(GIB, cx, cy, w[2] / 2, w[3] / 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0); put(MTB, cx, cy, w[2] / 2, w[3] / 2, 0, 0, 0, 0, 0.20, 0.235, 0.29, 0, 1, 0, 0, 0); }
+  for (const l of Wd.laps){
+    if (l.noAgent){ // no EDR agent: no light of its own
+      put(GIB, l.x, l.y, l.w / 2, l.h / 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+      put(MTB, l.x, l.y, l.w / 2, l.h / 2, 0, 0, 0, 0, 0.16, 0.17, 0.19, 1, 1, 0, 0, 0); continue;
+    }
+    const fl = reduced ? 1 : 0.85 + 0.15 * Math.sin(tt * (1.3 + hash1(l.seed) * 2.1) + l.seed);
+    const I = 2.4 * fl * fs.rev(l.t0) * F;
+    put(GIB, l.x, l.y, l.w / 2, l.h / 2, COLD[0], COLD[1], COLD[2], I, 0, 0, 0, 0, 0, 0, 0, 0);
+    put(MTB, l.x, l.y, l.w / 2, l.h / 2, COLD[0], COLD[1], COLD[2], I * 0.35, 0.05, 0.06, 0.07, 1, 1, 0, 0, 0);
+  }
+  const rackLed = 0.9 * F * fs.revK(B.netflow);
+  for (const b of Wd.racks){ put(GIB, b.x + b.w / 2, b.y + b.h / 2, b.w / 2, b.h / 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0); put(MTB, b.x + b.w / 2, b.y + b.h / 2, b.w / 2, b.h / 2, 0, 0, 0, 0, 0.11, 0.125, 0.15, 1, 1, b.w * 0.33, rackLed, 0); }
+  for (const b of Wd.blocks){ put(GIB, b.x + b.w / 2, b.y + b.h / 2, b.w / 2, b.h / 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0); put(MTB, b.x + b.w / 2, b.y + b.h / 2, b.w / 2, b.h / 2, 0, 0, 0, 0, ...b.alb, 1, 1, 0, 0, 0); }
+  for (const d of Wd.discs){
+    let I = d.I * fs.rev(d.t0) * F;
+    const lk = d.late ? fs[d.late] : 0;
+    if (lk > 0){
+      const ph = (tt * 0.9 + d.ph) % 1, burst = Math.exp(-ph * 9) * 0.9, jitter = 0.5 + 0.5 * Math.sin(tt * 17.3 + d.ph * 9) * Math.sin(tt * 7.1 + 1.0);
+      const lateMul = reduced ? 0.3 : 0.16 + 0.12 * jitter + burst * 0.55;
+      I *= 1 + (lateMul - 1) * lk;
+    }
+    const c = mixc(COLD, LATEC, lk);
+    put(GIB, d.x, d.y, d.r, d.r, c[0], c[1], c[2], I, 0, 0, 0, 5, 0, 0, 0, 0);
+    put(MTB, d.x, d.y, d.r, d.r, COLDW[0], COLDW[1], COLDW[2], I * 0.18, 0.10, 0.11, 0.13, 5, 1, 0, 0, 0);
+  }
+  for (const b of Wd.shelves){ put(GIB, b.x + b.w / 2, b.y + b.h / 2, b.w / 2, b.h / 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0); put(MTB, b.x + b.w / 2, b.y + b.h / 2, b.w / 2, b.h / 2, 0, 0, 0, 0, 0.17, 0.165, 0.16, 1, 1, b.h * 0.9, 0, 0); }
+  const zf = z * F;
+  Wd.scanners.forEach((s, i) => {
+    const hot07 = i === 6 && zf > 0;
+    const led = zf * (0.6 + 0.4 * Math.sin(tt * 3 + i));
+    put(GIB, s.x + s.w / 2, s.y + s.h / 2, s.w / 2, s.h / 2, COLD[0], COLD[1], COLD[2], zf * 3.2, 0, 0, 0, 0, 0, 0, 0, 0);
+    put(MTB, s.x + s.w / 2, s.y + s.h / 2, s.w / 2, s.h / 2, hot07 ? HOT[0] : 0, hot07 ? HOT[1] : 0, hot07 ? HOT[2] : 0, hot07 ? 0.5 * zf : 0, 0.32, 0.34, 0.37, 1, 1, 0, led * 1.6, 0);
+  });
+  const sw = Wd.switch;
+  put(GIB, sw.x + sw.w / 2, sw.y + sw.h / 2, sw.w / 2, sw.h / 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+  put(MTB, sw.x + sw.w / 2, sw.y + sw.h / 2, sw.w / 2, sw.h / 2, 0, 0, 0, 0, 0.26, 0.28, 0.31, 1, 1, 5, (0.3 + z * 1.2) * F, 0);
+  if (zf > 0){
+    // the beacon exists all along; it becomes visible (and hot) only once a sensor can see it
+    const Bp = Wd.beacon, LL = Wd.beaconLen, total = LL[LL.length - 1], sp = 30, off = reduced ? 0 : (tt * 46) % sp, lim = fs.beacon * total;
+    for (let s = off; s < lim; s += sp){
+      let i = 1; while (i < LL.length - 1 && s > LL[i]) i++;
+      const k = (s - LL[i - 1]) / (LL[i] - LL[i - 1]);
+      const x = Bp[i - 1][0] + (Bp[i][0] - Bp[i - 1][0]) * k, y = Bp[i - 1][1] + (Bp[i][1] - Bp[i - 1][1]) * k;
+      const horiz = Math.abs(Bp[i][0] - Bp[i - 1][0]) > Math.abs(Bp[i][1] - Bp[i - 1][1]);
+      const hw = horiz ? 6.5 : 2.4, hh = horiz ? 2.4 : 6.5;
+      const pulse = reduced ? 0.8 : 0.55 + 0.45 * Math.cos((s / total - tt * 0.35) * Math.PI * 6);
+      const head = 1 + 1.4 * sstep(lim - 60, lim, s) * (1 - fs.beacon);
+      const hc = mixc(HOT, HOTW, pulse * 0.6);
+      put(GIB, x, y, hw, hh, HOT[0], HOT[1], HOT[2], 3.2 * zf * pulse * head, 0, 0, 0, 0, 0, 0, 0, 0);
+      put(MTB, x, y, hw, hh, hc[0], hc[1], hc[2], 2.6 * zf * pulse * head, 0.9, 0.5, 0.45, 0, 0, 0, 0, 0);
+    }
+    const s7 = Wd.s07, r = s7.w * (1.3 + (reduced ? 0 : 0.25 * Math.sin(tt * 5)));
+    put(GIB, s7.x + s7.w / 2, s7.y + s7.h / 2, r, r, HOT[0], HOT[1], HOT[2], 5 * zf, 0, 0, 0, 7, 0, 1.6, 0, 0);
+    put(MTB, s7.x + s7.w / 2, s7.y + s7.h / 2, r, r, HOT[0], HOT[1], HOT[2], 2.2 * zf, 0, 0, 0, 7, 0, 1.6, 0, 0);
+    // Zeek: one light that sees the whole VLAN, with a sweep the moment it switches on
+    const zk = Wd.zeek, age = fs.zAge, swell = 1 + (age >= 0 ? 0.25 * Math.exp(-age * 1.6) : 0);
+    put(GIB, zk.x, zk.y, zk.r, zk.r, COLD[0], COLD[1], COLD[2], 120 * zf * swell, 0, 0, 0, 5, 0, 0, 0, 0);
+    if (!reduced && age > 0 && age < 1.6){ const k = age / 1.6, rr = 30 + k * Math.max(S.W, S.H) * 0.62; put(GIB, zk.x, zk.y, rr / 0.78, rr / 0.78, COLDW[0], COLDW[1], COLDW[2], 9 * (1 - k) * (1 - k) * F, 0, 0, 0, 7, 0, 5 + 10 * k, 0, 0); }
+    put(MTB, zk.x, zk.y, zk.r, zk.r, COLDW[0], COLDW[1], COLDW[2], 5 * zf, 0, 0, 0, 5, 1, 0, 0, 0);
+  }
+}
+
+function bindTex(unit, tx){ gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, tx); }
+function fullPass(prog, fb, w, h){ gl.bindFramebuffer(gl.FRAMEBUFFER, fb); gl.viewport(0, 0, w, h); gl.useProgram(prog.p); gl.bindVertexArray(emptyVao); gl.drawArrays(gl.TRIANGLES, 0, 3); }
+function drawInst(Bf, mode, xf, tw, th, pxw, pad){
+  const u = P.inst.u;
+  gl.useProgram(P.inst.p);
+  gl.uniform1i(u.uMode, mode); gl.uniform3f(u.uXf, xf[0], xf[1], xf[2]); gl.uniform2f(u.uTgt, tw, th); gl.uniform1f(u.uPad, pad); gl.uniform1f(u.uPx, pxw);
+  gl.bindVertexArray(instVao); gl.bindBuffer(gl.ARRAY_BUFFER, instVbo);
+  gl.bufferData(gl.ARRAY_BUFFER, Bf.a.subarray(0, Bf.n * IF), gl.STREAM_DRAW);
+  gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, Bf.n); gl.bindVertexArray(null);
+}
+function renderGL(fs){
+  if (!Wd || !GLOK) return;
+  buildScene(fs);
+  const { W, H, N, g } = GI;
+  gl.disable(gl.BLEND);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, GI.fb.scene); gl.viewport(0, 0, W, H); gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+  drawInst(GIB, 0, [view.sc * g, view.ox * g, view.oy * g], W, H, 1 / (view.sc * g), 0);
+  gl.useProgram(P.seed.p); bindTex(0, GI.tex.scene); gl.uniform1i(P.seed.u.uScene, 0); fullPass(P.seed, GI.fb.ja, W, H);
+  let src = 'ja', dst = 'jb', step = 1 << Math.ceil(Math.log2(Math.max(W, H)));
+  const steps = []; for (step >>= 1; step >= 1; step >>= 1) steps.push(step); steps.push(1);
+  for (const s of steps){ gl.useProgram(P.jfa.p); gl.uniform2f(P.jfa.u.uSize, W, H); bindTex(0, GI.tex[src]); gl.uniform1i(P.jfa.u.uJ, 0); gl.uniform1f(P.jfa.u.uStep, s); fullPass(P.jfa, GI.fb[dst], W, H); [src, dst] = [dst, src]; }
+  gl.useProgram(P.df.p); bindTex(0, GI.tex[src]); gl.uniform1i(P.df.u.uJ, 0); bindTex(1, GI.tex.scene); gl.uniform1i(P.df.u.uScene, 1); fullPass(P.df, GI.fb.df, W, H);
+  const u = P.rc.u;
+  gl.useProgram(P.rc.p); gl.uniform2f(u.uSize, W, H); gl.uniform1f(u.uN, N); gl.uniform1f(u.uS0, S0); gl.uniform1f(u.uB0, B0); gl.uniform1f(u.uI0, I0);
+  let cs = 'ca', cd = 'cb'; const fixMax = LOW ? 1 : (tier >= 2 ? 2 : 1);
+  for (let c = N - 1; c >= 0; c--){ gl.useProgram(P.rc.p); bindTex(0, GI.tex.df); gl.uniform1i(u.uDF, 0); bindTex(1, GI.tex[cs]); gl.uniform1i(u.uUp, 1); gl.uniform1f(u.uC, c); gl.uniform1i(u.uFix, c <= fixMax ? 1 : 0); fullPass(P.rc, GI.fb[cd], W, H); [cs, cd] = [cd, cs]; }
+  gl.useProgram(P.irr.p); bindTex(0, GI.tex[cs]); gl.uniform1i(P.irr.u.uC0, 0); gl.uniform2f(P.irr.u.uPG, W / S0, H / S0); gl.uniform1f(P.irr.u.uB0, B0); fullPass(P.irr, GI.fb.irr, W / S0, H / S0);
+  bindTex(0, GI.tex.irr); gl.generateMipmap(gl.TEXTURE_2D);
+  const dpr = view.dpr;
+  gl.bindFramebuffer(gl.FRAMEBUFFER, MT.fb); gl.viewport(0, 0, MT.W, MT.H); gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.enable(gl.BLEND); gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+  drawInst(MTB, 1, [view.sc * dpr, view.ox * dpr, view.oy * dpr], MT.W, MT.H, 1 / (view.sc * dpr), 1.5); gl.disable(gl.BLEND);
+  const cu = P.comp.u;
+  gl.useProgram(P.comp.p); for (let i = 0; i < 3; i++) bindTex(i, MT.tex[i]);
+  gl.uniform1i(cu.uT0, 0); gl.uniform1i(cu.uT1, 1); gl.uniform1i(cu.uT2, 2); bindTex(3, GI.tex.irr); gl.uniform1i(cu.uIrr, 3);
+  gl.uniform2f(cu.uCanvas, canvas.width, canvas.height); gl.uniform1f(cu.uDpr, dpr); gl.uniform2f(cu.uGI, W, H); gl.uniform1f(cu.uG, g); gl.uniform3f(cu.uXf, view.sc, view.ox, view.oy);
+  gl.uniform1f(cu.uTime, fs.tt); gl.uniform1f(cu.uAmb, 0.012);
+  fullPass(P.comp, null, canvas.width, canvas.height);
+}
+
+/* ------------------------------------------------------------------ rail: readout, source lag (SMIL), decision, case */
+const E = {}; ['kCov', 'kCovFrom', 'kCovBar', 'kCovGhost', 'kCovSub', 'kBlind', 'kBlindOf', 'kBlindSub', 'dChip', 'dTxt', 'zBtn', 'dMeta', 'cChip', 'cTxt', 'cBar', 'cVal', 'cap', 'capN', 'capTx', 'prog', 'progFill', 'playBtn', 'liveTxt', 'srcSum', 'fcur', 'fcurR', 'rail', 'callout', 'maptip'].forEach(id => { E[id] = $(id); });
+const CARD = { kpi: $('cKpi'), srcs: $('cSrcs'), decide: $('cDecide'), case: $('cCase') };
+const setText = (e, v) => { if (e.__t !== v){ e.__t = v; e.textContent = v; } };
+const setHTML = (e, v) => { if (e.__h !== v){ e.__h = v; e.innerHTML = v; } };
+const setCls = (e, c, on) => { on = !!on; const m = e.__c || (e.__c = {}); if (m[c] !== on){ m[c] = on; e.classList.toggle(c, on); } };
+const setSt = (e, k, v) => { const m = e.__s || (e.__s = {}); if (m[k] !== v){ m[k] = v; e.style[k] = v; } };
+
+const ROWS = [
+  { id: 'okta', nm: 'Okta System Log', t0: B.okta, n: 3, dur: 1.6, cls: 'hx' },
+  { id: 'm365', nm: 'Microsoft 365 audit', t0: B.m365, n: 2, dur: 2.8, cls: 'hx xl' },
+  { id: 'edr', nm: 'CrowdStrike EDR', t0: B.fin, n: 4, dur: 1.8, cls: 'hx' },
+  { id: 'cloudtrail', nm: 'AWS CloudTrail', t0: B.cloudtrail, n: 2, dur: 2.6, cls: 'hx xl' },
+  { id: 'netflow', nm: 'NetFlow core', t0: B.netflow, n: 4, dur: 1.4, cls: 'hm' },
+  { id: 'workday', nm: 'Workday HR', t0: B.workday, n: 2, dur: 2.4, late: 'wdLate', ldur: 9, ln: 1 },
+  { id: 'zscaler', nm: 'Zscaler ZIA', t0: B.zscaler, n: 3, dur: 1.7, late: 'zsLate', ldur: 5, ln: 4 },
+  { id: 'zeek', nm: 'Zeek · VLAN 40', zeek: true, n: 4, dur: 1.2 },
+];
+const SPLINE = 'calcMode="spline" keyTimes="0;0.25;0.85;1" keyPoints="0;0.42;0.5;1" keySplines=".2 .6 .4 1;0 0 1 1;.6 0 .8 .4"';
+function laneSVG(r){
+  const pid = 'lp-' + r.id, mk = (sym, n, dur, extra) => Array.from({ length: n }, (_, i) => `<use href="#${sym}"><animateMotion dur="${dur}s" begin="${(-dur * i / n).toFixed(3)}s" repeatCount="indefinite" rotate="auto" ${extra || ''}><mpath href="#${pid}"/></animateMotion></use>`).join('');
+  let body = `<path id="${pid}" class="trk" d="M1,6 H99" fill="none" stroke="${r.zeek ? '#2C333D' : '#22404C'}" stroke-width="1" ${r.zeek ? 'stroke-dasharray="2 4"' : ''}/>`;
+  if (r.zeek) body += `<g class="g-on" filter="url(#pkg)" opacity="0">${mk('pkc', r.n, r.dur)}</g>`;
+  else {
+    body += `<g class="g-ok" filter="url(#pkg)">${mk('pkc', r.n, r.dur)}</g>`;
+    if (r.late) body += `<g class="g-late" opacity="0"><g filter="url(#haze)"><g filter="url(#pkg)">${mk('pkw', r.ln, r.ldur, SPLINE)}</g></g></g>`;
+  }
+  return `<svg class="lane smil" viewBox="0 0 100 12" preserveAspectRatio="xMidYMid meet" aria-hidden="true">${body}</svg>`;
+}
+$('srcList').innerHTML = ROWS.map(r => `<li data-id="${r.id}" class="${r.cls || ''}${r.zeek ? ' off' : ''}" title="${esc(r.zeek ? 'Blinds: ' + BLINDS.vlan40.join(', ') : r.late ? 'Blinds while late: ' + BLINDS[r.id].join(', ') : '')}"><span class="dot"></span><span class="nm">${esc(r.nm)}</span>${laneSVG(r)}<span class="lag">${r.zeek ? 'off' : fmtLag(LAG[r.id])}</span></li>`).join('');
+ROWS.forEach(r => {
+  const li = document.querySelector(`#srcList li[data-id="${r.id}"]`);
+  r.li = li; r.lag = li.querySelector('.lag'); r.svg = li.querySelector('svg'); r.trk = li.querySelector('.trk');
+  r.gOk = li.querySelector('.g-ok'); r.gLate = li.querySelector('.g-late'); r.gOn = li.querySelector('.g-on');
+});
+const SMILS = [...document.querySelectorAll('svg.smil')];
+function sizeLanes(){
+  for (const r of ROWS){
+    const w = Math.max(20, Math.round(r.svg.getBoundingClientRect().width));
+    if (r.svg.__w === w) continue; r.svg.__w = w;
+    r.svg.setAttribute('viewBox', `0 0 ${w} 12`); r.trk.setAttribute('d', `M1,6 H${w - 1}`);
+  }
+}
+
+/* progress ticks */
+for (const [t0] of CAPS.slice(1)){ const tk = document.createElement('b'); tk.className = 'tk'; tk.style.left = (t0 / LOOP * 100) + '%'; E.prog.appendChild(tk); }
+
+function applyRail(fs){
+  for (const k in CARD) setCls(CARD[k], 'focus', fs.focus.includes(k));
+  setSt(E.rail, 'opacity', (0.35 + 0.65 * fs.railDim).toFixed(3));
+  // coverage
+  setText(E.kCov, fs.cov == null ? '—' : Math.round(fs.cov) + '%');
+  setSt(E.kCovBar, 'width', (fs.cov || 0).toFixed(2) + '%');
+  setText(E.kCovFrom, fs.covFrom ? `from ${fs.covFrom}%` : '');
+  setSt(E.kCovGhost, 'opacity', fs.covFrom ? '1' : '0');
+  setText(E.kCovSub, `${fs.segs} of 6 segments lit`);
+  // blind detections
+  setText(E.kBlind, fs.blindN == null ? '—' : String(fs.blindN));
+  setText(E.kBlindOf, fs.blindFrom ? `from ${fs.blindFrom}` : 'of 412');
+  const parts = [fs.parts.vlan && '2\u00a0VLAN\u00a040', fs.parts.zs && '2\u00a0Zscaler', fs.parts.wd && '2\u00a0Workday'].filter(Boolean).join(' · ');
+  setText(E.kBlindSub, fs.blindN == null ? 'checking 61 sources…' : parts);
+  // sources
+  setText(E.srcSum, `61 total · ${(fs.wdLate > .5 ? 1 : 0) + (fs.zsLate > .5 ? 1 : 0)} late`);
+  for (const r of ROWS){
+    const vis = r.zeek ? fs.zeekRow : fs.revK(r.t0);
+    setSt(r.li, 'opacity', (0.14 + 0.86 * vis).toFixed(3));
+    if (r.zeek){
+      const on = fs.z > .5;
+      setCls(r.li, 'off', !on); setText(r.lag, on ? '3 s' : 'off');
+      setA(r.gOn, 'opacity', op(fs.z)); setA(r.trk, 'stroke', on ? '#22404C' : '#2C333D'); setA(r.trk, 'stroke-dasharray', on ? 'none' : '2 4');
+    } else if (r.late){
+      const lk = fs[r.late];
+      setCls(r.li, 'late', lk > .5);
+      setText(r.lag, lk < .02 ? 'on time' : fmtLag(LAG[r.id] * easeOut(lk)));
+      setA(r.gOk, 'opacity', op(1 - lk)); setA(r.gLate, 'opacity', op(lk));
+      setA(r.trk, 'stroke', lk > .5 ? '#5A3A1E' : '#22404C'); setA(r.trk, 'stroke-dasharray', lk > .5 ? '3 4' : 'none');
+    }
+  }
+  // decision
+  const on = fs.zeekOn;
+  setCls(E.zBtn, 'pri-ai', !on); setCls(E.zBtn, 'press', fs.press);
+  setText(E.zBtn, on ? 'Undo' : 'Enable Zeek on VLAN 40'); E.zBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  setHTML(E.dTxt, on ? '<b>Zeek is on for VLAN 40.</b><span class="x"> Reading the WH-SW-40 span port: 38 devices, 6.4k events/min.</span>'
+                     : '<b>Enable Zeek on VLAN 40.</b><span class="x"> The WH-SW-40 span port is already mirrored: +6.4k events/min, ≈ $0.42 a day.</span>');
+  setText(E.dMeta, on ? 'Applied · change DS-90' : 'Reversible · change DS-90');
+  setHTML(E.dChip, on ? '<span>2 <span class="lw">detections </span>restored</span>' : '<span><span class="lw">restores </span><span class="sw2">+</span>2 detections</span>');
+  setCls(E.dChip, 'c-agent', !on); setCls(E.dChip, 'c-ok', on);
+  // case
+  const cs = fs.caseState;
+  setHTML(E.cChip, cs === 'inc' ? 'Inconclusive' : cs === 'reinv' ? '<span class="dot live"></span>Re-investigating' : 'Suspicious · 78%');
+  setCls(E.cChip, 'v-inc', cs === 'inc'); setCls(E.cChip, 'c-agent', cs === 'reinv'); setCls(E.cChip, 'v-sus', cs === 'sus');
+  setHTML(E.cTxt, cs === 'inc' ? 'No EDR on WH-SCAN-07, no sensor on VLAN 40.<span class="x"> One NetFlow sample (01:52) can’t decide it, so it asks instead of closing.</span>'
+    : cs === 'reinv' ? 'New telemetry on VLAN 40.<span class="x"> Re-running the question tree with Zeek conn.log…</span>'
+    : 'Zeek conn.log: SMB 445 to 198.51.100.23 every 61 s since 01:52.<span class="x"> Scanners never talk SMB to the internet: escalated.</span>');
+  setCls(E.cBar, 'none', cs === 'inc'); setCls(E.cBar, 'run', cs === 'reinv');
+  const bi = E.cBar.firstElementChild;
+  if (cs === 'reinv'){ const p = ((fs.tt * .9) % 1.4) - .4; setSt(bi, 'left', (p * 100).toFixed(1) + '%'); setSt(bi, 'width', '40%'); }
+  else { setSt(bi, 'left', '0%'); setSt(bi, 'width', cs === 'sus' ? '78%' : '0%'); }
+  setText(E.cVal, cs === 'sus' ? '78%' : cs === 'reinv' ? '…' : '—'); setCls(E.cVal, 'sus', cs === 'sus');
+}
+function applyFooter(fs){
+  const c = fs.cap;
+  setCls(E.cap, 'off', !SHOW_CAPS); setCls(E.cap, 'hint', !!c.hint);
+  setText(E.capN, c.hint ? 'LIVE' : `${c.n}/${CAPS.length}`); setText(E.capTx, c.txt);
+  setSt(E.cap, 'opacity', c.op.toFixed(3));
+  setSt(E.progFill, 'width', (mode === 'loop' ? loopT / LOOP * 100 : 0).toFixed(2) + '%');
+  setCls(E.prog, 'dim', mode !== 'loop');
+  E.prog.setAttribute('aria-valuenow', mode === 'loop' ? loopT.toFixed(1) : '0');
+}
+const w2s = (x, y) => [view.ox + x * view.sc, view.oy + y * view.sc];
+function placeCallout(fs){
+  if (!Wd) return;
+  // sits on the shelf row above WH-SCAN-07's aisle, ending at the scanner: covers furniture, not devices or labels
+  const co = E.callout, s7 = Wd.s07, wr = S.rooms.wh.r, cw = co.offsetWidth || 220, ch = co.offsetHeight || 28;
+  const cr = S.rooms.core.r, [cx, cy] = w2s(s7.x + s7.w * .5, S === SPECS.port ? (cr[1] + cr[3] + wr[1]) / 2 : wr[1] + wr[3] * .25);
+  const lx = clamp(cx - cw + 12, 8, view.cssW - cw - 8), ly = clamp(cy - ch / 2, 8, view.cssH - ch - 8);
+  setSt(co, 'transform', `translate(${Math.round(lx)}px, ${Math.round(ly)}px)`);
+  setSt(co, 'opacity', op(fs.callout * fs.fade));
+}
+function applyCursor(fs){
+  const c = fs.cursor;
+  if (!c || c.op <= 0){ setSt(E.fcur, 'opacity', '0'); return; }
+  const sr = stage.getBoundingClientRect(), br = E.zBtn.getBoundingClientRect();
+  const [wx, wy] = w2s(S.rooms.wh.r[0] + S.rooms.wh.r[2] * .55, S.rooms.wh.r[1] + S.rooms.wh.r[3] * .45);
+  const x0 = sr.left + wx, y0 = sr.top + wy, x1 = br.left + br.width * .5, y1 = br.top + br.height * .55;
+  const k = c.k, x = x0 + (x1 - x0) * k, y = y0 + (y1 - y0) * k - Math.sin(k * Math.PI) * 40;
+  setSt(E.fcur, 'opacity', op(c.op));
+  setSt(E.fcur, 'transform', `translate(${(x - 3).toFixed(1)}px, ${(y - 2).toFixed(1)}px) scale(${c.press ? .86 : 1})`);
+  const rp = c.ripple;
+  setSt(E.fcurR, 'opacity', op(rp > 0 && rp < 1 ? (1 - rp) * .9 : 0));
+  setSt(E.fcurR, 'transform', `scale(${(.4 + rp * 1.4).toFixed(3)})`);
+}
+
+/* ------------------------------------------------------------------ map tooltip (when the viewer drives) */
+function roomAt(x, y){ for (const k in S.rooms){ const r = S.rooms[k].r; if (x >= r[0] && x <= r[0] + r[2] && y >= r[1] && y <= r[1] + r[3]) return k; } return null; }
+function onMapMove(e){
+  if (!Wd || mode !== 'live'){ E.maptip.style.opacity = 0; return; }
+  const r = stage.getBoundingClientRect(), x = (e.clientX - r.left - view.ox) / view.sc, y = (e.clientY - r.top - view.oy) / view.sc, k = roomAt(x, y);
+  if (!k){ E.maptip.style.opacity = 0; canvas.style.cursor = 'default'; return; }
+  const inf = roomInfo(k, LV.zeek);
+  E.maptip.innerHTML = `<h3>${esc(ROOM_TXT[k][0])}</h3><div class="row" style="gap:6px;margin-bottom:5px"><span class="t3">Seen</span><b class="mono ${inf.cov === '0%' ? 'warn' : ''}">${inf.cov}</b></div>
+    <ul>${inf.srcs.map(([n, h, lag]) => `<li class="row" style="gap:6px"><span class="dot ${h === 'ok' ? 'ben' : h === 'late' ? 'warn' : 't3'}"></span><span>${esc(n)}</span>${lag ? `<span class="mono t3" style="margin-left:auto">${esc(lag)}</span>` : ''}</li>`).join('')}</ul>
+    ${inf.note ? `<p class="t2" style="margin-top:6px">${esc(inf.note)}</p>` : ''}`;
+  const px = e.clientX - r.left, py = e.clientY - r.top, tw = E.maptip.offsetWidth || 262, th = E.maptip.offsetHeight || 140;
+  E.maptip.style.transform = `translate(${Math.round(clamp(px + 14, 6, r.width - tw - 6))}px, ${Math.round(clamp(py + 14, 6, r.height - th - 6))}px)`; E.maptip.style.opacity = 1;
+  canvas.style.cursor = 'help';
+}
+stage.addEventListener('pointermove', onMapMove);
+stage.addEventListener('pointerdown', onMapMove);
+stage.addEventListener('pointerleave', () => { E.maptip.style.opacity = 0; });
+
+/* ------------------------------------------------------------------ modes, clock and the embed protocol */
+let mode = 'loop', loopT = 0, clock = 0, lastInput = 0, resetAt = 0, raf = 0, lastTs = 0, curFS = null;
+let extPaused = false, hidden = document.hidden, userPaused = false, seekPaused = false, offscreen = false;
+function draw(){
+  if (!S) fitView();
+  const fs = mode === 'loop' ? loopFS(loopT) : liveFS(clock);
+  if (mode === 'reset'){ const k = 1 - sstep(0, .8, clock - resetAt); fs.fade = k; fs.railDim = .35 + .65 * k; fs.cap = { hint: true, txt: '', op: 0 }; }
+  curFS = fs;
+  renderGL(fs); applyOverlay(fs); placeCallout(fs); applyRail(fs); applyFooter(fs); applyCursor(fs);
+}
+function resetLive(){ Object.assign(LV, { zeek: false, zFrom: 0, zAt: -99, sweep: false, snap: null, takeAt: -99, covFrom: 81, covAt: -99, reinvAt: 0, susAt: 0 }); }
+function takeover(){
+  lastInput = clock;
+  if (mode === 'live') return;
+  if (mode === 'loop'){
+    const s = loopFS(loopT);
+    LV.snap = s; LV.takeAt = clock;
+    LV.zeek = s.z > .5; LV.zFrom = s.z; LV.zAt = clock; LV.sweep = false;
+    LV.covFrom = s.cov == null ? 0 : s.cov; LV.covAt = clock - .6;
+    if (LV.zeek){ if (s.caseState === 'sus'){ LV.reinvAt = LV.susAt = clock - 1; } else { LV.reinvAt = clock - 1; LV.susAt = clock + (s.caseState === 'reinv' ? 1.4 : 2.4); } }
+  }
+  mode = 'live';
+  seekPaused = false; userPaused = false; app.classList.remove('nt');
+  sync(); if (!raf) draw();
+}
+function toggleZeek(){
+  const cur = liveFS(clock);
+  LV.zFrom = cur.z; LV.zeek = !LV.zeek; LV.zAt = clock; LV.sweep = LV.zeek;
+  LV.covFrom = cur.cov; LV.covAt = clock - (LV.zeek ? 0 : .6);
+  if (LV.zeek){ LV.reinvAt = clock + 1.2; LV.susAt = clock + 3.8; }
+  const b = E.zBtn; b.classList.remove('flash'); void b.offsetWidth; b.classList.add('flash');
+  if (!raf) draw();
+}
+E.zBtn.addEventListener('click', () => { if (mode !== 'live') takeover(); lastInput = clock; toggleZeek(); });
+
+function shouldRun(){ return !extPaused && !hidden && !userPaused && !seekPaused && !offscreen; }
+function sync(){
+  const r = shouldRun();
+  if (r && !raf){ lastTs = performance.now(); raf = requestAnimationFrame(frame); SMILS.forEach(s => s.unpauseAnimations && s.unpauseAnimations()); }
+  else if (!r && raf){ cancelAnimationFrame(raf); raf = 0; SMILS.forEach(s => s.pauseAnimations && s.pauseAnimations()); }
+  else if (!r) SMILS.forEach(s => s.pauseAnimations && s.pauseAnimations());
+  app.classList.toggle('is-paused', !r);
+  setText(E.liveTxt, (userPaused || extPaused) ? 'Paused' : 'Live');
+  const icon = mode !== 'loop' ? 'replay' : (r || (!userPaused && !seekPaused) ? 'pause' : 'play');
+  E.playBtn.innerHTML = icon === 'pause' ? '<svg width="12" height="12" viewBox="0 0 12 12"><rect x="2" y="1.5" width="2.6" height="9" rx="1" fill="currentColor"/><rect x="7.4" y="1.5" width="2.6" height="9" rx="1" fill="currentColor"/></svg>'
+    : icon === 'play' ? '<svg width="12" height="12" viewBox="0 0 12 12"><path d="M3 1.6v8.8l7.2-4.4z" fill="currentColor"/></svg>'
+    : '<svg width="14" height="14" viewBox="0 0 14 14"><path d="M11.5 7a4.5 4.5 0 1 1-1.3-3.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M10.9 1.4v3h-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  E.playBtn.setAttribute('aria-label', icon === 'pause' ? 'Pause tour' : icon === 'play' ? 'Play tour' : 'Restart the tour');
+}
+function frame(ts){
+  raf = requestAnimationFrame(frame);
+  const dt = Math.min(.1, Math.max(0, (ts - lastTs) / 1000)); lastTs = ts;
+  clock += dt;
+  if (mode === 'loop') loopT = (loopT + dt) % LOOP;
+  else if (mode === 'live' && clock - lastInput > IDLE){ mode = 'reset'; resetAt = clock; E.maptip.style.opacity = 0; }
+  else if (mode === 'reset' && clock - resetAt > .9){ mode = 'loop'; loopT = 0; resetLive(); sync(); }
+  adapt(dt * 1000);
+  draw();
+}
+function seekLoop(t){ mode = 'loop'; resetLive(); loopT = ((t % LOOP) + LOOP) % LOOP; SMILS.forEach(s => s.setCurrentTime && s.setCurrentTime(loopT)); }
+window.__seek = t => { seekLoop(+t || 0); seekPaused = true; app.classList.add('nt'); sync(); draw(); return loopT; };
+window.__play = () => { seekPaused = false; userPaused = false; extPaused = false; app.classList.remove('nt'); if (mode !== 'loop'){ seekLoop(0); } sync(); };
+window.__state = () => ({ mode, t: +loopT.toFixed(3), running: !!raf, zeek: curFS ? curFS.zeekOn : false, z: curFS ? +curFS.z.toFixed(3) : 0, caseState: curFS ? curFS.caseState : null, cov: curFS && curFS.cov != null ? Math.round(curFS.cov) : null, blind: curFS ? curFS.blindN : null, gl: GLOK, spec: S === SPECS.port ? 'port' : 'land' });
+
+E.playBtn.addEventListener('click', () => {
+  if (mode !== 'loop'){ seekLoop(0); seekPaused = false; userPaused = false; app.classList.remove('nt'); sync(); return; }
+  if (shouldRun()){ userPaused = true; } else { userPaused = false; seekPaused = false; app.classList.remove('nt'); }
+  sync(); if (!raf) draw();
+});
+function progAt(e){ const r = E.prog.getBoundingClientRect(); return clamp((e.clientX - r.left) / r.width, 0, 1) * LOOP; }
+E.prog.addEventListener('pointerdown', e => {
+  E.prog.setPointerCapture(e.pointerId);
+  const go = ev => { seekLoop(progAt(ev)); draw(); };
+  go(e);
+  const mv = ev => go(ev), up = () => { E.prog.removeEventListener('pointermove', mv); E.prog.removeEventListener('pointerup', up); };
+  E.prog.addEventListener('pointermove', mv); E.prog.addEventListener('pointerup', up);
+});
+
+/* real input takes over immediately; controls of the tour itself do not */
+const isTourCtl = e => e.target && e.target.closest && e.target.closest('.play, .prog');
+let moveAcc = 0;
+window.addEventListener('pointermove', e => {
+  if (isTourCtl(e)) return;
+  if (e.pointerType === 'mouse' && !e.movementX && !e.movementY) return; // synthetic moves when layout changes under a resting cursor
+  if (mode !== 'live'){ moveAcc += Math.abs(e.movementX || 0) + Math.abs(e.movementY || 0); if (e.pointerType === 'mouse' && moveAcc < 6) return; }
+  moveAcc = 0; takeover();
+}, { passive: true });
+for (const ev of ['pointerdown', 'wheel', 'keydown', 'touchstart']) window.addEventListener(ev, e => { if (isTourCtl(e)) return; takeover(); }, { passive: true });
+
+window.addEventListener('message', e => {
+  const d = e.data; if (!d || typeof d !== 'object') return;
+  if (d.corvid === 'pause'){ extPaused = true; sync(); }
+  else if (d.corvid === 'play'){ extPaused = false; sync(); }
+});
+document.addEventListener('visibilitychange', () => { hidden = document.hidden; sync(); });
+new IntersectionObserver(es => { offscreen = !es[0].isIntersecting; sync(); }).observe(stage);
+
+/* ------------------------------------------------------------------ sizing and adaptive quality */
+let ema = 16.7, since = 0, settle = 6;
+function resize(){
+  fitView();
+  sizeLanes();
+  if (GLOK){
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const w = Math.max(1, Math.round(view.cssW * dpr)), h = Math.max(1, Math.round(view.cssH * dpr));
+    if (canvas.width !== w || canvas.height !== h){ canvas.width = w; canvas.height = h; }
+    view.dpr = w / view.cssW; allocGI(view.cssW, view.cssH); allocMat(w, h); settle = 6;
+  }
+  draw();
+}
+function adapt(dtMs){
+  if (LOW || !GLOK) return; if (settle > 0){ settle--; return; } if (dtMs > 250) return;
+  ema += (dtMs - ema) * 0.07; since++; if (since < 30) return;
+  if (ema > 20.5 && tier > 0){ tier--; since = 0; ema = 16.7; allocGI(view.cssW, view.cssH); settle = 6; }
+  else if (ema < 15.5 && since > 240 && tier < BUDGETS.length - 2){ tier++; since = 0; allocGI(view.cssW, view.cssH); settle = 6; }
+}
+new ResizeObserver(() => resize()).observe(stage);
+
+/* ------------------------------------------------------------------ start */
+const qt = QS.get('t');
+fitView(); sizeLanes();
+if (qt != null && qt !== '' && isFinite(+qt)){ seekLoop(+qt); seekPaused = true; app.classList.add('nt'); }
+else if (reduced){ seekLoop(REDUCED_T); seekPaused = true; app.classList.add('nt'); }
+resize();
+sync();
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { sizeLanes(); if (S){ buildOverlay(); } if (!raf) draw(); });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1268 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blast radius</title>
+<!--
+  Keynote component: blast-radius.
+  "What can the stolen identity reach?" Meridian Freight's 1,964-entity graph as Gaussian splats (Spark 2.3.1, WebGL 2).
+  The camera flies the CASE-4127 path hop by hop, names condense as it nears (semantic zoom), blast-radius rings come
+  from a breadth-first search computed in this page, and containment cools the path. No WebGL 2: the same BFS as a table.
+  Engines reused from demos/pages/16-entity-blast-radius.html and app/case-entities.html.
+  Hooks: window.__seek(t) renders attract-loop time t and pauses (returns a promise), window.__play() resumes,
+         ?t=12.5 starts paused there, ?captions=0 hides captions, ?gl=0 forces the table fallback, ?q=low halves splats.
+  Parent messages {corvid:'pause'|'play'}; hidden tabs pause; when paused nothing renders.
+-->
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../shared/ui.css">
+<style>
+:root{--hh:48px;--pad:14px;--sideW:300px}
+html,body{height:100%;overflow:hidden;background:var(--ground)}
+body{min-height:0}
+button{font:inherit;color:inherit}
+.cmp{display:grid;grid-template-rows:var(--hh) minmax(0,1fr);width:100vw;height:100vh;height:100dvh}
+
+/* header */
+.ch{display:flex;align-items:center;gap:10px;padding:0 16px;border-bottom:1px solid #1C222B;background:var(--side);min-width:0}
+.ch-ic{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:7px;background:var(--raised);border:1px solid var(--line2);color:var(--text);flex:none}
+.ch h1{font-size:14.5px;font-weight:600;letter-spacing:-.01em;white-space:nowrap}
+.ch .ctx b{color:var(--text);font-weight:500}
+.ch .sp{flex:1;min-width:8px}
+.ch .who{display:inline-flex;align-items:center;gap:7px;color:var(--text2);font-size:12px;white-space:nowrap}
+.ch .who .ag{width:18px;height:18px;font-size:7.5px}
+.status{display:inline-flex;align-items:center;gap:7px;font:500 12px/1 var(--sans);color:var(--text2);white-space:nowrap}
+.status .dot{width:8px;height:8px;color:var(--cold3)}
+.status.off .dot{color:#5A6472}
+
+/* body */
+.body{display:grid;grid-template-columns:minmax(0,1fr) var(--sideW);gap:var(--pad);padding:var(--pad);min-height:0}
+.col{display:flex;flex-direction:column;gap:10px;min-width:0;min-height:0}
+.stage{position:relative;flex:1 1 auto;min-height:0;border-radius:10px;overflow:hidden;background:#080B0F;box-shadow:0 0 0 1px #1C222B,0 18px 60px rgba(0,0,0,.4);touch-action:none}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab;outline:none}
+.stage canvas.drag{cursor:grabbing}
+.stage .fade{position:absolute;inset:0;background:#080B0F;opacity:0;pointer-events:none;transition:opacity .6s ease;z-index:6}
+.stage .fade.on{opacity:1;transition:opacity .3s ease}
+.loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--text2);font-size:12.5px;z-index:5;background:radial-gradient(60% 60% at 50% 45%,#0F1822,#080B0F)}
+.loading .bar{width:180px;height:3px;border-radius:2px;background:var(--line);overflow:hidden}
+.loading .bar i{display:block;height:100%;width:40%;background:var(--cold3);animation:ld 1.2s ease-in-out infinite}
+@keyframes ld{0%{transform:translateX(-100%)}100%{transform:translateX(260%)}}
+@media (prefers-reduced-motion:reduce){.loading .bar i{animation:none;width:100%}}
+
+/* on-stage overlays */
+.zchip{position:absolute;left:12px;top:12px;z-index:3;display:flex;align-items:center;gap:8px;padding:5px 6px 5px 10px;border-radius:9px;background:rgba(10,13,17,.74);border:1px solid var(--line);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);font-size:11.5px;color:var(--text3);pointer-events:none}
+.zchip .zs{display:inline-flex;border:1px solid var(--line2);border-radius:6px;overflow:hidden}
+.zchip .zs span{padding:3px 7px;font:500 11px/1.2 var(--sans);color:var(--text3);border-right:1px solid var(--line2)}
+.zchip .zs span:last-child{border-right:0}
+.zchip .zs span.on{background:var(--raised);color:var(--text)}
+.vctl{position:absolute;right:12px;top:12px;z-index:3;display:flex;flex-direction:column;gap:2px;padding:3px;border-radius:10px;background:rgba(10,13,17,.74);border:1px solid var(--line);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.vctl button{width:30px;height:30px;border:0;border-radius:7px;background:transparent;color:var(--text2);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0}
+.vctl button:hover{background:var(--raised);color:var(--text)}
+.vctl hr{border:0;height:1px;background:var(--line2);margin:2px 4px}
+.ret{position:absolute;left:0;top:0;width:0;height:0;pointer-events:none;display:none;z-index:2}
+.ret .ring{position:absolute;left:-17px;top:-17px;width:34px;height:34px;border-radius:50%;border:1.5px solid rgba(232,235,239,.9);box-shadow:0 0 0 4px rgba(10,13,17,.35)}
+.ret .ring::before,.ret .ring::after{content:"";position:absolute;background:rgba(232,235,239,.9)}
+.ret .ring::before{left:50%;top:-7px;width:1.5px;height:5px;margin-left:-.75px}
+.ret .ring::after{top:50%;left:-7px;height:1.5px;width:5px;margin-top:-.75px}
+.ret .tag{position:absolute;left:24px;top:-14px;white-space:nowrap;padding:5px 9px;border-radius:7px;background:rgba(10,13,17,.86);border:1px solid var(--line2);font-size:11.5px;color:var(--text2);line-height:1.25}
+.ret .tag b{color:var(--text);font:600 12px/1.25 var(--mono)}
+.ret.sel .ring{border-style:dashed;border-color:var(--link)}
+.cap{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);z-index:3;display:flex;align-items:center;gap:10px;width:max-content;max-width:calc(100% - 28px);padding:9px 14px 9px 10px;border-radius:11px;background:rgba(8,10,13,.82);border:1px solid rgba(44,53,64,.8);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);font-size:14px;line-height:1.35;color:var(--text);transition:opacity .25s;pointer-events:none}
+.cap .ag,.cap .av{width:20px;height:20px;flex:none}
+.cap .av{font-size:8.5px}
+.cap[hidden]{display:none!important}
+
+/* table fallback, also the no-WebGL view */
+.fb{position:absolute;inset:0;z-index:4;display:flex;flex-direction:column;background:var(--panel)}
+.fb-h{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:12px;color:var(--text2)}
+.fb-h b{color:var(--text);font-weight:600;font-size:13px}
+.fb-s{flex:1;overflow:auto;min-height:0}
+.fb table td{padding:6px 12px;font-size:12.5px}
+.fb table th{padding:7px 12px}
+.fb .nm{font-family:var(--mono);color:var(--text)}
+.fb .via{font:11.5px var(--mono);color:var(--text3)}
+.fb tr.hot td:first-child{box-shadow:inset 3px 0 0 var(--hot2)}
+.fb tr.cold td:first-child{box-shadow:inset 3px 0 0 var(--cold3)}
+.fb tr.exposed td:first-child{box-shadow:inset 3px 0 0 var(--sus)}
+.fb tr.lit td{background:rgba(242,181,58,.07)}
+.fb tr.cur td{background:#18202A}
+.fb tbody tr{cursor:pointer}
+.hopdot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:0}
+
+/* control row */
+.ctl{display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-height:36px}
+.ibtn{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:9px;border:1px solid var(--line2);background:var(--raised);cursor:pointer;color:var(--text);flex:none}
+.ibtn:hover{border-color:var(--line3);background:#19202A}
+.clock{display:flex;align-items:baseline;gap:6px;white-space:nowrap}
+.clock .utc{font:600 15px/1 var(--mono);color:var(--text)}
+.clock .z{font:500 10.5px/1 var(--mono);color:var(--text3)}
+.vr{width:1px;height:22px;background:var(--line2);flex:none}
+.abtn{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 13px;border-radius:9px;border:1px solid var(--line2);background:var(--raised);color:var(--text);font:500 12.5px/1 var(--sans);cursor:pointer;white-space:nowrap;flex:none}
+.abtn:hover{border-color:var(--line3);background:#19202A}
+.abtn svg{flex:none}
+.abtn[aria-pressed="true"]{border-color:rgba(255,106,85,.55);background:rgba(255,106,85,.10);color:#FFD2CA}
+.abtn.amb[aria-pressed="true"]{border-color:rgba(242,181,58,.6);background:rgba(242,181,58,.10);color:#FBE2A8}
+.ctl .sp{flex:1}
+.acts{display:inline-flex;gap:10px}
+.abtn .sm{display:none}
+.legend{display:flex;align-items:center;gap:12px;font-size:11.5px;color:var(--text3);white-space:nowrap;flex-wrap:wrap}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:8px;height:8px;border-radius:50%;display:inline-block}
+
+/* side readout */
+.side{min-height:0;display:flex;flex-direction:column;gap:12px;overflow:auto;scrollbar-width:thin;scrollbar-color:#2C3540 transparent}
+.side>*{flex-shrink:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.eyebrow{font-size:10.5px;letter-spacing:.07em}
+.hop{position:relative;display:flex;flex-direction:column;gap:5px;min-height:136px}
+.hop-h{display:flex;align-items:center;gap:8px;min-width:0}
+.hop-h .eyebrow{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.hop-h .chip{margin-left:auto;flex:none}
+.hop-n{font:600 17px/1.25 var(--mono);color:var(--text);letter-spacing:-.01em;overflow-wrap:anywhere;margin-top:2px}
+.hop-t{font-size:12px;color:var(--text2)}
+.hop-d{font-size:12.5px;color:var(--text);line-height:1.45}
+.hop-list{list-style:none;margin:2px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.hop-list li{display:grid;grid-template-columns:20px minmax(0,1fr);gap:8px;align-items:start;font-size:12px;color:var(--text2);line-height:1.4}
+.hop-list li.wait{opacity:.4}
+.hop-list .ag,.hop-list .av{width:18px;height:18px;font-size:7.5px;margin-top:1px}
+.hop-list b{color:var(--text);font-weight:500}
+.chain{display:flex;flex-wrap:wrap;align-items:center;gap:3px 4px;font:11px/1.5 var(--mono);color:var(--text2);margin-top:2px}
+.chain .ar{color:var(--text3)}
+.hop .x{position:absolute;right:8px;bottom:8px;height:24px;padding:0 8px;border-radius:6px;border:1px solid var(--line2);background:transparent;color:var(--text2);font-size:11.5px;cursor:pointer}
+.hop .x:hover{color:var(--text);border-color:var(--line3)}
+.crumbs{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-wrap:wrap;align-items:center;gap:5px 3px}
+.crumbs li{display:flex;align-items:center;gap:3px}
+.crumbs li:not(:last-child)::after{content:"›";color:#4A5361;font-size:12px;margin-left:1px}
+.crumbs button{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 7px;border-radius:6px;border:1px solid var(--line2);background:transparent;font:500 11px/1 var(--mono);color:var(--text3);cursor:pointer;white-space:nowrap}
+.crumbs button i{width:6px;height:6px;border-radius:50%;background:#3A4656;flex:none}
+.crumbs button.hot{color:#FFB4A8;border-color:rgba(255,106,85,.45)}
+.crumbs button.hot i{background:var(--hot2);box-shadow:0 0 6px rgba(255,106,85,.8)}
+.crumbs button.cold{color:var(--cold3);border-color:rgba(127,214,238,.35)}
+.crumbs button.cold i{background:var(--cold3)}
+.crumbs button.exposed{color:var(--sus);border-color:rgba(242,181,58,.45)}
+.crumbs button.exposed i{background:var(--sus)}
+.crumbs button.cur{background:#18202A;box-shadow:0 0 0 1px var(--text2)}
+.crumbs button:hover{color:var(--text)}
+.headline{display:flex;align-items:baseline;gap:8px;margin:8px 0 2px;flex-wrap:wrap}
+.headline .n{font:600 26px/1 var(--sans);letter-spacing:-.02em;color:var(--sus);transition:color .4s}
+.headline .n.dim{color:var(--text2)}
+.headline .l{font-size:12px;color:var(--text2)}
+.bt{width:100%;border-collapse:collapse;margin-top:8px;font-size:12px}
+.bt th{font:500 10px/1.2 var(--sans);letter-spacing:.05em;text-transform:uppercase;color:var(--text3);text-align:right;padding:5px 4px;border-bottom:1px solid var(--line)}
+.bt th:first-child,.bt td:first-child{text-align:left}
+.bt td{padding:6px 4px;border-bottom:1px solid #1A2029;text-align:right;font-family:var(--mono);color:var(--text3);transition:color .3s,background .3s}
+.bt tr.lit td{color:var(--sus);background:rgba(242,181,58,.06)}
+.bt tr.lit td:first-child{color:var(--text)}
+.bt tr.tot td{color:var(--text2);border-bottom:0;border-top:1px solid var(--line2)}
+.bt tr.tot.lit td{color:var(--text);background:transparent}
+.foot{display:flex;gap:9px;align-items:flex-start;font-size:11.5px;line-height:1.5;color:var(--text3);padding:0 4px}
+.foot .ag{width:18px;height:18px;font-size:7.5px;margin-top:1px}
+
+@media (max-width:1180px){:root{--sideW:272px}.ch .who{display:none}.legend .lx{display:none}}
+@media (min-width:1500px){:root{--sideW:320px}}
+@media (max-width:760px){
+  :root{--pad:10px}
+  .ch{gap:8px;padding:0 12px}
+  .ch .ctx .tn,.ch .cnt{display:none}
+  .body{display:flex;flex-direction:column;gap:10px}
+  .col{flex:0 0 auto}
+  .stage{flex:0 0 auto;height:clamp(220px,31vh,340px)}
+  .ctl{gap:8px}
+  .acts{flex:1 1 100%;display:flex;gap:8px}
+  .abtn{flex:1 1 0;justify-content:center;padding:0 8px}
+  .abtn .lg{display:none}.abtn .sm{display:inline}
+  .crumbs-card .eyebrow,.blast-card>.eyebrow,.hop-d{display:none}
+  .card{padding:10px 12px}
+  .hop-n{font-size:15px}
+  .headline{margin:4px 0 0}.headline .n{font-size:22px}
+  .bt{margin-top:4px}.bt td{padding:4px}.bt th{padding:4px}
+  .crumbs{margin-top:6px}
+  .vr,.legend,.ctl .sp{display:none}
+  .crumbs{margin-top:0}
+  .side{flex:1 1 auto;gap:10px}
+  .hop{min-height:0}
+  .foot{display:none}
+  .cap{font-size:12.5px;bottom:10px;padding:7px 10px}
+  .zchip .zl{display:none}
+  .ret .tag{font-size:11px}
+}
+@media (max-width:420px){.status .lbl{display:none}}
+</style>
+</head>
+<body>
+<div class="cmp" id="cmp">
+  <header class="ch">
+    <span class="ch-ic" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="8" r="6.4" stroke-opacity=".45"/><circle cx="8" cy="8" r="3.9" stroke-opacity=".75"/><circle cx="8" cy="8" r="1.5" fill="currentColor" stroke="none"/></svg></span>
+    <h1>Blast radius</h1>
+    <span class="chip ctx"><b class="mono">CASE-4127</b><span class="tn">· Meridian Freight</span></span>
+    <span class="chip mono cnt" id="entCount">1,964 entities</span>
+    <span class="sp"></span>
+    <span class="who"><span class="ag">TR</span>BFS by Triage · snapshot 02:41 UTC</span>
+    <span class="status" id="status" role="status"><span class="dot live"></span><span class="lbl" id="statusText">Auto-tour</span></span>
+  </header>
+
+  <main class="body">
+    <section class="col" aria-label="Entity graph">
+      <div class="stage" id="stage">
+        <canvas id="c" tabindex="0" aria-label="Meridian Freight's entity graph as Gaussian splats. The CASE-4127 attack path flares hot hop by hop, names condense as the camera nears, blast-radius rings warm amber by hop, and containment cools the path. The side panel and the table view hold the same data."></canvas>
+        <div class="zchip" id="zchip" aria-hidden="true"><span class="zl">Semantic zoom</span><span class="zs"><span data-z="0" class="on">Clusters</span><span data-z="1">Entities</span><span data-z="2">Names</span></span></div>
+        <div class="vctl" id="vctl" role="group" aria-label="Camera">
+          <button type="button" data-act="zin" aria-label="Zoom in" title="Zoom in"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M7 2.5v9M2.5 7h9"/></svg></button>
+          <button type="button" data-act="zout" aria-label="Zoom out" title="Zoom out"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2.5 7h9"/></svg></button>
+          <hr>
+          <button type="button" data-act="left" aria-label="Orbit left" title="Orbit left"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11.5 8.5A4.8 4.8 0 1 1 9.8 3.2"/><path d="M9.6 1v2.4H12"/></svg></button>
+          <button type="button" data-act="right" aria-label="Orbit right" title="Orbit right"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 8.5A4.8 4.8 0 1 0 4.2 3.2"/><path d="M4.4 1v2.4H2"/></svg></button>
+          <hr>
+          <button type="button" data-act="reset" aria-label="Reset view" title="Reset view"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5V2h3M12 5V2H9M2 9v3h3M12 9v3H9"/></svg></button>
+        </div>
+        <div class="ret" id="ret" aria-hidden="true"><span class="ring"></span><span class="tag" id="retTag"></span></div>
+        <div class="cap" id="cap" aria-live="polite"><span class="ag" id="capWho">IN</span><span id="capText"></span></div>
+        <div class="fb" id="fb" hidden>
+          <div class="fb-h"><b>Reachable from the stolen identity</b><span id="fbWhy">Table view</span></div>
+          <div class="fb-s"><table class="tbl" id="fbt"><thead><tr><th>Entity</th><th>Type</th><th>Hop</th><th>Via</th></tr></thead><tbody></tbody></table></div>
+        </div>
+        <div class="loading" id="loading"><span>Building the entity graph: 1,964 entities as Gaussian splats</span><span class="bar"><i></i></span></div>
+        <div class="fade" id="fade"></div>
+      </div>
+      <div class="ctl">
+        <button type="button" class="ibtn" id="play" aria-label="Pause"><svg id="playIcon" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"></svg></button>
+        <span class="clock" title="Incident clock (UTC)"><span class="utc" id="utc">02:11:40</span><span class="z">UTC</span></span>
+        <span class="vr"></span>
+        <span class="acts">
+        <button type="button" class="abtn" id="fly" aria-pressed="false"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="2.8" cy="12.6" r="1.6"/><circle cx="13.2" cy="3.4" r="1.6"/><path d="M4.2 11.4c2-1 1.5-4 4-4.8s2.4-2 3.6-2.6"/></svg><span class="lg">Fly the attack path</span><span class="sm">Fly the path</span></button>
+        <button type="button" class="abtn amb" id="blastBtn" aria-pressed="false"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="8" cy="8" r="6.3" stroke-opacity=".5"/><circle cx="8" cy="8" r="3.8"/><circle cx="8" cy="8" r="1.4" fill="currentColor" stroke="none"/></svg><span class="lg">Show blast radius</span><span class="sm">Blast radius</span></button>
+        </span>
+        <span class="sp"></span>
+        <span class="legend" aria-hidden="true"><span><i style="background:var(--hot2)"></i>Attack path</span><span><i style="background:var(--sus)"></i>Reachable</span><span><i style="background:var(--agent)"></i>Agent action</span><span class="lx"><i style="background:var(--cold3)"></i>Trusted or contained</span></span>
+      </div>
+    </section>
+
+    <aside class="side" aria-label="Blast radius readout">
+      <section class="card hop" id="hop" aria-live="polite"></section>
+      <section class="card crumbs-card">
+        <p class="eyebrow">Attack path</p>
+        <ol class="crumbs" id="crumbs"></ol>
+      </section>
+      <section class="card blast-card">
+        <p class="eyebrow">Blast radius from the stolen identity</p>
+        <div class="headline"><span class="n" id="reachN">0</span><span class="l" id="reachL">entities reachable within 3 hops</span></div>
+        <table class="bt" id="bt"><thead><tr><th>Hop</th><th>Devices</th><th>Apps</th><th>Roles</th><th>Data</th></tr></thead><tbody></tbody></table>
+      </section>
+      <p class="foot"><span class="ag">TR</span><span id="footText">Breadth-first search over “can reach” relationships from j.alvarez, WIN-7F2C and okta session 9f3c (hop 0), computed in this page.</span></p>
+    </aside>
+  </main>
+</div>
+
+<script>
+/* =====================================================================
+   Model: the seeded Meridian Freight tenant (1,964 entities), the CASE-4127 path, BFS blast radius.
+   Pure JS, no WebGL needed (from app/case-entities.html). Exposed as window.BR for the renderer module.
+   ===================================================================== */
+(() => {
+'use strict';
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const TAU = Math.PI * 2;
+const polar = (r, deg, y) => [r * Math.cos(deg * Math.PI / 180), y, r * Math.sin(deg * Math.PI / 180)];
+const addv = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+const lerpv = (a, b, u) => [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u];
+const CAT = { user: 0, host: 1, role: 2, data: 3, app: 4, ip: 5 };
+const CAT_LABEL = ['User', 'Device', 'Cloud role', 'Data store', 'App or session', 'External IP'];
+const CAT_SHORT = ['User', 'Device', 'Role', 'Data store', 'App/session', 'IP'];
+const ents = [], edges = [];
+const R = mulberry32(4127);
+const gauss = () => { let u = 0; while (u === 0) u = R(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU * R()); };
+function add(name, cat, pos, cluster, size = 1) { ents.push({ id: ents.length, name, cat, pos, size, cluster, tone: R() }); return ents.length - 1; }
+const link = (a, b) => edges.push([a, b]);
+const ball = (c, r, flat = 0.6) => [c[0] + gauss() * r, c[1] + gauss() * r * flat, c[2] + gauss() * r];
+const FIRST = 'ana ben chen dana eli farah gus hana ivan jae kai lena mo nia omar pia quinn raj sara tomas uma vik wen xia yusuf zoe abel bea cyrus dev esme finn gia hugo ines jon kofi lara milo noor otto pele rhea sol tara'.split(' ');
+const LAST = 'adams baker cruz diaz evans ford garcia hill ito james khan lopez moore ng ortiz patel quinn reyes silva tan usman vega wong young zhang abara brandt costa duarte eriksen fischer gomez holm iqbal jensen kowalski lindqvist mensah novak okafor petrov rossi sato ueda varga weber'.split(' ');
+const userName = () => `${FIRST[Math.floor(R() * FIRST.length)][0]}.${LAST[Math.floor(R() * LAST.length)]}`;
+const HUB = [0, 0, 0];
+const okta = add('Okta', CAT.app, HUB.slice(), 'Okta', 7);
+const APPS = ['Microsoft 365', 'Slack', 'Salesforce', 'Workday', 'GitHub', 'Zscaler', 'Jira', 'Confluence', 'ServiceNow', 'DocuSign',
+  'Zoom', 'Box', 'Snowflake', 'Datadog', 'PagerDuty', 'Concur', 'NetSuite', 'SAP TMS', 'Samsara', 'Project44', 'Figma'];
+const app = {};
+APPS.forEach((n, i) => { app[n] = add(n, CAT.app, polar(3.3, i * 360 / APPS.length + 8, 0.9 + 0.35 * Math.sin(i * 1.7)), 'SaaS', 2.2); });
+for (let i = 0; i < 34; i++) add(`okta session ${(Math.floor(R() * 0xffff)).toString(16).padStart(4, '0')}`, CAT.app, ball(HUB, 0.75, 0.8), 'Okta', 0.6);
+const DEPTS = [
+  { name: 'Finance', n: 64, pre: 'FIN', ang: 135, apps: ['Workday', 'Concur', 'NetSuite', 'Snowflake'] },
+  { name: 'Operations', n: 190, pre: 'OPS', ang: 180, apps: ['SAP TMS', 'Project44', 'Samsara'] },
+  { name: 'Warehouse', n: 300, pre: 'WH', ang: 222, apps: ['SAP TMS'], kiosk: true },
+  { name: 'Engineering', n: 92, pre: 'ENG', ang: 266, apps: ['GitHub', 'Datadog', 'Jira', 'Confluence', 'PagerDuty'] },
+  { name: 'HR', n: 28, pre: 'HRS', ang: 306, apps: ['Workday', 'DocuSign'] },
+  { name: 'Executive', n: 12, pre: 'EXE', ang: 24, apps: ['Box', 'Zoom', 'Salesforce'] },
+  { name: 'IT', n: 36, pre: 'ITS', ang: 55, apps: ['ServiceNow', 'Zscaler', 'Jira'] },
+  { name: 'Sales', n: 72, pre: 'SAL', ang: 94, apps: ['Salesforce', 'DocuSign', 'Zoom'] },
+];
+const clusterCenters = {}, deptUsers = {};
+for (const d of DEPTS) {
+  const c = polar(7.6, d.ang, (R() - 0.5) * 0.8); clusterCenters[d.name] = c;
+  const ru = 0.32 + 0.05 * Math.sqrt(d.n), users = deptUsers[d.name] = [];
+  for (let i = 0; i < d.n; i++) {
+    const u = add(userName(), CAT.user, ball(addv(c, [0, 0.3, 0]), ru, 0.55), d.name); users.push(u);
+    link(u, okta); link(u, app['Microsoft 365']); link(u, app['Slack']);
+    for (const a of d.apps) if (R() < 0.85) link(u, app[a]);
+    if (!d.kiosk) { const h = add(`${d.pre}-LT-${String(i + 1).padStart(4, '0')}`, CAT.host, ball(addv(c, [0, -0.55, 0]), ru * 0.95, 0.4), d.name, 0.9); link(u, h); }
+  }
+  if (d.kiosk) {
+    for (let i = 0; i < 60; i++) add(`WH-KIOSK-${String(i + 1).padStart(2, '0')}`, CAT.host, ball(addv(c, [0, -0.6, 0]), ru * 0.9, 0.4), d.name, 0.9);
+    for (let i = 0; i < 40; i++) add(`WH-SCAN-${String(i + 1).padStart(2, '0')}`, CAT.host, ball(addv(c, [0.4, -0.9, 0.2]), ru * 0.7, 0.4), d.name, 0.8);
+  }
+}
+const AWS = polar(12.2, -16, 1.9);
+const awsDataRoles = addv(AWS, [-0.2, 0.9, 0.2]), awsBuckets = addv(AWS, [1.3, -0.7, 1.2]), awsAppRoles = addv(AWS, [-0.9, 0.2, -2.4]), awsAppData = addv(AWS, [0.8, -0.6, -3.4]), awsDevRoles = addv(AWS, [2.6, 1.3, -1.2]);
+clusterCenters['AWS mf-prod-data'] = addv(AWS, [0.5, 0.1, 0.7]); clusterCenters['AWS mf-prod-app'] = addv(AWS, [0, 0, -2.9]); clusterCenters['AWS mf-dev'] = awsDevRoles.slice();
+const DATA_ROLES = ['DataEngineer', 'LakeFormationAdmin', 'GlueJobRole', 'AthenaAnalyst', 'BackupOperator', 'AuditReadOnly', 'SecurityTooling',
+  'etl-runner', 'snowflake-ingest', 'cost-reporting', 'QuickSightReader', 'RedshiftLoader', 'KinesisWriter', 's3-replication', 'break-glass',
+  'terraform-deployer', 'dms-migrate', 'partner-sftp', 'EventBridgeRouter', 'LambdaETL', 'DataSteward', 'SupportReadOnly'];
+const BUCKETS = ['mf-finance-archive', 'mf-ap-invoices', 'mf-payroll-reports', 'mf-customer-contracts', 'mf-shipment-manifests',
+  'mf-telematics-raw', 'mf-telematics-curated', 'mf-lake-bronze', 'mf-lake-silver', 'mf-lake-gold', 'mf-athena-results', 'mf-glue-scripts',
+  'mf-backups-rds', 'mf-cloudtrail-logs', 'mf-vpc-flowlogs', 'mf-snowflake-stage', 'mf-partner-sftp', 'mf-quicksight-cache', 'mf-ml-features',
+  'mf-audit-evidence', 'mf-tax-filings', 'mf-hr-exports', 'mf-legal-hold'];
+const dataRole = {}, bucket = {};
+DATA_ROLES.forEach(n => { dataRole[n] = add(n, CAT.role, ball(awsDataRoles, 0.55, 0.6), 'AWS mf-prod-data', 1.3); });
+BUCKETS.forEach(n => { bucket[n] = add(n, CAT.data, ball(awsBuckets, 0.6, 0.55), 'AWS mf-prod-data', 1.3); });
+const APP_ROLES = ['dispatch-api', 'routing-engine', 'tracking-web', 'pricing-svc', 'customer-portal', 'eta-model', 'notify-svc', 'billing-sync',
+  'edi-gateway', 'carrier-api', 'label-print', 'yard-mgmt', 'fuel-cards', 'claims-svc', 'quote-svc', 'driver-app', 'telemetry-ingest',
+  'geo-fence', 'proof-of-delivery', 'customs-docs', 'rate-engine', 'returns-svc', 'ops-dashboards', 'search-svc', 'auth-proxy', 'ci-deploy',
+  'k8s-node-prod-eu', 'k8s-irsa-batch', 'secrets-reader', 'config-sync'];
+const appRoleIds = APP_ROLES.map(n => add(n, CAT.role, ball(awsAppRoles, 0.7, 0.6), 'AWS mf-prod-app', 1.1));
+const APP_DATA = ['dispatch-db', 'tracking-db', 'pricing-db', 'claims-db', 'portal-db', 'mf-portal-uploads', 'mf-pod-images', 'mf-edi-archive',
+  'mf-labels', 'mf-customs-docs', 'mf-driver-media', 'mf-app-logs', 'mf-geo-tiles', 'mf-model-artifacts'];
+const appDataIds = APP_DATA.map(n => add(n, CAT.data, ball(awsAppData, 0.55, 0.6), 'AWS mf-prod-app', 1.1));
+appRoleIds.forEach((r, i) => { link(r, appDataIds[i % appDataIds.length]); if (R() < 0.4) link(r, appDataIds[Math.floor(R() * appDataIds.length)]); });
+for (let i = 0; i < 20; i++) add(`dev-${['sandbox', 'ci', 'ml', 'qa'][i % 4]}-${String(i + 1).padStart(2, '0')}`, CAT.role, ball(awsDevRoles, 0.5, 0.6), 'AWS mf-dev', 0.9);
+const K8S = polar(12.6, 238, -1.4); clusterCenters['prod-eu'] = K8S;
+for (let i = 0; i < 18; i++) { const n = add(`ip-10-42-${Math.floor(i / 6) + 5}-${10 + (i % 6) * 3}`, CAT.host, ball(addv(K8S, [0, 0.3, 0]), 0.5, 0.5), 'prod-eu', 1.4); link(n, appRoleIds[26 + (i % 2)]); }
+for (let i = 0; i < 60; i++) add(`srv-${['db', 'app', 'edi', 'ftp', 'dc'][i % 5]}-${String(i + 1).padStart(2, '0')}`, CAT.host, ball(addv(K8S, [0.9, -0.6, 1.0]), 0.75, 0.45), 'prod-eu', 1.0);
+const FLEET = polar(13.4, 196, -2.8); clusterCenters['Fleet telematics'] = FLEET;
+for (let i = 0; i < 260; i++) { const tr = add(`TRK-${String(1000 + i)}`, CAT.host, ball(FLEET, 1.25, 0.35), 'Fleet telematics', 0.7); if (R() < 0.15) link(tr, app['Samsara']); }
+for (let i = 0; i < 64; i++) {
+  const z = 2 * R() - 1, ph = R() * TAU, rr = Math.sqrt(1 - z * z), rad = 17 + R() * 3;
+  add(`198.51.100.${Math.floor(R() * 250) + 2}`, CAT.ip, [rr * Math.cos(ph) * rad, Math.abs(z) * rad * 0.5 + 1, rr * Math.sin(ph) * rad], 'Internet', 0.9);
+}
+link(app['Snowflake'], bucket['mf-snowflake-stage']); link(app['Snowflake'], bucket['mf-lake-gold']);
+link(app['NetSuite'], bucket['mf-ap-invoices']); link(app['Workday'], bucket['mf-hr-exports']); link(app['Workday'], bucket['mf-payroll-reports']);
+link(app['Concur'], bucket['mf-ap-invoices']); link(app['Box'], bucket['mf-legal-hold']);
+for (const n of DATA_ROLES) for (let k = 0; k < 3; k++) link(dataRole[n], bucket[BUCKETS[Math.floor(R() * BUCKETS.length)]]);
+deptUsers['Engineering'].forEach(u => { if (R() < 0.3) link(u, appRoleIds[Math.floor(R() * appRoleIds.length)]); });
+/* the CASE-4127 path */
+const FIN = clusterCenters['Finance'], IP_POS = polar(18.4, 141, 6.4);
+const pIP = add('203.0.113.77', CAT.ip, IP_POS, 'Internet', 3.2);
+const finDir = (() => { const d = [IP_POS[0] - FIN[0], 0, IP_POS[2] - FIN[2]]; const l = Math.hypot(d[0], d[2]); return [d[0] / l, 0, d[2] / l]; })();
+const pUser = add('j.alvarez', CAT.user, addv(addv(FIN, [0, 0.35, 0]), [finDir[0] * 0.75, 0, finDir[2] * 0.75]), 'Finance', 3.0);
+const pDev = add('WIN-7F2C', CAT.host, addv(lerpv(ents[pUser].pos, IP_POS, 0.2), [0, 0.5, 0]), 'Unmanaged', 2.8);
+const finN = (() => { const l = Math.hypot(FIN[0], FIN[1], FIN[2]); return [FIN[0] / l, FIN[1] / l, FIN[2] / l]; })();
+const pSess = add('okta session 9f3c', CAT.app, addv([finN[0] * 1.15, finN[1] * 1.15, finN[2] * 1.15], [0, 0.45, 0]), 'Okta', 2.6);
+const pFDR = add('FinanceDataReadOnly', CAT.role, addv(awsDataRoles, [-0.95, 0.25, 0.55]), 'AWS mf-prod-data', 2.8);
+const pOps = add('ops-admin', CAT.role, addv(awsDataRoles, [0.75, 0.6, -0.45]), 'AWS mf-prod-data', 3.0);
+const pBkt = add('mf-finance-exports', CAT.data, addv(awsBuckets, [-0.4, 0.15, 0.75]), 'AWS mf-prod-data', 3.0);
+const pRule = add('inbox rule zz-rss', CAT.app, addv(ents[app['Microsoft 365']].pos, [0.15, 0.55, 0.2]), 'SaaS', 2.4);
+const PATH = [pIP, pUser, pDev, pSess, pFDR, pOps, pBkt, pRule];
+const PATH_SET = new Set(PATH);
+const jLaptop = add('FIN-LT-0388', CAT.host, addv(ents[pUser].pos, [0.3, -0.75, 0.15]), 'Finance', 1.2);
+link(pUser, jLaptop); link(pUser, okta); link(pUser, app['Microsoft 365']); link(pUser, app['Slack']);
+for (const a of ['Workday', 'Concur', 'NetSuite', 'Snowflake']) link(pUser, app[a]);
+link(pUser, pDev); link(pDev, pSess); link(pSess, pFDR); link(pSess, app['Microsoft 365']); link(app['Microsoft 365'], pRule);
+deptUsers['Finance'].forEach(u => { if (R() < 0.55) link(u, pFDR); });
+for (const b of ['mf-finance-archive', 'mf-ap-invoices', 'mf-payroll-reports', 'mf-tax-filings']) link(pFDR, bucket[b]);
+link(pFDR, pBkt); link(pFDR, pOps);
+for (const b of BUCKETS) link(pOps, bucket[b]);
+link(pOps, pBkt);
+for (const n of DATA_ROLES) if (R() < 0.85) link(pOps, dataRole[n]);
+for (let k = 0; k < 6; k++) link(pOps, appDataIds[k]);
+deptUsers['IT'].slice(0, 4).forEach(u => link(u, pOps));
+
+/* ---------- blast radius: BFS over "can reach" from the stolen identity ---------- */
+const adj = ents.map(() => []), radj = ents.map(() => []);
+for (const [a, b] of edges) { adj[a].push(b); radj[b].push(a); }
+const deg = ents.map((_, i) => adj[i].length + radj[i].length);
+const hop = new Array(ents.length).fill(Infinity), parent = new Array(ents.length).fill(-1);
+{ const q = [pUser, pDev, pSess]; for (const s of q) hop[s] = 0;
+  while (q.length) { const c = q.shift(); if (hop[c] >= 3) continue; for (const n of adj[c]) if (hop[n] === Infinity) { hop[n] = hop[c] + 1; parent[n] = c; q.push(n); } } }
+
+window.BR = { mulberry32, TAU, ents, edges, CAT, CAT_LABEL, DEPTS, clusterCenters, deptUsers, HUB, K8S, FLEET, AWS, IP_POS, okta, app,
+  PATH, PATH_SET, pIP, pUser, pDev, pSess, pFDR, pOps, pBkt, pRule, adj, radj, deg, hop, parent, CAT_SHORT };
+})();
+</script>
+<script>
+/* =====================================================================
+   Director: attract loop, story time, side readout, captions, controls, embedding protocol, table fallback.
+   Story time s runs 0-30 (the storyboard below); the attract loop plays it in 33 s.
+     0.0  wide: Meridian Freight's identity graph, cold
+     0.6  203.0.113.77 flares; 0.9-3.9 fifteen push beads fly to j.alvarez, 14 cool to ice (denied), the 15th lands hot
+     3.8  j.alvarez ignites; the camera follows the path: 5.6 device, 6.8 session, 8.2 FinanceDataReadOnly, 9.6 ops-admin, 11.0 bucket
+    11.6  exfil arc mf-finance-exports -> 203.0.113.77; 13.2 inbox rule
+    13.6  pull back; 14.0 blast-radius rings by BFS hop: 1, 2 at 14.9, 3 at 15.8 (amber)
+    17.8  Responder revokes Okta sessions (chartreuse sweep); 19.0-19.8 approved actions cool the rest
+    20.6  rings cool; the bucket stays amber: data already left
+    26.5-28.5 everything returns to cold; 30 = 0
+   ===================================================================== */
+(() => {
+'use strict';
+const BR = window.BR;
+const { ents, edges, PATH, PATH_SET, hop, parent, CAT, CAT_LABEL, pUser, pDev, pSess } = BR;
+const Q = new URLSearchParams(location.search);
+const REDUCE = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const clamp = (x, a, b) => x < a ? a : x > b ? b : x;
+const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+const lerp = (a, b, u) => a + (b - a) * u;
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/* ---------- storyboard constants (shared with the GLSL) ---------- */
+const S_LOOP = 30;
+const PT = [0.6, 3.8, 5.6, 6.8, 8.2, 9.6, 11.0, 13.2];          // ignition
+const CT = [19.4, 17.8, 17.8, 17.8, 19.0, 19.0, 99.0, 19.8];      // containment
+const RES = [0.3, 0, 0, 0, 0, 0, 0.52, 0];                         // what stays warm after containment
+const EDGE_PATH = [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 0], [3, 7]];
+const E0 = [3.72, 3.9, 5.7, 6.9, 8.3, 9.7, 11.5, 12.7];
+const E1 = [3.95, 5.6, 6.8, 8.2, 9.6, 11.0, 12.6, 13.2];
+const EC = [19.4, 17.8, 17.8, 19.0, 19.0, 19.0, 19.4, 19.8];
+const PATH_INFO = [
+  { time: '02:11:52', type: 'External IP', sub: '15 Okta Verify pushes; 14 denied in 2 m 39 s', short: '203.0.113.77', label: ['203.0.113.77', 'AS64500 HostBV, never seen in 180 days'], hot: 'Hostile', cold: 'Blocked' },
+  { time: '02:14:38', type: 'User', sub: 'Approved the 15th push at 02:14:38', short: 'j.alvarez', label: ['j.alvarez', 'Finance analyst, approved push 02:14'], hot: 'Compromised', cold: 'Sessions revoked' },
+  { time: '02:14:38', type: 'Device', sub: 'New Windows device, registered at the approval', short: 'WIN-7F2C', label: ['WIN-7F2C', 'new device, registered 02:14'], hot: 'Unmanaged', cold: 'Revoked' },
+  { time: '02:15:10', type: 'Okta session', sub: 'Session from Amsterdam, impossible travel', short: 'okta 9f3c', label: ['okta session 9f3c', 'Amsterdam, impossible travel'], hot: 'Active', cold: 'Revoked' },
+  { time: '02:17:44', type: 'Cloud role', sub: 'AWS SSO sign-in from AS64500', short: 'FinanceDataReadOnly', label: ['FinanceDataReadOnly', 'AWS SSO, 02:17'], hot: 'In use', cold: 'STS revoked' },
+  { time: '02:21:03', type: 'Privileged cloud role', sub: 'AssumeRole, first time in 365 days', short: 'ops-admin', label: ['ops-admin', 'first AssumeRole in 365 days'], hot: 'In use', cold: 'STS revoked' },
+  { time: '02:29:47', type: 'S3 bucket', sub: '1,284 objects, 2.3 GB read, sent to 203.0.113.77', short: 'mf-finance-exports', label: ['mf-finance-exports', '1,284 objects, 2.3 GB read'], hot: 'Read', cold: 'Data exposed' },
+  { time: '02:35:02', type: 'M365 inbox rule', sub: 'Moves invoice and payment mail to RSS Feeds', short: 'zz-rss', label: ['inbox rule zz-rss', 'invoice|payment to RSS Feeds'], hot: 'Active', cold: 'Removed' },
+];
+// which path entity the camera is visiting, and where a breadcrumb click lands
+const HOLDS = [[2.4, 3.9, 0], [3.9, 5.2, 1], [5.2, 6.5, 2], [6.5, 7.8, 3], [7.8, 9.2, 4], [9.2, 11.2, 5], [11.2, 13.2, 6], [13.2, 14.0, 7]];
+const CRUMB_S = [3.1, 4.6, 6.0, 7.3, 8.7, 10.4, 12.0, 13.45];
+const CLOCK = [[0, '02:11:40'], [0.6, '02:11:52'], [3.8, '02:14:31'], [4.0, '02:14:38'], [5.6, '02:14:38'], [6.8, '02:15:10'], [8.2, '02:17:44'], [9.6, '02:21:03'],
+  [11.0, '02:29:47'], [12.6, '02:31:12'], [13.2, '02:35:02'], [14.0, '02:36:40'], [17.8, '02:38:05'], [19.0, '02:47:20'], [19.8, '02:47:41'], [30, '02:48:30']]
+  .map(([t, x]) => [t, x.split(':').reduce((a, v) => a * 60 + +v, 0)]);
+function clockAt(s) {
+  let i = 0; while (i < CLOCK.length - 2 && s >= CLOCK[i + 1][0]) i++;
+  const [t0, a] = CLOCK[i], [t1, b] = CLOCK[i + 1], v = Math.round(lerp(a, b, clamp((s - t0) / (t1 - t0), 0, 1)));
+  return [Math.floor(v / 3600), Math.floor(v / 60) % 60, v % 60].map(n => String(n).padStart(2, '0')).join(':');
+}
+const CAPS = [
+  [0.2, 3.9, 'IN', '203.0.113.77, never seen in 180 days, sends 15 MFA pushes. 14 denied, the 15th approved.'],
+  [3.9, 6.7, 'IN', 'j.alvarez is now a stolen identity: a new device and a session from Amsterdam.'],
+  [6.7, 9.5, 'IN', 'Into AWS as FinanceDataReadOnly, which a stale trust lets assume ops-admin.'],
+  [9.5, 11.6, 'IN', 'ops-admin, unused by her for 365 days, reads 1,284 objects from mf-finance-exports.'],
+  [11.6, 14.0, 'IN', '2.3 GB leaves for 203.0.113.77. An inbox rule starts hiding invoice mail.'],
+  [14.0, 17.7, 'TR', 'What else can she reach? Across 1,964 entities: 22 roles, 30 data stores within 3 hops.'],
+  [17.7, 20.6, 'RS', 'Responder revokes her Okta sessions; approved actions cool the rest of the path.'],
+  [20.6, 26.4, 'RP', 'Contained. The bucket stays amber: 2.3 GB already left, so a data review is open.'],
+];
+function pathState(i, s) {
+  if (s >= 26.5 || s < PT[i]) return 'wait';
+  if (s >= CT[i]) return i === 6 ? 'exposed' : 'cold';
+  if (i === 6 && s >= 19.4) return 'exposed';
+  return 'hot';
+}
+const ringOn = (h, s) => s >= 14 + (h - 1) * 0.9 + 0.25 && s < 20 + (3 - h) * 0.4 + 0.9;
+
+/* ---------- BFS aggregates (path entities included, so the totals match the headline) ---------- */
+const COLS = [CAT.host, CAT.app, CAT.role, CAT.data];
+const BLAST = [1, 2, 3].map(h => COLS.map(c => ents.filter(e => hop[e.id] === h && e.cat === c).length));
+const TOT = COLS.map((_, k) => BLAST.reduce((a, r) => a + r[k], 0));
+const REACH = ents.filter(e => hop[e.id] >= 1 && hop[e.id] <= 3).length;
+const REACH_ROLES = ents.filter(e => hop[e.id] >= 1 && hop[e.id] <= 3 && e.cat === CAT.role).length;
+const REACH_DATA = ents.filter(e => hop[e.id] >= 1 && hop[e.id] <= 3 && e.cat === CAT.data).length;
+Object.assign(BR, { S_LOOP, PT, CT, RES, EDGE_PATH, E0, E1, EC, PATH_INFO, HOLDS, pathState, REACH, REACH_ROLES, REACH_DATA });
+
+/* ---------- attract loop: loop time L -> story time s (the aftermath runs a little faster) ---------- */
+const LOOP = 33;
+const WARP = [[0, 0], [25.2, 21], [33, 30]];
+function sOf(L) { for (let i = 1; i < WARP.length; i++) if (L <= WARP[i][0]) { const [a, sa] = WARP[i - 1], [b, sb] = WARP[i]; return lerp(sa, sb, (L - a) / (b - a)); } return S_LOOP; }
+const HERO_L = 18.7;   // story 15.6: the path hot, hop 1-2 rings lit, hop 3 igniting
+
+/* ---------- state ---------- */
+let mode = 'loop', L = 0, s = 0, intent = false, playing = false, stopAt = null, flying = false;
+let idleFrom = -1e9;   // idle counts from the last input or from when playback stopped, whichever is later
+let raf = 0, last = 0, lastInput = -1e9, parentPaused = false, captions = Q.get('captions') !== '0';
+let R = null, gl = 'pending', sel = -1, blastLayer = true, zoomLevel = 0;
+let resolveReady; const rendererReady = new Promise(r => { resolveReady = r; });
+const canRun = () => !parentPaused && !document.hidden;
+
+/* ---------- static UI ---------- */
+$('entCount').textContent = `${ents.length.toLocaleString('en-US')} entities`;
+$('footText').textContent = `Breadth-first search over ${edges.length.toLocaleString('en-US')} “can reach” relationships from j.alvarez, WIN-7F2C and okta session 9f3c (hop 0), computed in this page.`;
+$('reachN').textContent = String(REACH);
+$('reachL').textContent = `entities within 3 hops: ${REACH_ROLES} cloud roles, ${REACH_DATA} data stores`;
+$('crumbs').innerHTML = PATH_INFO.map((p, i) => `<li><button type="button" data-i="${i}" title="${esc(ents[PATH[i]].name)} · ${esc(p.type)}"><i></i>${esc(p.short)}</button></li>`).join('');
+const crumbBtns = [...$('crumbs').querySelectorAll('button')];
+const HOPC = ['', '#F2B53A', '#D49A33', '#B8892E'];
+$('bt').querySelector('tbody').innerHTML = BLAST.map((r, i) => `<tr data-h="${i + 1}"><td><span class="hopdot" style="background:${HOPC[i + 1]}"></span>Hop ${i + 1}</td>${r.map(v => `<td>${v}</td>`).join('')}</tr>`).join('') +
+  `<tr class="tot"><td>Total</td>${TOT.map(v => `<td>${v}</td>`).join('')}</tr>`;
+const btRows = [...$('bt').querySelectorAll('tbody tr[data-h]')], btTot = $('bt').querySelector('tr.tot');
+const PAUSE_ICON = '<rect x="2.5" y="1.5" width="3.2" height="11" rx="1" fill="currentColor"/><rect x="8.3" y="1.5" width="3.2" height="11" rx="1" fill="currentColor"/>';
+const PLAY_ICON = '<path d="M3.5 1.8v10.4L12.4 7z" fill="currentColor"/>';
+const setText = (el, v) => { if (el._t !== v) { el._t = v; el.textContent = v; } };
+const setHTML = (el, v) => { if (el._h !== v) { el._h = v; el.innerHTML = v; } };
+const glyph = who => who === 'RP' ? '<span class="av">RP</span>' : `<span class="ag">${who}</span>`;
+
+/* ---------- table view (fallback, and the same BFS in rows) ---------- */
+const rows = ents.filter(e => PATH_SET.has(e.id) || (hop[e.id] >= 1 && hop[e.id] <= 3)).map(e => ({
+  id: e.id, name: e.name, cat: e.cat, hop: hop[e.id], path: PATH.indexOf(e.id), via: parent[e.id] >= 0 ? ents[parent[e.id]].name : '' }));
+rows.sort((a, b) => ((b.path >= 0) - (a.path >= 0)) || (a.path >= 0 ? a.path - b.path : (a.hop - b.hop) || COLS.indexOf(b.cat) - COLS.indexOf(a.cat) || a.name.localeCompare(b.name)));
+function buildTable() {
+  $('fbt').querySelector('tbody').innerHTML = rows.map(x => `<tr data-id="${x.id}"><td><span class="nm">${esc(x.name)}</span></td><td class="t2">${x.path >= 0 ? esc(PATH_INFO[x.path].type) : esc(CAT_LABEL[x.cat])}</td><td class="mono">${x.path >= 0 ? (x.hop <= 3 ? 'path · ' + x.hop : 'source') : `<span class="hopdot" style="background:${HOPC[x.hop]}"></span>${x.hop}`}</td><td class="via">${esc(x.via || (x.path >= 0 ? 'attack path' : ''))}</td></tr>`).join('');
+  const trs = [...$('fbt').querySelectorAll('tbody tr')];
+  $('fbt').addEventListener('click', e => { const tr = e.target.closest('tr[data-id]'); if (tr) select(+tr.dataset.id); });
+  const T = {
+    frame(st) {
+      trs.forEach((tr, k) => {
+        const x = rows[k];
+        const ps = x.path >= 0 ? pathState(x.path, st) : '';
+        const cls = (ps && ps !== 'wait' ? ps : '') + (x.path < 0 && blastLayer && x.hop >= 1 && ringOn(x.hop, st) ? ' lit' : '') + (x.id === sel || (sel < 0 && x.path >= 0 && x.path === curHold(st)) ? ' cur' : '');
+        if (tr._c !== cls) { tr._c = cls; tr.className = cls; if (cls.includes('cur')) { const sc = tr.closest('.fb-s'); const top = tr.offsetTop - 40; if (top < sc.scrollTop || top > sc.scrollTop + sc.clientHeight - 60) sc.scrollTop = Math.max(0, top - 40); } }
+      });
+      return 0;
+    },
+    busy: () => false, seek: async st => { T.frame(st); }, project: () => null, pick: () => -1, nudge() {}, resetView() {}, setBlast() {}, setQuality() {}, resize() {},
+  };
+  return T;
+}
+function fail(why) {
+  if (gl === 'table') return;
+  gl = 'table';
+  $('loading').hidden = true; $('vctl').hidden = true; $('zchip').hidden = true;
+  $('fb').hidden = false; setText($('fbWhy'), why);
+  R = buildTable(); resolveReady(); paint();
+}
+
+/* ---------- playback ---------- */
+// exactly one pending frame at a time (Spark can report dirty synchronously from inside a render)
+const schedule = () => { if (!raf) raf = requestAnimationFrame(tick); };
+function apply() {
+  const run = intent && canRun() && !!R;
+  if (run && !playing) { playing = true; last = performance.now(); schedule(); }
+  else if (!run && playing) { playing = false; }
+  if (!playing && R && R.busy(performance.now())) schedule();
+  syncChrome();
+}
+function setIntent(p) { if (intent && !p) idleFrom = performance.now(); intent = p; if (!p) stopAt = null; apply(); }
+let slow = 0, qLevel = 0;
+function tick(now) {
+  raf = 0;
+  const dt = Math.min(.1, Math.max(0, (now - last) / 1000)); last = now;
+  if (playing) {
+    if (mode === 'loop') { L += dt; if (L >= LOOP) L %= LOOP; s = sOf(L); }
+    else { s += dt / 1.2; const end = stopAt != null ? stopAt : 26; if (s >= end) { s = end; intent = false; stopAt = null; flying = false; idleFrom = performance.now(); } }
+  }
+  paint(now);
+  if (playing) { slow = dt > .045 ? slow + 1 : Math.max(0, slow - 2); if (slow > 40 && qLevel < 2) { qLevel++; slow = 0; R.setQuality(qLevel); } }
+  if (playing && !intent) apply();
+  if ((playing && intent) || (R && R.busy(now) && canRun())) schedule();
+}
+function kick(force) { if (!raf && R && canRun() && (force || R.busy(performance.now()))) { last = performance.now(); schedule(); } }
+function paint(now = performance.now()) {
+  if (!R) return;
+  const camDist = R.frame(s, now) || 0;
+  syncUI(camDist);
+}
+
+/* ---------- UI sync (all a function of story time s) ---------- */
+function curHold(st) { const h = HOLDS.find(([a, b]) => st >= a && st < b); return h ? h[2] : -1; }
+function phase(st) { return st < 0.6 ? 'tenant' : st < 14.0 ? 'path' : st < 17.7 ? 'blast' : st < 20.6 ? 'contain' : st < 26.5 ? 'after' : 'tenant'; }
+const STATE_CHIP = { hot: 'chip sm v-mal', cold: 'chip sm c-info', exposed: 'chip sm v-sus', wait: 'chip sm' };
+function chainTo(id) { const c = []; let x = id; for (let g = 0; g < 6 && x >= 0; g++) { c.unshift(x); x = parent[x]; } return c; }
+function hopCard(st) {
+  if (sel >= 0) {
+    const e = ents[sel], pi = PATH.indexOf(sel), h = hop[sel];
+    const ps = pi >= 0 ? pathState(pi, st) : '';
+    const chip = pi >= 0 ? `<span class="${STATE_CHIP[ps]}">${ps === 'wait' ? 'Not yet involved' : ps === 'hot' ? PATH_INFO[pi].hot : PATH_INFO[pi].cold}</span>`
+      : h >= 1 && h <= 3 ? `<span class="chip sm v-sus">Reachable · hop ${h}</span>` : '<span class="chip sm c-info">Not reachable in 3 hops</span>';
+    const chain = h >= 1 && h <= 3 ? `<div class="chain">${chainTo(sel).map((x, k) => `${k ? '<span class="ar">→</span>' : ''}<span>${esc(ents[x].name)}</span>`).join('')}</div>` : '';
+    return `<div class="hop-h"><span class="eyebrow">Selected entity</span>${chip}</div><div class="hop-n">${esc(e.name)}</div>
+      <div class="hop-t">${pi >= 0 ? esc(PATH_INFO[pi].type) : esc(CAT_LABEL[e.cat])} · ${esc(e.cluster)}${h === 0 ? ' · hop 0 (stolen identity)' : ''}</div>${chain || `<div class="hop-d">${pi >= 0 ? esc(PATH_INFO[pi].sub) : 'No path from the stolen identity within three hops.'}</div>`}
+      <button type="button" class="x" id="selClear">Back to the tour</button>`;
+  }
+  const ph = phase(st);
+  if (ph === 'path') {
+    const ch = curHold(st), i = ch >= 0 ? ch : Math.max(0, PT.reduce((b, t, k) => (st >= t ? k : b), -1));
+    const ps = pathState(i, st), id = PATH[i], h = hop[id];
+    return `<div class="hop-h"><span class="eyebrow">Step ${i + 1} of 8 · ${PATH_INFO[i].time} UTC</span><span class="${STATE_CHIP[ps]}">${ps === 'wait' ? 'Next' : ps === 'hot' ? PATH_INFO[i].hot : PATH_INFO[i].cold}</span></div>
+      <div class="hop-n">${esc(ents[id].name)}</div><div class="hop-t">${esc(PATH_INFO[i].type)} · ${h === 0 ? 'hop 0, the stolen identity' : h <= 3 ? `BFS hop ${h}` : 'outside the tenant'}</div><div class="hop-d">${esc(PATH_INFO[i].sub)}</div>`;
+  }
+  if (ph === 'blast') {
+    const lit = [1, 2, 3].filter(h => ringOn(h, st)).length;
+    return `<div class="hop-h"><span class="eyebrow">Blast radius · ${lit ? `hop ${lit} of 3` : 'computing'}</span><span class="chip sm v-sus">BFS</span></div>
+      <div class="hop-n">j.alvarez</div><div class="hop-t">plus WIN-7F2C and okta session 9f3c, hop 0</div>
+      <div class="hop-d">${REACH_ROLES} cloud roles and ${REACH_DATA} data stores within three hops, most of them through <span class="mono">ops-admin</span>.</div>`;
+  }
+  if (ph === 'contain' || ph === 'after') {
+    const a = st >= 17.8, b = st >= 19.0, cold = PATH.filter((_, i) => pathState(i, st) === 'cold').length;
+    return `<div class="hop-h"><span class="eyebrow">${ph === 'after' ? 'Contained' : 'Containment'} · ${cold} of 8 cooled</span><span class="chip sm ${ph === 'after' ? 'v-sus' : 'c-agent'}">${ph === 'after' ? 'Data exposed' : 'In progress'}</span></div>
+      <ul class="hop-list"><li class="${a ? '' : 'wait'}"><span class="ag">RS</span><span><b>Okta sessions revoked</b> under AP-07 · 02:38:05</span></li>
+      <li class="${b ? '' : 'wait'}"><span class="av">RP</span><span><b>APR-311 to 313 approved</b>: STS revoked, 203.0.113.77 blocked, rule removed</span></li>
+      ${ph === 'after' ? '<li><span class="ag" style="background:var(--sus)">!</span><span><b>mf-finance-exports</b> stays amber: 2.3 GB already left</span></li>' : ''}</ul>`;
+  }
+  return `<div class="hop-h"><span class="eyebrow">Identity graph · snapshot 02:41 UTC</span><span class="chip sm">Meridian Freight</span></div>
+    <div class="hop-n">${ents.length.toLocaleString('en-US')} entities</div><div class="hop-t">${edges.length.toLocaleString('en-US')} relationships: users, devices, cloud roles, data, apps, IPs</div>
+    <div class="hop-d">The question: once j.alvarez is stolen, what can the attacker reach?</div>`;
+}
+function syncChrome() {
+  $('playIcon').innerHTML = intent ? PAUSE_ICON : PLAY_ICON;
+  $('play').setAttribute('aria-label', intent ? 'Pause' : 'Play');
+  setText($('statusText'), !intent || !canRun() ? 'Paused' : mode === 'loop' ? 'Auto-tour' : flying ? 'Flying the path' : 'Playing');
+  $('status').classList.toggle('off', !playing);
+  $('status').querySelector('.dot').classList.toggle('live', playing);
+}
+function syncUI(camDist) {
+  setText($('utc'), clockAt(s));
+  const ph = phase(s);
+  setHTML($('hop'), hopCard(s));
+  const hi = sel >= 0 ? PATH.indexOf(sel) : curHold(s);
+  crumbBtns.forEach((b, i) => { const st = pathState(i, s), cls = (st === 'wait' ? '' : st) + (i === hi ? ' cur' : ''); if (b._c !== cls) { b._c = cls; b.className = cls; } });
+  let anyLit = false;
+  btRows.forEach((tr, i) => { const on = blastLayer && ringOn(i + 1, s); anyLit = anyLit || on; tr.classList.toggle('lit', on); });
+  btTot.classList.toggle('lit', anyLit);
+  $('reachN').classList.toggle('dim', !(anyLit || ph === 'blast' || ph === 'contain' || ph === 'after'));
+  $('fly').setAttribute('aria-pressed', String(flying || (mode === 'loop' && ph === 'path')));
+  $('blastBtn').setAttribute('aria-pressed', String(blastLayer && [1, 2, 3].some(h => ringOn(h, s))));
+  // caption
+  const c = captions ? CAPS.find(([a, b]) => s >= a && s < b) : null;
+  const cap = $('cap');
+  if (c) {
+    cap.hidden = false;
+    if (cap._k !== c[3]) { cap._k = c[3]; cap.innerHTML = `${glyph(c[2])}<span>${esc(c[3])}</span>`; }
+    cap.style.opacity = String(Math.max(0, Math.min(1, (s - c[0]) / .25, (c[1] - s) / .25)));
+  } else cap.hidden = true;
+  // semantic zoom + reticle (WebGL only)
+  if (gl === 'on') {
+    const z = camDist > 14 ? 0 : camDist > 5 ? 1 : 2;
+    if (z !== zoomLevel) { zoomLevel = z; document.querySelectorAll('#zchip [data-z]').forEach(e => e.classList.toggle('on', +e.dataset.z === z)); }
+    const fid = sel >= 0 ? sel : curHold(s) >= 0 ? PATH[curHold(s)] : -1;
+    const ret = $('ret'), pr = fid >= 0 ? R.project(fid) : null;
+    if (pr && pr.vis) {
+      ret.style.display = 'block'; ret.classList.toggle('sel', sel >= 0);
+      ret.style.transform = `translate(${pr.x.toFixed(1)}px, ${pr.y.toFixed(1)}px)`;
+      const pi = PATH.indexOf(fid), st = pi >= 0 ? pathState(pi, s) : 'wait';
+      setHTML($('retTag'), `<b>${esc(ents[fid].name)}</b> ${pi >= 0 ? esc(PATH_INFO[pi].type) : esc(CAT_LABEL[ents[fid].cat])}${pi >= 0 && st !== 'wait' ? ', ' + esc((st === 'hot' ? PATH_INFO[pi].hot : PATH_INFO[pi].cold).toLowerCase()) : hop[fid] >= 1 && hop[fid] <= 3 ? `, hop ${hop[fid]}` : ''}`);
+      const tag = $('retTag'), tw = tag.offsetWidth;
+      let left = 24, top = pr.y < 30 ? 14 : -14;
+      if (pr.x + 24 + tw > pr.w - 8) { if (pr.x - 24 - tw >= 8) left = -24 - tw; else { left = clamp(-tw / 2, 8 - pr.x, pr.w - 8 - pr.x - tw); top = 24; } }
+      tag.style.left = left + 'px'; tag.style.top = top + 'px';
+    } else ret.style.display = 'none';
+  }
+}
+
+/* ---------- real input takes over; the tour comes back after 15 s idle ---------- */
+function takeover(e) {
+  lastInput = performance.now();
+  if (mode !== 'loop') return;
+  mode = 'manual'; setIntent(false); flying = false;
+  paint();
+}
+for (const ev of ['pointerdown', 'keydown', 'wheel', 'touchstart']) addEventListener(ev, takeover, { capture: true, passive: true });
+function resumeLoop() {
+  const stamp = lastInput;
+  $('fade').classList.add('on');
+  setTimeout(() => {
+    if (stamp !== lastInput || mode !== 'manual') { $('fade').classList.remove('on'); return; }
+    sel = -1; blastLayer = true; R.setBlast(true); R.resetView(true);
+    mode = 'loop'; L = 0; s = 0; flying = false; setIntent(true); paint();
+    $('fade').classList.remove('on');
+  }, 340);
+}
+setInterval(() => {
+  if (REDUCE || mode !== 'manual' || intent || !R || !canRun()) return;
+  if (performance.now() - Math.max(lastInput, idleFrom) > 15000) resumeLoop();
+}, 500);
+
+/* ---------- controls ---------- */
+function playStory(from, to) { mode = 'manual'; sel = -1; s = from; stopAt = to; R.resetView(); setIntent(true); paint(); }
+$('play').addEventListener('click', () => { if (!intent && s >= 25.9) s = 0; flying = false; stopAt = null; setIntent(!intent); paint(); });
+$('fly').addEventListener('click', () => { flying = true; playStory(0.3, 13.5); });
+$('blastBtn').addEventListener('click', () => {
+  flying = false;
+  if (blastLayer && [1, 2, 3].some(h => ringOn(h, s))) { blastLayer = false; R.setBlast(false); setIntent(false); paint(); kick(true); return; }
+  blastLayer = true; R.setBlast(true); playStory(13.6, 17.4);
+});
+$('crumbs').addEventListener('click', e => { const b = e.target.closest('button[data-i]'); if (!b) return; flying = false; sel = -1; setIntent(false); s = CRUMB_S[+b.dataset.i]; R.resetView(); paint(); kick(true); });
+$('vctl').addEventListener('click', e => { const b = e.target.closest('button[data-act]'); if (!b) return; R.nudge(b.dataset.act); kick(true); });
+$('hop').addEventListener('click', e => { if (e.target.closest('#selClear')) { sel = -1; paint(); } });
+function select(id) { sel = id; setIntent(false); paint(); kick(true); }
+addEventListener('keydown', e => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const tag = (e.target && e.target.tagName) || '';
+  if (e.code === 'Space') { if (tag === 'BUTTON' || tag === 'A') return; e.preventDefault(); $('play').click(); }
+  else if (e.key === '+' || e.key === '=') { R && R.nudge('zin'); kick(true); }
+  else if (e.key === '-' || e.key === '_') { R && R.nudge('zout'); kick(true); }
+  else if (e.key === 'ArrowLeft' && tag !== 'BUTTON') { R && R.nudge('left'); kick(true); }
+  else if (e.key === 'ArrowRight' && tag !== 'BUTTON') { R && R.nudge('right'); kick(true); }
+  else if (e.key === 'Escape' && sel >= 0) { sel = -1; paint(); }
+});
+
+/* ---------- embedding protocol ---------- */
+addEventListener('message', e => {
+  const d = e.data; if (!d || typeof d !== 'object') return;
+  if (d.corvid === 'pause') { parentPaused = true; apply(); }
+  else if (d.corvid === 'play') { parentPaused = false; if (mode === 'loop') intent = true; apply(); }
+});
+document.addEventListener('visibilitychange', apply);
+
+/* ---------- renderer plumbing ---------- */
+BR.fail = fail;
+BR.ready = rend => { if (gl === 'table') return; R = rend; gl = 'on'; $('loading').hidden = true; resolveReady(); boot2(); };
+BR.input = () => { lastInput = performance.now(); };
+BR.select = id => select(id);
+BR.kick = () => kick(false);
+BR.getS = () => s;
+BR.blastLayer = () => blastLayer;
+BR.mode = () => mode;
+BR.isTable = () => gl === 'table';
+window.__seek = async t => {
+  t = clamp(+t || 0, 0, LOOP - 1e-3);
+  mode = 'loop'; L = t; s = sOf(t); sel = -1; flying = false; setIntent(false);
+  await rendererReady;
+  R.resetView(true);
+  await R.seek(s);
+  syncUI(R.lastDist || 0);
+};
+window.__play = () => { mode = 'loop'; setIntent(true); };
+window.__state = () => ({ mode, L: +L.toFixed(3), s: +s.toFixed(3), playing, intent, gl, sel, blastLayer, rafActive: !!raf, parentPaused, loop: LOOP, quality: qLevel, flying, stopAt, zoomLevel,
+  cam: R && R.user ? { yaw: +R.user.ty.toFixed(3), pitch: +R.user.tp.toFixed(3), zoom: +R.user.tz.toFixed(3) } : null });
+window.__dbg = () => (R && R.dbg ? R.dbg() : null);
+window.__project = id => (R && R.project ? R.project(id) : null);
+window.__path = () => PATH.slice();
+
+let booted = false;
+function boot2() {
+  if (booted) return; booted = true;
+  if (Q.has('t')) window.__seek(parseFloat(Q.get('t')) || 0);
+  else if (REDUCE) window.__seek(HERO_L);
+  else setIntent(true);
+}
+const gl2 = (() => { try { const c = document.createElement('canvas'); return !!c.getContext('webgl2'); } catch (e) { return false; } })();
+if (Q.get('gl') === '0') fail('Table view (forced). Same breadth-first search as the graph.');
+else if (!gl2) fail('No WebGL 2 in this browser, so the graph shows as a table. Same breadth-first search.');
+else setTimeout(() => { if (gl === 'pending') fail('The 3D renderer did not start in time. Same breadth-first search, as a table.'); }, 30000);
+rendererReady.then(() => { if (gl === 'table') boot2(); });
+syncChrome(); syncUI(0);
+})();
+
+</script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/",
+  "@sparkjsdev/spark": "https://cdn.jsdelivr.net/npm/@sparkjsdev/spark@2.3.1/dist/spark.module.js"
+} }
+</script>
+<script type="module" id="glmod" onerror="window.BR && BR.fail && BR.fail('The 3D renderer could not load (offline?). Same BFS, as a table.')">
+/* =====================================================================
+   Renderer: Spark 2.3.1 Gaussian splats on WebGL 2 (engine from demos/pages/16-entity-blast-radius.html).
+   Every entity, relationship and name is a splat; one GLSL dyno modifier per splat does heat by path order,
+   amber rings by BFS hop, agent containment, and semantic zoom (names condense as the camera nears).
+   ===================================================================== */
+import * as THREE from 'three';
+import { SparkRenderer, SplatMesh, ExtSplats, textSplats, dyno } from '@sparkjsdev/spark';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const BR = window.BR;
+if (BR && !BR.isTable()) {
+  try { await main(); }
+  catch (e) { console.warn('blast-radius: 3D graph unavailable', e); BR.fail('The 3D graph could not start here. Same breadth-first search, as a table.'); }
+}
+
+async function main() {
+const { ents, PATH, PATH_SET, hop, parent, CAT, DEPTS, clusterCenters, HUB, K8S, FLEET, IP_POS, pSess, pBkt, edges, okta,
+  PT, CT, RES, E0, E1, EC, EDGE_PATH, PATH_INFO, S_LOOP } = BR;
+const params = new URLSearchParams(location.search);
+const LOW = params.get('q') === 'low';
+const TAU = Math.PI * 2, V3 = THREE.Vector3, UP = new V3(0, 1, 0);
+const DENS = LOW ? 0.5 : 1;
+const clamp = (x, a, b) => x < a ? a : x > b ? b : x;
+const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+const mod = (x, m) => ((x % m) + m) % m;
+const POS = ents.map(e => new V3(e.pos[0], e.pos[1], e.pos[2]));
+const IPV = new V3(IP_POS[0], IP_POS[1], IP_POS[2]);
+
+/* ---------- camera track (pure function of story time) ---------- */
+const dirFrom = (az, el, out = new V3()) => out.set(Math.cos(el) * Math.cos(az), Math.sin(el), Math.cos(el) * Math.sin(az));
+const C0 = new V3(-1.0, -0.5, 1.5);
+const A0 = Math.PI / 2 + 0.12, EL0 = 0.5;
+const WIDE = 44;
+const pathAz = [], pathEl = [];
+{
+  let prev = C0.clone().addScaledVector(dirFrom(A0, EL0), WIDE);
+  PATH.forEach((id, i) => {
+    const p = POS[id], src = i === 7 ? POS[pSess] : prev;
+    const d = src.clone().sub(p); d.y = 0; d.normalize();
+    pathAz.push(Math.atan2(d.z, d.x) + (i % 2 ? -0.5 : 0.5)); pathEl.push(0.22);
+    prev = p;
+  });
+}
+const pathNrm = PATH.map((_, i) => dirFrom(pathAz[i], pathEl[i]));
+let track = null, portrait = false, distScale = 1;
+function unwrap(list) { for (let i = 1; i < list.length; i++) { while (list[i][4] - list[i - 1][4] > Math.PI) list[i][4] -= TAU; while (list[i][4] - list[i - 1][4] < -Math.PI) list[i][4] += TAU; } return list; }
+function makeTrack(keys) {
+  const n = keys.length, dim = keys[0].length - 1, m = keys.map(() => new Float64Array(dim));
+  for (let c = 0; c < dim; c++) {
+    const v = i => keys[i][c + 1], tt = i => keys[i][0], sec = [], hh = [];
+    for (let i = 0; i < n - 1; i++) { hh.push(tt(i + 1) - tt(i)); sec.push((v(i + 1) - v(i)) / hh[i]); }
+    for (let i = 0; i < n; i++) {
+      const ip = i === 0 ? n - 2 : i - 1, inx = i === n - 1 ? 0 : i, sP = sec[ip], sN = sec[inx], hP = hh[ip], hN = hh[inx];
+      let mi = 0;
+      if (sP * sN > 0) { mi = (sP * hN + sN * hP) / (hP + hN); const a = mi / sP, b = mi / sN, s2 = a * a + b * b; if (s2 > 9) mi *= 3 / Math.sqrt(s2); }
+      m[i][c] = mi;
+    }
+  }
+  return (t, out) => {
+    t = mod(t, S_LOOP);
+    let i = 0; while (i < n - 2 && t >= keys[i + 1][0]) i++;
+    const t0 = keys[i][0], h = keys[i + 1][0] - t0, s = (t - t0) / h, s2 = s * s, s3 = s2 * s;
+    const h00 = 2 * s3 - 3 * s2 + 1, h10 = s3 - 2 * s2 + s, h01 = -2 * s3 + 3 * s2, h11 = s3 - s2;
+    for (let c = 0; c < dim; c++) out[c] = h00 * keys[i][c + 1] + h10 * h * m[i][c] + h01 * keys[i + 1][c + 1] + h11 * h * m[i + 1][c];
+    return out;
+  };
+}
+function buildTrack() {
+  const P = i => POS[PATH[i]].clone().add(new V3(0, 0.12, 0));
+  const near = d => d * (portrait ? 1.35 : 1);
+  const W = WIDE * distScale;
+  const K = unwrap([
+    [0.0, C0, W, A0, EL0],
+    [1.7, C0.clone().lerp(P(0), 0.38), W * 0.6, A0 + 0.15, 0.42],
+    [3.0, P(0), near(3.6), pathAz[0], 0.24],
+    [4.4, P(1), near(3.1), pathAz[1], 0.22],
+    [5.8, P(2), near(2.9), pathAz[2], 0.22],
+    [7.1, P(3), near(3.2), pathAz[3], 0.24],
+    [8.5, P(4), near(3.2), pathAz[4], 0.22],
+    [10.0, P(5), near(2.9), pathAz[5], 0.2],
+    [10.8, P(5), near(3.1), pathAz[5] + 0.05, 0.21],
+    [11.8, P(6), near(3.3), pathAz[6], 0.22],
+    [13.6, POS[pBkt].clone().lerp(IPV, 0.5).add(new V3(0, -1.5, 0)), W * 0.62, A0 + 0.25, 0.55],
+    [15.8, C0, W * 0.72, A0 + 0.5, 0.62],
+    [17.6, C0.clone().lerp(POS[pSess], 0.5), W * 0.52, A0 + 0.72, 0.5],
+    [20.4, C0.clone().lerp(POS[pSess], 0.3), W * 0.6, A0 + 0.9, 0.5],
+    [24.5, C0, W * 0.92, A0 + 0.35, 0.52],
+    [30.0, C0, W, A0, EL0],
+  ].map(([t, T, d, az, el]) => [t, T.x, T.y, T.z, az, el, Math.log(d)]));
+  track = makeTrack(K.map(k => [k[0], k[1], k[2], k[3], k[6], k[4], k[5]]));
+}
+
+/* ---------- text: Spark textSplats re-packed into the one mesh ---------- */
+const MONO = '"Geist Mono", ui-monospace, monospace', SANS = '"Geist", ui-sans-serif, system-ui, sans-serif';
+const metricsCache = new Map();
+function fontMetrics(F, fam) {
+  const key = F + fam; if (metricsCache.has(key)) return metricsCache.get(key);
+  const ctx = document.createElement('canvas').getContext('2d'); ctx.font = `${F}px ${fam}`;
+  const m0 = ctx.measureText(''), m = { ctx, LH: (m0.fontBoundingBoxAscent + m0.fontBoundingBoxDescent) || F * 1.3, adv: ctx.measureText('MMMMMMMMMM').width / 10 };
+  metricsCache.set(key, m); return m;
+}
+function lineSplats(str, F, fam) {
+  if (!str.trim()) return { pts: [], w: 0 };
+  const { ctx } = fontMetrics(F, fam); ctx.font = `${F}px ${fam}`; ctx.textAlign = 'start';
+  const m = ctx.measureText(str);
+  const ol = Math.floor(-m.actualBoundingBoxLeft), ot = Math.floor(-m.actualBoundingBoxAscent);
+  const width = Math.ceil(m.actualBoundingBoxRight) - ol, height = Math.ceil(m.actualBoundingBoxDescent) - ot;
+  const mesh = textSplats({ text: str, font: fam, fontSize: F, lineHeight: 1 }); const pts = [];
+  mesh.packedSplats.forEachSplat((i, c, s, q, o) => { pts.push(c.x + 0.5 * (width - 1) + ol + 0.5, 0.5 * (height - 1) - c.y + ot + 0.5, o); });
+  mesh.dispose(); return { pts, w: m.width };
+}
+
+/* ---------- renderer / scene ---------- */
+const canvas = document.getElementById('c'), stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
+renderer.toneMapping = THREE.NoToneMapping; renderer.setClearColor(0x080B0F, 1);
+let prCap = LOW ? 1 : 1.75;
+const PR = () => Math.min(window.devicePixelRatio || 1, prCap, 2);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(38, 1, 0.05, 400);
+let dirty = true, lastChange = 0;   // Spark reports dirty while its sort settles; we only follow that for a moment after a real change
+const spark = new SparkRenderer({ renderer, accumExtSplats: true, onDirty: () => { dirty = true; BR.kick(); } });
+scene.add(spark);
+{
+  const col = h => new THREE.Color(h);
+  const m = new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false,
+    uniforms: { uBot: { value: col('#05080B') }, uTop: { value: col('#0F1822') }, uHalo: { value: col('#14283A') } },
+    vertexShader: 'varying vec3 vW; void main(){ vec4 w = modelMatrix * vec4(position,1.); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }',
+    fragmentShader: `uniform vec3 uBot, uTop, uHalo; varying vec3 vW;
+      float h12(vec2 p){ vec3 q = fract(vec3(p.xyx) * .1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
+      void main(){ vec3 d = normalize(vW - cameraPosition); vec3 c = mix(uBot, uTop, smoothstep(-.6, .9, d.y));
+        c += uHalo * pow(max(dot(d, normalize(-cameraPosition)), 0.), 8.) * .25; c += (h12(gl_FragCoord.xy) - .5) * .0012; gl_FragColor = vec4(c, 1.); }`,
+  });
+  const bg = new THREE.Mesh(new THREE.SphereGeometry(200, 32, 16), m); bg.renderOrder = -10; scene.add(bg);
+}
+
+/* ---------- per-splat animation (dyno GLSL) ---------- */
+const uT = dyno.dynoFloat(0), uCam = dyno.dynoVec3(new V3()), uMask = dyno.dynoFloat(511);
+const v3 = v => `vec3(${v.x.toFixed(4)}, ${v.y.toFixed(4)}, ${v.z.toFixed(4)})`;
+const fl = a => a.map(x => x.toFixed(3)).join(', ');
+const GLSL = dyno.unindent(`
+  const float CV_TAU = 6.2831853;
+  const float CV_LOOP = ${S_LOOP.toFixed(1)};
+  const vec3 CV_P[8] = vec3[8](${PATH.map(id => v3(POS[id])).join(', ')});
+  const float CV_PT[8] = float[8](${fl(PT)});
+  const float CV_CT[8] = float[8](${fl(CT)});
+  const float CV_RES[8] = float[8](${fl(RES)});
+  const float CV_E0[8] = float[8](${fl(E0)});
+  const float CV_E1[8] = float[8](${fl(E1)});
+  const float CV_EC[8] = float[8](${fl(EC)});
+  const vec3 CV_AGENT = vec3(0.776, 0.953, 0.420);
+  const vec3 CV_AMBER = vec3(0.949, 0.710, 0.227);
+  uint cvHash(uint x) { x ^= x >> 16; x *= 0x7feb352du; x ^= x >> 15; x *= 0x846ca68bu; x ^= x >> 16; return x; }
+  float cvRand(uint x) { return float(cvHash(x) >> 8) / 16777216.0; }
+  vec3 cvDir(uint s) { float z = cvRand(s) * 2.0 - 1.0, a = cvRand(s ^ 0x9e3779b9u) * CV_TAU, r = sqrt(max(0.0, 1.0 - z * z)); return vec3(r * cos(a), z, r * sin(a)); }
+  float cvLoopSin(float t, float k, float ph) { return sin(CV_TAU * (t / CV_LOOP) * k + ph); }
+  bool cvOn(float mask, int bit) { return ((int(mask + 0.5) >> bit) & 1) == 1; }
+  vec3 cvCold(float x) { x = clamp(x, 0.0, 1.0) * 4.0;
+    vec3 c0 = vec3(0.043, 0.122, 0.165), c1 = vec3(0.078, 0.314, 0.416), c2 = vec3(0.184, 0.576, 0.710), c3 = vec3(0.498, 0.839, 0.933), c4 = vec3(0.867, 0.965, 1.000);
+    if (x < 1.0) return mix(c0, c1, x); if (x < 2.0) return mix(c1, c2, x - 1.0); if (x < 3.0) return mix(c2, c3, x - 2.0); return mix(c3, c4, x - 3.0); }
+  vec3 cvHeat(float x) { x = clamp(x, 0.0, 1.0) * 5.0;
+    vec3 c0 = vec3(0.165, 0.055, 0.078), c1 = vec3(0.494, 0.110, 0.165), c2 = vec3(1.000, 0.416, 0.333), c3 = vec3(0.961, 0.604, 0.239), c4 = vec3(1.000, 0.827, 0.420), c5 = vec3(1.000, 0.965, 0.878);
+    if (x < 1.0) return mix(c0, c1, x); if (x < 2.0) return mix(c1, c2, x - 1.0); if (x < 3.0) return mix(c2, c3, x - 2.0); if (x < 4.0) return mix(c3, c4, x - 3.0); return mix(c4, c5, x - 4.0); }
+  float cvFade(float t) { return 1.0 - smoothstep(26.5, 28.5, t); }
+  float cvPathHeat(int i, float t) { float rise = smoothstep(CV_PT[i], CV_PT[i] + 0.45, t); float c = smoothstep(CV_CT[i], CV_CT[i] + 1.1, t); return rise * mix(1.0, CV_RES[i], c) * cvFade(t); }
+  float cvBlast(float h, float t) { float t0 = 14.0 + (h - 1.0) * 0.9; float rise = smoothstep(t0, t0 + 0.7, t); float t1 = 20.0 + (3.0 - h) * 0.4; float fall = 1.0 - smoothstep(t1, t1 + 1.3, t); return rise * fall * mix(0.85, 0.5, (h - 1.0) / 2.0); }
+  float cvContain(float ct, float t) { float d = t - ct; return d > 0.0 ? exp(-d * 1.8) * smoothstep(0.0, 0.1, d) : 0.0; }
+  float cvShock(vec3 p, float t) { if (t < 0.6 || t > 3.4) return 0.0; float r = (t - 0.6) * 8.0; float d = length(p - CV_P[0]) - r; return exp(-d * d / 0.9) * (1.0 - smoothstep(0.6, 3.4, t)); }
+
+  void cvModify(inout Gsplat g, float t, vec3 cam, float mask) {
+    if ((g.flags & GSPLAT_FLAG_ACTIVE) == 0u) return;
+    vec3 m = floor(g.rgba.rgb * 255.0 + 0.5);
+    int code = int(m.r), rt = int(m.g), role = rt / 16, sub = rt - role * 16;
+    float bb = m.b / 255.0;
+    uint id = uint(g.index);
+    float rnd = cvRand(id * 7u + 3u);
+    vec3 p = g.center, sc = g.scales; float a = g.rgba.a; vec3 col;
+    float dCam = length(p - cam), fade = cvFade(t);
+    if (role == 0) {                                      // far stars
+      col = mix(vec3(0.42, 0.47, 0.55), vec3(0.87, 0.95, 1.0), bb);
+      a *= 0.55 + 0.45 * cvLoopSin(t, floor(3.0 + rnd * 7.0), rnd * CV_TAU);
+    } else if (role == 1) {                               // cluster haze, warmed near the burning path
+      p += 0.06 * vec3(cvLoopSin(t, 1.0, rnd * CV_TAU), 0.4 * cvLoopSin(t, 2.0, rnd * 5.0), cvLoopSin(t, 1.0, rnd * CV_TAU + 1.6));
+      col = cvCold(bb);
+      float lit = 0.0;
+      for (int i = 0; i < 8; i++) { vec3 d = p - CV_P[i]; lit += cvPathHeat(i, t) * exp(-dot(d, d) / 1.4); }
+      lit = min(lit, 1.0);
+      col = mix(col, cvHeat(0.3 + 0.3 * lit), smoothstep(0.0, 0.9, lit) * 0.7);
+      float sh = cvShock(p, t);
+      col = mix(col, cvHeat(0.55), clamp(sh, 0.0, 1.0) * 0.85);
+      a = min(1.0, a * (1.0 + 1.6 * sh + 0.7 * lit));
+      a *= smoothstep(0.5, 2.2, dCam);
+    } else if (role == 2) {                               // an entity
+      if (code > 7 && !cvOn(mask, sub)) a = 0.0;
+      col = cvCold(bb);
+      if (code <= 7) {
+        float h = cvPathHeat(code, t), gk = cvContain(CV_CT[code], t) * fade;
+        col = mix(col, cvHeat(0.36 + 0.24 * h) * (1.0 + 0.25 * h), smoothstep(0.02, 0.25, h));
+        col = mix(col, CV_AGENT * 1.15, clamp(gk, 0.0, 1.0));
+        sc *= 1.0 + 0.5 * h + 1.0 * gk;
+        a = min(1.0, a * (1.0 + 0.7 * h + 1.6 * gk));
+        p += cvDir(id) * 0.05 * h * (0.5 + 0.5 * cvLoopSin(t, 37.0, rnd * CV_TAU));
+      } else if (code >= 21 && code <= 23 && cvOn(mask, 7)) {
+        float hb = cvBlast(float(code - 20), t);
+        col = mix(col, CV_AMBER * (0.95 + 0.5 * hb), smoothstep(0.02, 0.3, hb));
+        sc *= 1.0 + 0.7 * hb;
+        a = min(1.0, a * (1.0 + 1.5 * hb));
+      }
+      float sh = cvShock(p, t);
+      col = mix(col, cvHeat(0.6), clamp(sh, 0.0, 1.0) * 0.6);
+      a *= smoothstep(0.2, 0.9, dCam);
+    } else if (role == 3) {                               // an attack-path edge
+      int e = sub; float s = bb;
+      float t0 = CV_E0[e], t1 = CV_E1[e];
+      float front = clamp((t - t0) / (t1 - t0), 0.0, 1.0);
+      float ign = t < t0 ? 0.0 : smoothstep(s - 0.06, s + 0.0001, front);
+      float cool = smoothstep(CV_EC[e], CV_EC[e] + 1.2, t);
+      float res = e == 6 ? 0.3 : 0.0;
+      float h = ign * mix(1.0, res, cool) * fade;
+      float pulse = 0.0, iceP = 0.0;
+      if (e == 0 && t > 0.9 && t < 4.3) {                 // 15 Okta pushes: 14 cool to ice as she denies them, the 15th lands hot
+        for (int k = 0; k < 15; k++) {
+          float ps = (t - (0.9 + float(k) * 0.17)) / 0.6;
+          if (ps > 0.0 && ps < 1.04) {
+            float w = exp(-pow(s - ps, 2.0) / 0.0012);
+            if (k == 14) pulse = max(pulse, w * 1.6);
+            else { float ice = smoothstep(0.7, 0.98, ps); pulse = max(pulse, w * 0.85 * (1.0 - ice)); iceP = max(iceP, w * 0.95 * ice); }
+          }
+        }
+      }
+      if (e == 6 && t > t0 && t < CV_EC[e]) pulse = smoothstep(0.8, 1.0, fract(s * 10.0 - t * 2.6)) * ign * (1.0 - cool);
+      float gk = 0.0;
+      if (t > CV_EC[e] && t < CV_EC[e] + 1.3) gk = exp(-pow(s - (t - CV_EC[e]) / 0.9, 2.0) / 0.014) * fade * (1.0 - smoothstep(1.0, 1.3, t - CV_EC[e]));
+      vec3 coldc = vec3(0.28, 0.34, 0.42);
+      col = mix(coldc, cvHeat(min(1.0, 0.38 + 0.2 * h + 0.32 * pulse)) * (1.0 + 0.15 * h), smoothstep(0.01, 0.1, h + pulse));
+      col = mix(col, cvCold(0.9) * 1.1, clamp(iceP * 1.4, 0.0, 1.0));
+      col = mix(col, CV_AGENT * 1.15, clamp(gk, 0.0, 1.0));
+      a = min(1.0, a * (0.04 + 1.05 * h + 1.9 * pulse + 1.7 * iceP + 1.6 * gk));
+      sc *= 1.0 + 0.3 * h + (e == 0 ? 2.6 : 1.4) * (pulse + iceP) + 1.6 * gk;
+      a *= smoothstep(0.25, 1.0, dCam);
+    } else if (role == 4) {                               // blast-radius reach lines (the BFS tree)
+      float hh = float(code - 20);
+      float hb = cvOn(mask, 7) ? cvBlast(hh, t) : 0.0;
+      float t0 = 14.0 + (hh - 1.0) * 0.9;
+      float front = clamp((t - t0) / 0.75, 0.0, 1.0);
+      float ign = smoothstep(bb - 0.08, bb, front);
+      col = CV_AMBER * (0.8 + 0.4 * hb);
+      a *= hb * ign * 1.9;
+      if (!cvOn(mask, sub)) a = 0.0;
+      a *= smoothstep(0.25, 1.0, dCam);
+    } else if (role == 5) {                               // ordinary relationships
+      col = mix(vec3(0.20, 0.27, 0.34), vec3(0.34, 0.44, 0.54), bb);
+      if (!cvOn(mask, 8)) a = 0.0;
+      a *= smoothstep(0.4, 1.8, dCam);
+    } else {                                              // text: 6 entity names, 7 cluster titles, 8 path labels
+      vec3 dir = cvDir(id * 3u + 1u);
+      float r0;
+      if (role == 6) r0 = smoothstep(5.2, 2.3, dCam);
+      else if (role == 7) r0 = smoothstep(7.5, 14.0, dCam) * (1.0 - smoothstep(70.0, 110.0, dCam));
+      else r0 = smoothstep(8.5, 3.6, dCam) * smoothstep(CV_PT[code], CV_PT[code] + 0.6, t) * fade;
+      float u = 1.0 - r0;
+      if (role == 6) {
+        col = vec3(0.78, 0.86, 0.92);
+        if (code >= 21 && code <= 23 && cvOn(mask, 7)) col = mix(col, CV_AMBER * 1.1, smoothstep(0.05, 0.3, cvBlast(float(code - 20), t)));
+        if (!cvOn(mask, sub)) a = 0.0;
+      } else if (role == 7) {
+        col = vec3(0.62, 0.67, 0.74);
+      } else {
+        float h = cvPathHeat(code, t), gk = cvContain(CV_CT[code], t) * fade;
+        vec3 syn = sub == 0 ? vec3(0.93, 0.96, 1.0) : vec3(0.64, 0.70, 0.78);
+        col = sub == 0 ? mix(syn, cvHeat(0.5 + 0.22 * h), smoothstep(0.05, 0.35, h)) : mix(syn, cvHeat(0.5 + 0.2 * h), 0.4 * smoothstep(0.05, 0.35, h));
+        col = mix(col, CV_AGENT * 1.15, clamp(gk, 0.0, 1.0));
+      }
+      if (!cvOn(mask, 6)) a = 0.0;
+      p += dir * (0.12 + 0.32 * rnd) * u * u;               // unresolved: glyph splats are part of the haze
+      sc = mix(vec3(0.006 + 0.01 * rnd), sc, r0);
+      a *= r0 * r0;
+    }
+    g.center = p; g.scales = sc; g.rgba = vec4(col, clamp(a, 0.0, 1.0));
+  }
+`);
+const modifier = dyno.dynoBlock({ gsplat: dyno.Gsplat }, { gsplat: dyno.Gsplat }, ({ gsplat }) => {
+  const d = new dyno.Dyno({
+    inTypes: { gsplat: dyno.Gsplat, t: 'float', cam: 'vec3', mask: 'float' },
+    outTypes: { gsplat: dyno.Gsplat },
+    globals: () => [dyno.defineGsplat, GLSL],
+    statements: ({ inputs, outputs }) => dyno.unindentLines(`
+      ${outputs.gsplat} = ${inputs.gsplat};
+      cvModify(${outputs.gsplat}, ${inputs.t}, ${inputs.cam}, ${inputs.mask});
+    `),
+  });
+  return { gsplat: d.apply({ gsplat, t: uT, cam: uCam, mask: uMask }).gsplat };
+});
+
+/* ---------- building the splats: metadata rides in the 8-bit colour channels ---------- */
+const ROLE = { star: 0, haze: 1, knot: 2, pathEdge: 3, blastEdge: 4, edge: 5, label: 6, title: 7, pathLabel: 8 };
+let splatCount = 0;
+function codeOf(id) { const i = PATH.indexOf(id); if (i >= 0) return i; const h = hop[id]; return h >= 1 && h <= 3 ? 20 + h : 255; }
+function buildSplats(sp) {
+  const r = BR.mulberry32(90210);
+  const g = () => { let u = 0; while (u === 0) u = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU * r()); };
+  const Pv = new V3(), S = new V3(), C = new THREE.Color(), QI = new THREE.Quaternion(), Qt = new THREE.Quaternion(), X = new V3(1, 0, 0);
+  const push = (x, y, z, sx, sy, sz, a, code, role, sub, b, q = QI) => {
+    Pv.set(x, y, z); S.set(sx, sy, sz); C.setRGB(code / 255, (role * 16 + sub) / 255, clamp(Math.round(b), 0, 255) / 255);
+    sp.pushSplat(Pv, S, q, a, C); splatCount++;
+  };
+  const N = n => Math.max(1, Math.round(n * DENS));
+  for (let i = 0, n = N(1800); i < n; i++) {
+    const z = 2 * r() - 1, ph = r() * TAU, rr = Math.sqrt(1 - z * z), Rr = 60 + r() * 60, s = 0.05 + r() * r() * 0.18;
+    push(rr * Math.cos(ph) * Rr, z * Rr * 0.8, rr * Math.sin(ph) * Rr, s, s, s, 0.4 + r() * 0.5, 255, ROLE.star, 0, r() * 255);
+  }
+  const haze = (c, rad, n, tone, flat = 0.5) => {
+    for (let i = 0, k = N(n); i < k; i++) { const sz = 0.12 + r() * r() * 0.5; push(c[0] + g() * rad, c[1] + g() * rad * flat, c[2] + g() * rad, sz, sz * 0.5, sz, 0.02 + 0.05 * r(), 255, ROLE.haze, 0, 255 * (tone + 0.2 * r())); }
+  };
+  for (const d of DEPTS) haze(clusterCenters[d.name], 0.6 + 0.07 * Math.sqrt(d.n), 300 + 4 * d.n, 0.28, 0.55);
+  haze(HUB, 1.6, 1400, 0.36, 0.6); haze([0, 0.9, 0], 3.4, 900, 0.22, 0.25);
+  haze(clusterCenters['AWS mf-prod-data'], 1.5, 1300, 0.34, 0.6); haze(clusterCenters['AWS mf-prod-app'], 1.3, 900, 0.3, 0.6); haze(clusterCenters['AWS mf-dev'], 0.8, 300, 0.24, 0.6);
+  haze(K8S, 1.2, 900, 0.28, 0.5); haze(FLEET, 1.8, 800, 0.24, 0.35);
+  for (const e of ents) {
+    const code = codeOf(e.id), c = e.pos, size = e.size, onPath = code <= 7;
+    const tone = onPath ? 0.86 : ([0.66, 0.5, 0.74, 0.8, 0.86, 0.44][e.cat] + (e.tone - 0.5) * 0.18), Rk = 0.026 + 0.016 * size;
+    for (let j = 0, n = N(8 + 5 * size); j < n; j++) { const sz = 0.008 + r() * r() * 0.03 * Math.sqrt(size); push(c[0] + g() * Rk, c[1] + g() * Rk * 0.8, c[2] + g() * Rk, sz, sz, sz, 0.25 + 0.4 * r(), code, ROLE.knot, e.cat, 255 * tone); }
+    const kz = 0.016 + 0.006 * size; push(c[0], c[1], c[2], kz, kz, kz, 0.9, code, ROLE.knot, e.cat, 250);
+    if (size > 1.5 || onPath) for (let j = 0; j < 3; j++) { const hz = 0.05 + 0.022 * size; push(c[0] + g() * 0.04, c[1] + g() * 0.03, c[2] + g() * 0.04, hz, hz * 0.7, hz, 0.035, code, ROLE.knot, e.cat, 255 * tone * 0.8); }
+  }
+  const A = new V3(), B = new V3(), M = new V3(), T = new V3(), Pt = new V3();
+  const filament = (ia, ib, role, sub, code, perLen, width, alpha) => {
+    A.copy(POS[ia]); B.copy(POS[ib]); const len = A.distanceTo(B);
+    M.addVectors(A, B).multiplyScalar(0.5).addScaledVector(UP, 0.1 * len + 0.08);
+    const n = Math.max(6, N(perLen * len + 6));
+    for (let j = 0; j < n; j++) {
+      const s = (j + r()) / n, u = 1 - s;
+      Pt.set(0, 0, 0).addScaledVector(A, u * u).addScaledVector(M, 2 * u * s).addScaledVector(B, s * s);
+      T.set(0, 0, 0).addScaledVector(A, -2 * u).addScaledVector(M, 2 * (u - s)).addScaledVector(B, 2 * s).normalize(); Qt.setFromUnitVectors(X, T);
+      const w = width * (0.7 + 0.6 * r());
+      push(Pt.x + g() * 0.01, Pt.y + g() * 0.01, Pt.z + g() * 0.01, w * 3.4, w, w, alpha * (0.6 + 0.6 * r()), code, role, sub, (role === ROLE.edge ? r() : s) * 255, Qt);
+    }
+  };
+  for (const [a, b] of edges) {
+    if (PATH_SET.has(a) && PATH_SET.has(b)) continue;
+    const ea = ents[a], eb = ents[b];
+    let keep = 0.06;
+    if (b === okta) keep = 0.07; else if (ea.cat === CAT.user && eb.cat === CAT.host) keep = 0.35; else if (ea.cat === CAT.role || eb.cat === CAT.data) keep = 0.9; else if (ea.cat === CAT.host && eb.cat === CAT.role) keep = 1;
+    if (r() > keep) continue;
+    filament(a, b, ROLE.edge, 0, 255, 7, 0.0045, 0.12);
+  }
+  ents.forEach(e => { const h = hop[e.id]; if (h < 1 || h > 3 || PATH_SET.has(e.id) || parent[e.id] < 0) return; filament(parent[e.id], e.id, ROLE.blastEdge, e.cat, 20 + h, 26, 0.006, 0.22); });
+  EDGE_PATH.forEach(([i, j], k) => filament(PATH[i], PATH[j], ROLE.pathEdge, k, 0, k === 6 ? 70 : 52, k === 6 ? 0.008 : 0.0062, 0.22));
+  const placeText = (lines, anchor, nrm, role, codeFor, subFor) => {
+    const TXR = new V3().crossVectors(nrm.clone().negate(), UP).normalize(), TXU = new V3().crossVectors(TXR, nrm.clone().negate()).normalize();
+    let yOff = 0;
+    lines.forEach((Ln, li) => {
+      const { text, F, charW, fam } = Ln, fm = fontMetrics(F, fam), sPx = charW / fm.adv, { pts, w } = lineSplats(text, F, fam);
+      for (let k = 0; k < pts.length; k += 3) {
+        if (pts[k + 2] < 0.1) continue;
+        const lx = (pts[k] - w / 2) * sPx, ly = yOff - (pts[k + 1] - F * 0.36) * sPx, z = g() * 0.002, s = sPx * 0.6;
+        push(anchor.x + TXR.x * lx + TXU.x * ly + nrm.x * z, anchor.y + TXR.y * lx + TXU.y * ly + nrm.y * z, anchor.z + TXR.z * lx + TXU.z * ly + nrm.z * z, s, s, s, pts[k + 2], codeFor, role, subFor(li), 255 * pts[k] / Math.max(1, w));
+      }
+      yOff -= fm.LH * sPx * 1.05;
+    });
+  };
+  const F_PATH = LOW ? 16 : 26, F_SUB = LOW ? 12 : 18, F_SMALL = LOW ? 9 : 13, F_TITLE = LOW ? 18 : 30;
+  PATH.forEach((id, i) => {
+    const nrm = pathNrm[i], TXU = new V3().crossVectors(new V3().crossVectors(nrm.clone().negate(), UP).normalize(), nrm.clone().negate()).normalize();
+    placeText([{ text: PATH_INFO[i].label[0], F: F_PATH, charW: 0.072, fam: MONO }, { text: PATH_INFO[i].label[1], F: F_SUB, charW: 0.04, fam: SANS }],
+      POS[id].clone().addScaledVector(nrm, 0.12).addScaledVector(TXU, 0.58), nrm, ROLE.pathLabel, i, li => li);
+  });
+  const smallLabels = [], nearest = p => { let bi = 0, bd = 1e9; PATH.forEach((id, i) => { const d = POS[id].distanceTo(p); if (d < bd) { bd = d; bi = i; } }); return bi; };
+  for (const e of ents) {
+    if (PATH_SET.has(e.id)) continue;
+    const p = POS[e.id], near = PATH.some(id => POS[id].distanceTo(p) < 1.35);
+    if (PATH.some(id => POS[id].distanceTo(p) < 0.75)) continue;
+    const isApp = e.cluster === 'SaaS';
+    if (!(near && (e.cat !== CAT.app || isApp)) && !isApp) continue;
+    if (e.cat === CAT.user && smallLabels.filter(x => ents[x].cat === CAT.user).length > 10) continue;
+    smallLabels.push(e.id);
+  }
+  for (const id of smallLabels) {
+    const nrm = pathNrm[nearest(POS[id])], TXU = new V3().crossVectors(new V3().crossVectors(nrm.clone().negate(), UP).normalize(), nrm.clone().negate()).normalize();
+    placeText([{ text: ents[id].name, F: F_SMALL, charW: 0.03, fam: MONO }], POS[id].clone().addScaledVector(TXU, 0.1).addScaledVector(nrm, 0.05), nrm, ROLE.label, codeOf(id), () => ents[id].cat);
+  }
+  const wideN = dirFrom(A0 + 0.3, EL0);
+  for (const name of [...DEPTS.map(d => d.name), 'Okta', 'AWS mf-prod-data', 'AWS mf-prod-app', 'AWS mf-dev', 'prod-eu', 'Fleet telematics']) {
+    const c = name === 'Okta' ? new V3(HUB[0], HUB[1] - 1.3, HUB[2]) : new V3(...clusterCenters[name]).add(new V3(0, 1.55, 0));
+    placeText([{ text: name, F: F_TITLE, charW: 0.3, fam: SANS }], c, wideN, ROLE.title, 255, () => 0);
+  }
+}
+
+/* ---------- post: bloom on the hot splats (dropped at the lowest quality step) ---------- */
+const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 0 });
+const composer = new EffectComposer(renderer, rt);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.42, 0.4, 0.93);
+composer.addPass(bloom); composer.addPass(new OutputPass());
+let bloomOn = true;
+
+/* ---------- layout ---------- */
+let SW = 1, SH = 1;
+function layout() {
+  const r = stage.getBoundingClientRect(); SW = Math.max(1, Math.round(r.width)); SH = Math.max(1, Math.round(r.height));
+  renderer.setPixelRatio(PR()); renderer.setSize(SW, SH, false);
+  composer.setPixelRatio(PR()); composer.setSize(SW, SH);
+  if (LOW || prCap < 1.5) bloom.setSize(Math.round(SW * 0.5), Math.round(SH * 0.5));
+  const va = SW / SH;
+  portrait = va < 0.9;
+  camera.fov = va < 0.8 ? 58 : va < 1.25 ? 46 : 38; camera.aspect = va; camera.updateProjectionMatrix();
+  const tanH = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * va;
+  distScale = Math.max(1, (Math.tan(THREE.MathUtils.degToRad(19)) * 1.55) / tanH) * (portrait ? 0.9 : 1);
+  buildTrack(); dirty = true; lastChange = performance.now();
+}
+
+/* ---------- camera = story track + the viewer's orbit/zoom offsets ---------- */
+const user = { yaw: 0, pitch: 0, zoom: 0, ty: 0, tp: 0, tz: 0, down: false, x: 0, y: 0, moved: 0, last: 0 };
+const camState = new Float64Array(6), camTarget = new V3(), tmpDir = new V3();
+let camDist = 1;
+function stepUser(now) {
+  const dt = Math.min(.1, Math.max(0, (now - (user.last || now)) / 1000)); user.last = now;
+  const k = 1 - Math.exp(-dt * 9);
+  user.yaw += (user.ty - user.yaw) * k; user.pitch += (user.tp - user.pitch) * k; user.zoom += (user.tz - user.zoom) * k;
+}
+const touch = () => { dirty = true; lastChange = performance.now(); };
+const animating = () => Math.abs(user.ty - user.yaw) + Math.abs(user.tp - user.pitch) + Math.abs(user.tz - user.zoom) > 1e-3;
+function placeCamera(s) {
+  track(s, camState);
+  camTarget.set(camState[0], camState[1], camState[2]);
+  camDist = Math.exp(camState[3] + user.zoom);
+  dirFrom(camState[4] + user.yaw, clamp(camState[5] + user.pitch, -1.2, 1.45), tmpDir);
+  camera.position.copy(camTarget).addScaledVector(tmpDir, camDist);
+  camera.up.set(0, 1, 0); camera.lookAt(camTarget); camera.updateMatrixWorld();
+}
+const _p = new V3();
+function project(id) { _p.copy(POS[id]).project(camera); const vis = _p.z < 1 && Math.abs(_p.x) < 1.05 && Math.abs(_p.y) < 1.05; return { x: (_p.x * 0.5 + 0.5) * SW, y: (-_p.y * 0.5 + 0.5) * SH, w: SW, h: SH, vis }; }
+function pick(x, y) {
+  let best = -1, bd = 22 * 22;
+  for (const e of ents) {
+    _p.copy(POS[e.id]).project(camera); if (_p.z > 1) continue;
+    const dx = (_p.x * 0.5 + 0.5) * SW - x, dy = (-_p.y * 0.5 + 0.5) * SH - y, d = dx * dx + dy * dy - (PATH_SET.has(e.id) ? 200 : 0);
+    if (d < bd) { bd = d; best = e.id; }
+  }
+  return best;
+}
+
+/* ---------- input on the canvas ---------- */
+canvas.addEventListener('pointerdown', e => { user.down = true; user.x = e.clientX; user.y = e.clientY; user.moved = 0; canvas.setPointerCapture(e.pointerId); canvas.classList.add('drag'); BR.input(); BR.kick(); });
+canvas.addEventListener('pointermove', e => {
+  if (!user.down) return;
+  const k = 3.2 / Math.max(SW, SH), dx = e.clientX - user.x, dy = e.clientY - user.y;
+  user.moved += Math.abs(dx) + Math.abs(dy); user.x = e.clientX; user.y = e.clientY;
+  user.ty = clamp(user.ty + dx * k, -1.2, 1.2); user.yaw = user.ty;
+  user.tp = clamp(user.tp + dy * k, -0.9, 0.9); user.pitch = user.tp;
+  BR.input(); touch(); BR.kick();
+});
+const endDrag = e => {
+  if (!user.down) return; user.down = false; canvas.classList.remove('drag');
+  if (user.moved < 5 && e && e.clientX !== undefined) { const r = canvas.getBoundingClientRect(), id = pick(e.clientX - r.left, e.clientY - r.top); if (id >= 0) BR.select(id); }
+  BR.kick();
+};
+canvas.addEventListener('pointerup', endDrag);
+canvas.addEventListener('pointercancel', () => { user.down = false; canvas.classList.remove('drag'); });
+canvas.addEventListener('wheel', e => { e.preventDefault(); user.tz = clamp(user.tz + e.deltaY * 0.0012, -1.6, 1.2); user.zoom = user.tz; BR.input(); touch(); BR.kick(); }, { passive: false });
+
+/* ---------- build ---------- */
+try { await Promise.race([Promise.all([document.fonts.load('400 24px "Geist Mono"'), document.fonts.load('500 24px "Geist"')]).then(() => document.fonts.ready), new Promise(r => setTimeout(r, 5000))]); } catch (e) { /* system fonts */ }
+layout();
+const scratch = new ExtSplats();
+buildSplats(scratch);
+const es = new ExtSplats({ extArrays: scratch.extArrays, numSplats: scratch.numSplats });
+const mesh = new SplatMesh({ extSplats: es, objectModifier: modifier });
+scene.add(mesh);
+await mesh.initialized;
+new ResizeObserver(() => { layout(); BR.kick(); }).observe(stage);
+let forceVersion = false;
+async function settleSpark() {
+  for (let k = 0; k < 2; k++) {
+    await spark.update({ scene, camera });
+    for (let g = 0; g < 600 && (spark.sorting || spark.sortDirty); g++) await new Promise(r => setTimeout(r, 10));
+  }
+}
+const R = {
+  lastDist: 0, splats: splatCount,
+  frame(s, now) {
+    stepUser(now);
+    placeCamera(s);
+    if (forceVersion || uT.value !== s || !uCam.value.equals(camera.position)) { uT.value = s; uCam.value.copy(camera.position); mesh.updateVersion(); forceVersion = false; lastChange = now; }
+    spark.focalDistance = camDist; spark.apertureAngle = 0.0065 * smooth(4.2, 2.6, camDist);
+    if (bloomOn) composer.render(); else renderer.render(scene, camera);
+    dirty = false; R.lastDist = camDist;
+    return camDist;
+  },
+  busy: now => user.down || animating() || (dirty && now - lastChange < 900),
+  async seek(s) { const now = performance.now(); R.frame(s, now); await settleSpark(); R.frame(s, performance.now()); },
+  project, pick,
+  nudge(act) {
+    if (act === 'zin') user.tz = clamp(user.tz - 0.45, -1.6, 1.2);
+    else if (act === 'zout') user.tz = clamp(user.tz + 0.45, -1.6, 1.2);
+    else if (act === 'left') user.ty = clamp(user.ty - 0.35, -1.2, 1.2);
+    else if (act === 'right') user.ty = clamp(user.ty + 0.35, -1.2, 1.2);
+    else if (act === 'reset') { user.ty = user.tp = user.tz = 0; }
+    BR.input(); touch();
+  },
+  resetView(instant) { user.ty = user.tp = user.tz = 0; if (instant) { user.yaw = user.pitch = user.zoom = 0; } touch(); },
+  setBlast(on) { let m = Math.round(uMask.value); m = on ? (m | 128) : (m & ~128); uMask.value = m; forceVersion = true; touch(); },
+  setQuality(level) { prCap = level >= 2 ? 1 : 1.25; bloomOn = level < 2; layout(); },
+  user,
+  dbg: () => ({ dirty, age: Math.round(performance.now() - lastChange), anim: animating(), down: user.down, yaw: user.yaw, ty: user.ty, zoom: user.zoom, tz: user.tz }),
+};
+document.getElementById('cmp').dataset.splats = String(splatCount);
+BR.ready(R);
+}
+
+</script>
+</body>
+</html>

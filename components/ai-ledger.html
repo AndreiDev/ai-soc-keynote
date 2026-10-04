@@ -1,0 +1,960 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Decision ledger</title>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../shared/ui.css">
+<!--
+  Keynote component: tamper-evident decision ledger (CASE-4127, Meridian Freight, shift C).
+  Every AI-agent and human decision is canonical JSON, SHA-256 hash-chained (entry text + '|prev=' + previous hash,
+  crypto.subtle in this tab, pure-JS fallback). Same canonical form, genesis and older entries as app/agents-ledger.html,
+  so every digest matches the app. Attract loop (31 s, every frame a pure function of t): entries append, Verify walks
+  the chain, a ghost edit flips approved_by RP -> RQ in #7315, the digest avalanches, every later link breaks, Restore heals.
+  Hooks: __seek(t), __play(), __state(); ?t=19 paused frame; ?captions=0; postMessage {corvid:'pause'|'play'}.
+-->
+<style>
+:root{--spw:40px;--insw:340px;--rg:6px;--rowmax:74px}
+html,body{height:100%;overflow:hidden;min-height:0}
+body{background:var(--ground)}
+button{cursor:pointer}
+.cx{position:fixed;inset:0;display:flex;flex-direction:column;min-width:0}
+/* ---------- header */
+.cx-head{flex:none;height:52px;display:flex;align-items:center;gap:12px;padding:0 16px;border-bottom:1px solid #1C222B;background:var(--side);min-width:0}
+.cx-icon{flex:none;width:28px;height:28px;border-radius:8px;background:#151A21;border:1px solid var(--line2);display:inline-flex;align-items:center;justify-content:center;color:var(--cold3)}
+.cx-title{font:600 15px/1 var(--sans);letter-spacing:-.01em;white-space:nowrap}
+.cx-sp{flex:1;min-width:0}
+.cx-status{display:inline-flex;align-items:center;gap:8px;font:500 12px/1 var(--sans);color:var(--text2);white-space:nowrap}
+.cx-dot{width:8px;height:8px;border-radius:50%;background:var(--text3);flex:none}
+.playing .cx-dot{animation:cvpulse 1.6s ease-in-out infinite}
+.cx-status.ok{color:var(--ben)} .cx-status.ok .cx-dot{background:var(--ben);box-shadow:0 0 8px rgba(76,201,166,.6)}
+.cx-status.run{color:var(--cold3)} .cx-status.run .cx-dot{background:var(--cold3);box-shadow:0 0 8px rgba(127,214,238,.6)}
+.cx-status.bad{color:var(--mal)} .cx-status.bad .cx-dot{background:var(--hot2);box-shadow:0 0 10px rgba(255,106,85,.75)}
+.cx-anchor{font-family:var(--mono);font-size:11px;color:var(--text3)}
+body.paused *{animation-play-state:paused!important}
+/* ---------- stage */
+.lg-stage{flex:1;min-height:0;position:relative;display:grid;grid-template-columns:minmax(0,1fr) var(--insw);gap:14px;padding:14px;transition:opacity .4s ease}
+.lg-stage.fading{opacity:0}
+.lg-chain{position:relative;min-height:0;min-width:0;display:flex;flex-direction:column;gap:8px;padding-bottom:52px}
+/* banner */
+.lg-banner{flex:none;height:36px;display:flex;align-items:center;gap:10px;padding:0 14px;border-radius:9px;border:1px solid var(--line);background:var(--panel);font:500 13px/1.2 var(--sans);color:var(--text2);min-width:0}
+.lg-banner i{flex:none;width:8px;height:8px;border-radius:50%;background:var(--text3)}
+.lg-banner span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lg-banner b{font-weight:600;color:var(--text)}
+.lg-banner .m{font-family:var(--mono);font-size:12px;color:var(--text3)}
+.lg-banner.ok{border-color:rgba(76,201,166,.35);background:linear-gradient(90deg,rgba(76,201,166,.08),rgba(16,20,26,0) 70%),var(--panel)}
+.lg-banner.ok i{background:var(--ben);box-shadow:0 0 8px rgba(76,201,166,.6)} .lg-banner.ok b{color:var(--ben)}
+.lg-banner.run{border-color:rgba(127,214,238,.35)} .lg-banner.run i{background:var(--cold3)} .lg-banner.run b{color:var(--cold3)}
+.lg-banner.bad{border-color:rgba(255,106,85,.7);background:linear-gradient(90deg,rgba(255,106,85,.2),rgba(255,106,85,.06) 75%),var(--panel);color:#FFC9BF}
+.lg-banner.bad i{background:var(--hot2);box-shadow:0 0 10px rgba(255,106,85,.9)} .lg-banner.bad b{color:#FFE1DA} .lg-banner.bad .m{color:#FF9C8C}
+/* list + spine */
+.lg-list{position:relative;flex:1;min-height:0;display:flex;flex-direction:column;gap:6px;padding-left:var(--spw)}
+.lg-spine{position:absolute;left:0;top:0;width:var(--spw);height:100%;overflow:visible;pointer-events:none}
+.lg-spine .pulse{filter:drop-shadow(0 0 5px #7FD6EE)}
+.lq .lg-spine .pulse{filter:none}
+.lg-stub{flex:none;height:28px;display:flex;align-items:center;gap:10px;padding:0 12px;border:1px dashed #252D38;border-radius:8px;font-size:12px;color:var(--text3);min-width:0}
+.lg-stub b{font:600 12px var(--mono);color:var(--text2)}
+.lg-stub .m{margin-left:auto;font:11px var(--mono);white-space:nowrap}
+.lg-stub span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.lg-rows{flex:1 1 0;min-height:0;max-height:calc(8 * var(--rowmax) + 7 * var(--rg));display:grid;grid-template-rows:repeat(8,minmax(0,1fr));gap:var(--rg)}
+.lg-anchor{flex:none;height:22px;display:block;line-height:22px;padding:0 12px;font:11px/22px var(--mono);color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.lg-anchor b{font-weight:500;color:var(--cold3)}
+.lg-anchor.bad{color:#FF9C8C} .lg-anchor.bad b{color:var(--hot4)}
+/* row */
+.lg-row{position:relative;min-height:0;display:grid;grid-template-columns:var(--metaw,128px) minmax(0,1fr) var(--digw,48px) var(--stw,104px);gap:12px;align-items:center;padding:0 12px;border:1px solid var(--line);border-radius:9px;background:var(--panel);will-change:transform,opacity;overflow:hidden}
+.lg-row::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--flash,transparent);opacity:var(--fl,0)}
+.lg-row.agent{--flash:var(--agent)} .lg-row.human{--flash:#C2CAD6}
+.lg-row.chk{border-color:rgba(127,214,238,.6);box-shadow:0 0 0 1px rgba(127,214,238,.15) inset}
+.lg-row.bad{border-color:rgba(255,106,85,.6);background:linear-gradient(90deg,rgba(255,106,85,.09),rgba(16,20,26,0) 62%),var(--panel)}
+.lg-row.edited{border-color:rgba(255,211,107,.75)}
+.lg-row.focus:not(.bad){border-color:#34404E}
+.lg-meta{display:flex;flex-direction:column;gap:5px;min-width:0}
+.lg-meta .l{display:flex;align-items:baseline;gap:7px;white-space:nowrap}
+.lg-seq{font:600 13px/1 var(--mono);color:var(--text)}
+.lg-time{font:11px/1 var(--mono);color:var(--text3)}
+.lg-who{display:flex;align-items:center;gap:6px;font:500 12px/1 var(--sans);color:var(--text2);white-space:nowrap;overflow:hidden}
+.lg-who .ag{width:18px;height:18px;font-size:7.5px}
+.lg-who .av{width:18px;height:18px;font-size:8px}
+.lg-body{min-width:0;display:flex;flex-direction:column;gap:3px}
+.lg-l1{display:flex;align-items:center;gap:6px;min-width:0}
+.lg-dec{font:500 var(--l1f,13px)/1.25 var(--sans);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:0 1 auto}
+.lg-l1 .chip{flex:none}
+.lg-json{font:var(--jf,10.5px)/var(--jlh,13.5px) var(--mono);color:#93A0AF;word-break:break-all;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:var(--jl,2);overflow:hidden;cursor:text}
+.lg-json span,.lg-rec span{cursor:pointer;border-radius:2px}
+.lg-json span:hover,.lg-rec span:hover{background:rgba(255,211,107,.28);color:#FFF6E0}
+.lg-json .k,.lg-rec .k{color:#7FA9C4} .lg-json .s,.lg-rec .s{color:#B9C99B} .lg-json .n,.lg-rec .n{color:#E2B877}
+.lg-json span.hv,.lg-rec span.hv{background:rgba(255,211,107,.3);color:#FFF6E0}
+.lg-json .fl,.lg-rec .fl{background:#FF6A55;color:#1A0703;box-shadow:0 0 10px rgba(255,106,85,.8)}
+.lq .lg-json .fl,.lq .lg-rec .fl{box-shadow:none}
+.lg-dig{display:block;border-radius:4px;background:#070A0D;justify-self:center}
+.lg-st{display:flex;flex-direction:column;align-items:flex-end;gap:5px;min-width:0}
+.lg-chip{display:inline-flex;align-items:center;gap:6px;height:21px;padding:0 8px;border-radius:999px;border:1px solid var(--line2);font:500 11px/1 var(--sans);color:var(--text3);white-space:nowrap}
+.lg-chip i{width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
+.lg-chip.ok{color:var(--ben);border-color:rgba(76,201,166,.45);background:rgba(76,201,166,.08)}
+.lg-chip.run{color:var(--cold3);border-color:rgba(127,214,238,.45);background:rgba(127,214,238,.08)}
+.lg-chip.bad{color:var(--mal);border-color:rgba(255,106,85,.55);background:rgba(255,106,85,.12)}
+.lg-chip.ed{color:#1A0703;border-color:var(--hot2);background:var(--hot2)}
+.lg-prev{font:10.5px/1 var(--mono);color:var(--text3);white-space:nowrap}
+.lg-prev.bad{color:#FF9C8C}
+.lg-stm{display:none}
+/* row size tiers (set from measured row height) */
+.rh-l{--jf:11px;--jlh:15px;--jl:2;--l1f:13.5px}
+.rh-m{--jf:10px;--jlh:13px;--jl:2;--l1f:12.5px}
+.rh-s{--jf:10px;--jlh:13px;--jl:1;--l1f:12.5px}
+.rh-s .lg-meta{gap:4px} .rh-s .lg-row{gap:10px}
+.rh-xs{--jl:0}
+.rh-xs .lg-json{display:none}
+/* ---------- inspector */
+.lg-insp{min-height:0;min-width:0;display:flex;flex-direction:column;gap:10px;overflow:hidden}
+.lg-card{flex:none;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.lg-card h3{font:600 12.5px/1 var(--sans);margin:0;color:var(--text)}
+.lg-ch{display:flex;align-items:center;gap:8px}
+.lg-ch .m{margin-left:auto;font:11px var(--mono);color:var(--text3);white-space:nowrap}
+.lg-ch .eb{font-size:10.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--text3)}
+.lg-focus .who{display:flex;align-items:center;gap:8px;font:600 14px/1.1 var(--sans)}
+.lg-focus .who .ag,.lg-focus .who .av{width:22px;height:22px}
+.lg-intent{font:13px/1.35 var(--sans);color:var(--text)}
+.lg-kv{display:grid;grid-template-columns:92px minmax(0,1fr);gap:4px 10px;margin:0;font-size:12px}
+.lg-kv dt{color:var(--text3)} .lg-kv dd{margin:0;color:var(--text2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lg-kv dd.wr{white-space:normal;line-height:1.35} .lg-kv dd.hot{color:var(--mal)} .lg-kv dd b{color:var(--text);font-weight:500}
+.lg-rec{font:10.5px/1.5 var(--mono);color:#93A0AF;word-break:break-all;background:var(--ground);border:1px solid #1A2029;border-radius:7px;padding:6px 8px}
+.lg-diff{font:12px/1.5 var(--mono);color:var(--text2);display:grid;grid-template-columns:auto minmax(0,1fr);gap:1px 10px;min-height:36px}
+.lg-diff .k{color:var(--text3);font-family:var(--sans);font-size:11.5px}
+.lg-diff .hot{color:#1A0703;background:var(--hot2);border-radius:2px;padding:0 1px}
+.lg-diff .hb{color:var(--hot4);font-weight:600}
+.lg-diff .calm{grid-column:1/-1;font-family:var(--sans);font-size:12px;color:var(--text3)}
+.lg-grids{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.lg-grids figure{margin:0;display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0}
+.lg-grids canvas{width:100%;max-width:var(--gmax,150px);aspect-ratio:1;display:block;border-radius:6px;background:#070A0D}
+.lg-grids figcaption{font-size:11px;color:var(--text3);white-space:nowrap}
+.lg-count{font:600 22px/1 var(--mono);color:var(--cold3);display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.lg-count small{font:500 12px/1.2 var(--sans);color:var(--text2)}
+.lg-count.hot{color:var(--hot4)}
+.lg-expl{font-size:12px;color:var(--text3);line-height:1.4}
+.lg-down{flex:0 1 auto;min-height:0;overflow:hidden}
+.lg-dl{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--text2)}
+.lg-dl li{display:flex;align-items:baseline;gap:8px;min-width:0}
+.lg-dl li i{flex:none;width:7px;height:7px;border-radius:50%;background:#2F93B5;transform:translateY(-1px)}
+.lg-dl li.bad i{background:var(--hot2)} .lg-dl li.bad{color:#FFC9BF}
+.lg-dl li .m{font:600 11.5px var(--mono);color:var(--text)}
+.lg-dl li span{min-width:0}
+/* ---------- caption */
+.cx-capw{position:absolute;left:calc(14px + var(--spw));right:calc(28px + var(--insw));bottom:12px;display:flex;justify-content:center;pointer-events:none;z-index:6}
+.cx-cap{max-width:100%;padding:8px 16px;border-radius:999px;border:1px solid var(--line2);background:rgba(10,13,17,.78);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);font:500 14.5px/1.3 var(--sans);color:var(--text);text-align:center;opacity:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lq .cx-cap{-webkit-backdrop-filter:none;backdrop-filter:none;background:rgba(10,13,17,.92)}
+.nocap .cx-capw{display:none}
+/* ---------- controls */
+.cx-ctl{position:relative;flex:none;height:44px;display:flex;align-items:center;gap:10px;padding:0 16px;border-top:1px solid #1C222B;background:var(--side);min-width:0}
+.cx-prog{position:absolute;left:0;top:-1px;height:2px;width:0;background:#2F93B5}
+.lg-btn{display:inline-flex;align-items:center;gap:8px;height:30px;padding:0 12px;border-radius:7px;border:1px solid var(--line2);background:var(--raised);color:var(--text);font:500 12.5px/1 var(--sans);white-space:nowrap}
+.lg-btn:hover{border-color:var(--line3);background:#19202A}
+.lg-btn.pri{border-color:rgba(127,214,238,.55);background:rgba(47,147,181,.16);color:#CFF1FA}
+.lg-btn.pri:hover{background:rgba(47,147,181,.26)}
+.lg-btn[aria-disabled="true"]{opacity:.45;cursor:default}
+.lg-btn.press{transform:scale(.95);background:rgba(47,147,181,.34)}
+.lg-btn .kbd{height:16px;font-size:10px}
+.lg-legend{display:flex;align-items:center;gap:12px;margin-left:6px;font-size:11.5px;color:var(--text3);white-space:nowrap}
+.lg-legend span{display:inline-flex;align-items:center;gap:5px}
+.lg-legend i{width:7px;height:7px;border-radius:50%}
+.lg-hint{font-size:11.5px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.lg-ib{flex:none;width:30px;height:30px;border-radius:7px;border:1px solid var(--line2);background:var(--raised);color:var(--text);display:inline-flex;align-items:center;justify-content:center}
+.lg-ib:hover{border-color:var(--line3)}
+/* ---------- ghost cursor + loupe (attract loop only) */
+.lg-ghost{position:fixed;left:0;top:0;width:22px;height:22px;pointer-events:none;z-index:40;opacity:0;will-change:transform}
+.lg-ghost .rip{position:absolute;left:-14px;top:-14px;width:28px;height:28px;border-radius:50%;border:2px solid #DDF6FF;opacity:0}
+.lg-loupe{position:fixed;left:0;top:0;width:120px;padding:8px 10px 9px;border-radius:12px;background:rgba(13,17,22,.95);border:1px solid rgba(127,214,238,.5);box-shadow:0 12px 40px rgba(0,0,0,.55);pointer-events:none;z-index:35;opacity:0;will-change:transform}
+.lg-loupe .g{font:600 34px/1 var(--mono);text-align:center;color:var(--text)}
+.lg-loupe .b{font:12px/1 var(--mono);text-align:center;color:var(--text2);margin-top:6px;letter-spacing:.06em}
+.lg-loupe .b i{font-style:normal;color:#1A0703;background:var(--hot4);border-radius:2px;padding:0 1px}
+.lg-loupe .c{font:10.5px/1 var(--sans);text-align:center;color:var(--text3);margin-top:5px}
+/* ---------- responsive */
+@media (min-width:1500px){:root{--insw:384px;--spw:44px} .lg-grids canvas{--gmax:168px}}
+@media (max-width:1180px){:root{--insw:300px;--spw:36px;--rg:4px} .lg-stage{gap:12px;padding:12px} .cx-capw{left:calc(12px + var(--spw));right:calc(24px + var(--insw))} .lg-row{--metaw:108px;--stw:96px;padding:0 10px} .lg-legend{display:none}}
+@media (max-width:980px){.cx-anchor{display:none}}
+@media (max-height:880px){.lg-rec{font-size:10px;line-height:1.4} .lg-expl{display:none} .lg-grids canvas{--gmax:128px} .lg-kv .opt2{display:none}}
+@media (max-height:760px){.lg-kv .opt{display:none} .lg-card{padding:10px 12px;gap:7px} .lg-grids canvas{--gmax:124px} .lg-count{font-size:19px}}
+@media (min-height:950px){:root{--rowmax:86px}}
+@media (max-height:700px){.lg-kv dd.wr{white-space:nowrap} .lg-intent{white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .lg-grids canvas{--gmax:108px} .lg-grids{gap:8px} .lg-insp{gap:8px} .lg-banner{height:32px;font-size:12.5px} .lg-stub{height:24px} .lg-down .calm2{display:none} .lg-rec{font-size:10px;line-height:1.4;padding:5px 7px} .lg-intent{font-size:12.5px}}
+@media (max-width:700px){
+  :root{--spw:28px;--rg:4px}
+  .cx-head{gap:9px;padding:0 12px}
+  .cx-title{font-size:14px}
+  .cx-ctx{font-size:10.5px;height:20px;padding:0 7px}
+  .cx-status span{display:none}
+  .lg-stage{display:flex;flex-direction:column;gap:10px;padding:10px 10px 68px}
+  .lg-chain{flex:1 1 auto;padding-bottom:0;gap:6px}
+  .lg-banner{height:32px;font-size:12px;padding:0 10px}
+  .lg-banner .m{display:none}
+  .lg-stub{display:none}
+  .lg-rows{--rowmax:46px}
+  .lg-row{--metaw:58px;grid-template-columns:var(--metaw) minmax(0,1fr) var(--digw);gap:8px;padding:0 8px}
+  .lg-st{display:none}
+  .lg-who{display:none}
+  .lg-meta{gap:4px}
+  .lg-time{display:none}
+  .lg-stm{display:block;font:500 10.5px/1 var(--sans);color:var(--text3);white-space:nowrap}
+  .lg-stm.ok{color:var(--ben)} .lg-stm.bad{color:var(--mal)} .lg-stm.run{color:var(--cold3)}
+  .lg-l1 .chip{display:none}
+  .lg-dec{font-size:12px}
+  .lg-json{display:none}
+  .lg-anchor{font-size:10px;padding:0 8px}
+  .lg-insp{flex:none;overflow:visible}
+  .lg-focus,.lg-down,.lg-expl{display:none!important}
+  .lg-aval{padding:10px 12px;gap:7px}
+  .lg-aval .lg-diff{display:none}
+  .lg-aval .lg-ch .m{display:inline;margin-left:auto}
+  .lg-grids{gap:10px} .lg-grids canvas{--gmax:112px} .lg-grids figcaption{font-size:10.5px}
+  .lg-count{font-size:18px;justify-content:center}
+  .cx-capw{left:10px;right:10px;bottom:10px}
+  .cx-cap{white-space:normal;font-size:13px;border-radius:14px;padding:7px 12px}
+  .lg-hint,.lg-legend{display:none}
+  .lg-btn .kbd{display:none}
+  .lg-ghost,.lg-loupe{display:none}
+}
+</style>
+</head>
+<body class="paused">
+<div class="cx" id="cx">
+  <header class="cx-head">
+    <span class="cx-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6.6 9.4l2.8-2.8"/><path d="M7.8 4.4l1.3-1.3a2.6 2.6 0 013.7 3.7l-1.3 1.3"/><path d="M8.2 11.6l-1.3 1.3a2.6 2.6 0 01-3.7-3.7l1.3-1.3"/></svg></span>
+    <span class="cx-title">Decision ledger</span>
+    <span class="chip cx-ctx">CASE-4127 · Meridian Freight</span>
+    <span class="cx-sp"></span>
+    <span class="cx-status" id="hstatus"><i class="cx-dot"></i><span id="hstatus-t">Recording</span></span>
+    <span class="chip cx-anchor">SHA-256 · head anchored 02:47:00 · RFC 3161</span>
+  </header>
+  <main class="lg-stage" id="stage">
+    <section class="lg-chain" id="chain" aria-label="Hash-chained decision ledger">
+      <div class="lg-banner" id="banner" role="status" aria-live="polite"><i></i><span id="banner-t">Recording decisions</span></div>
+      <div class="lg-list" id="list">
+        <svg class="lg-spine" id="spine" aria-hidden="true"></svg>
+        <div class="lg-stub" id="stub"><b>#7296–#7309</b><span>14 earlier entries tonight · verified</span><span class="m" id="stub-h"></span></div>
+        <div class="lg-rows" id="rows"></div>
+        <div class="lg-anchor" id="anchor"></div>
+      </div>
+    </section>
+    <aside class="lg-insp" aria-label="Entry inspector">
+      <section class="lg-card lg-focus" id="focus"></section>
+      <section class="lg-card lg-aval" id="aval">
+        <div class="lg-ch"><h3>Avalanche</h3><span class="m" id="av-entry"></span></div>
+        <div class="lg-diff" id="av-diff"></div>
+        <div class="lg-grids">
+          <figure><canvas id="avA" aria-label="Stored digest, 256 bits"></canvas><figcaption>Stored digest</figcaption></figure>
+          <figure><canvas id="avB" aria-label="Recomputed digest, 256 bits"></canvas><figcaption id="avB-cap">Recomputed now</figcaption></figure>
+        </div>
+        <div class="lg-count" id="av-count"></div>
+        <p class="lg-expl">Change one input bit and about half of SHA-256's output bits flip.</p>
+      </section>
+      <section class="lg-card lg-down" id="down"><div class="lg-ch"><h3 id="dn-title">Downstream</h3></div><ul class="lg-dl" id="dn-list"></ul></section>
+    </aside>
+    <div class="cx-capw"><div class="cx-cap" id="cap"></div></div>
+  </main>
+  <footer class="cx-ctl">
+    <i class="cx-prog" id="prog"></i>
+    <button type="button" class="lg-btn pri" id="verifyBtn">Verify chain <span class="kbd">V</span></button>
+    <button type="button" class="lg-btn" id="restoreBtn">Restore <span class="kbd">R</span></button>
+    <span class="lg-legend"><span><i style="background:#7FD6EE"></i>verified</span><span><i style="background:#FFD36B"></i>edited</span><span><i style="background:#FF6A55"></i>link broken</span></span>
+    <span class="cx-sp"></span>
+    <span class="lg-hint">Click any character of an entry to flip one bit</span>
+    <button type="button" class="lg-ib" id="playBtn" aria-label="Pause"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path id="playIco" d="M3 2h2v8H3zM7 2h2v8H7z" fill="currentColor"/></svg></button>
+  </footer>
+</div>
+<div class="lg-ghost" id="ghost" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M3 2l15 8.5-6.6 1.6L8 18.5z" fill="#E8EBEF" stroke="#0A0D11" stroke-width="1.4" stroke-linejoin="round"/></svg><span class="rip" id="rip"></span></div>
+<div class="lg-loupe" id="loupe" aria-hidden="true"><div class="g" id="lp-g">P</div><div class="b" id="lp-b">0101 0000</div><div class="c" id="lp-c">one byte, 8 bits</div></div>
+
+<script src="../shared/data.js"></script>
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const Q = new URLSearchParams(location.search);
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const D = window.CORVID;
+const clamp = (x, a, b) => x < a ? a : x > b ? b : x, sat = x => clamp(x, 0, 1);
+const sstep = (a, b, x) => { const u = sat((x - a) / (b - a)); return u * u * (3 - 2 * u); };
+const lerp = (a, b, u) => a + (b - a) * u;
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+if (Q.get('captions') === '0') document.body.classList.add('nocap');
+
+// =====================================================================================
+// Ledger data. Display: data.js ledger #7310–#7317. Older entries (#7296–#7309) are chained first, exactly as the app does.
+const OLDER = [{"seq":7296,"t":"00:54:10","actor":"agent:responder","action":"purge_email","body":{"case":"CASE-4123","mailboxes":41,"receipt":"RCPT-9903"},"policy":"AP-03"},{"seq":7297,"t":"00:54:12","actor":"agent:responder","action":"block_url","body":{"case":"CASE-4123","target":"docu-sign-review[.]example","receipt":"RCPT-9904","expiry":"7d"},"policy":"AP-03"},{"seq":7298,"t":"00:55:40","actor":"agent:investigator","action":"verdict","body":{"case":"CASE-4123","verdict":"malicious","confidence":0.92},"policy":"—"},{"seq":7299,"t":"01:04:21","actor":"agent:triage","action":"correlate","body":{"case":"CASE-4118","signals":5},"policy":"—"},{"seq":7300,"t":"01:11:48","actor":"agent:investigator","action":"verdict","body":{"case":"CASE-4118","verdict":"malicious","confidence":0.88},"policy":"—"},{"seq":7301,"t":"01:12:03","actor":"agent:responder","action":"quarantine_pod","body":{"case":"CASE-4118","target":"prod-eu/batch/xmrig-7f9c","receipt":"RCPT-9912"},"policy":"AP-19"},{"seq":7302,"t":"01:12:05","actor":"agent:responder","action":"cordon_node","body":{"case":"CASE-4118","target":"ip-10-42-7-19","receipt":"RCPT-9913"},"policy":"AP-19"},{"seq":7303,"t":"01:14:30","actor":"agent:responder","action":"request_approval","body":{"case":"CASE-4118","approval":"APR-309","persons":2},"policy":"AP-21"},{"seq":7304,"t":"01:31:02","actor":"human:MI","action":"approve","body":{"approval":"APR-309","of":"1/2","case":"CASE-4118"},"policy":"AP-21"},{"seq":7305,"t":"02:11:20","actor":"agent:triage","action":"auto_close","body":{"case":"CASE-4121","verdict":"benign","confidence":0.98,"lesson":"L-207"},"policy":"AP-01"},{"seq":7306,"t":"02:20:14","actor":"human:LB","action":"approve","body":{"case":"CASE-4126","action":"isolate_host","target":"FIN-LT-0442","receipt":"RCPT-9919"},"policy":"AP-11"},{"seq":7307,"t":"02:25:40","actor":"agent:triage","action":"auto_close","body":{"case":"CASE-4124","verdict":"benign","confidence":0.99,"change":"CHG-88213"},"policy":"AP-01"},{"seq":7308,"t":"02:31:55","actor":"agent:data_steward","action":"remap_field","body":{"source":"aws.cloudtrail","field":"userIdentity.sessionContext.sourceIdentity","env":"staging"},"policy":"DS-02"},{"seq":7309,"t":"02:33:10","actor":"agent:detection_engineer","action":"open_pr","body":{"pr":316,"rule":"AWS root console login","reason":"silent since 09-30"},"policy":"—"}];
+// per-entry detail, as in app/agents-ledger.html
+const DETAIL = {
+  7310: { intent: 'Correlate 9 signals into one case', outcome: 'CASE-4127 created · P1', delegation: 'Triage' },
+  7311: { intent: 'Revoke all Okta sessions for j.alvarez', outcome: '3 sessions → 0 · RCPT-9921 · undo until 08:38', delegation: 'Triage → Responder' },
+  7312: { intent: 'Ask j.alvarez on Slack whether she approved the sign-in', outcome: 'DM sent · no reply yet', delegation: 'Investigator' },
+  7313: { intent: 'Determine the verdict for CASE-4127', outcome: 'Malicious · 97% · 3 approvals requested', delegation: 'Triage → Investigator' },
+  7314: { intent: 'Acknowledge and take CASE-4127', outcome: 'owner Ravi Patel', delegation: 'Paged by Investigator' },
+  7315: { intent: 'Hunt tenant-wide for the TTPs in ADV-2026-0931', outcome: 'H-77 running · $2 cost cap', delegation: 'Intel → Hunter' },
+  7316: { intent: 'Write the Shift C brief', outcome: 'posted to #soc-shift · 14 citations', delegation: 'Reporter' },
+  7317: { intent: 'Report a new lead from H-77', outcome: 'm.kowalski: 6 denied pushes then an approval from AS64500', delegation: 'Intel → Hunter' },
+};
+const DECISION = {
+  7310: 'Correlated 9 signals into CASE-4127',
+  7311: 'Revoked all Okta sessions for j.alvarez',
+  7312: 'Asked j.alvarez on Slack if she approved the sign-in',
+  7313: 'Verdict on CASE-4127: malicious, confidence 0.97',
+  7314: 'Acknowledged and took CASE-4127',
+  7315: 'Launched hunt H-77 from ADV-2026-0931',
+  7316: 'Wrote the Shift C brief with 14 citations',
+  7317: 'New lead from hunt H-77: m.kowalski',
+};
+const BOUND = { 'write case': 'write', 'write report': 'draft', 'write finding': 'write', write: 'write', execute: 'execute', recommend: 'recommend', human: 'human', read: 'read' };
+const agentByCode = Object.fromEntries(D.agents.map(a => [a.code, a]));
+const canon = e => { const obj = { seq: e.seq, ts: `2026-10-03T${e.t}Z`, actor: e.actor, action: e.action, policy: e.policy, ...e.body };
+  return '{' + Object.keys(obj).sort().map(k => JSON.stringify(k) + ':' + JSON.stringify(obj[k])).join(',') + '}'; };
+const E = D.ledger.map(e => {
+  const human = e.actor.startsWith('human');
+  return { ...e, ...DETAIL[e.seq], human, name: human ? D.people[e.code].name : agentByCode[e.code].name, b: BOUND[e.boundary] || e.boundary,
+    decision: DECISION[e.seq], text: canon(e), model: human ? 'human decision' : 'reason-L pinned 2026-09-12 · ' + e.model.replace('pinned 2026-09-12 · ', '') };
+});
+const N = E.length;
+const TR = E.findIndex(e => e.seq === 7315);                                   // tampered row
+const TI = E[TR].text.indexOf('"approved_by":"RP"') + '"approved_by":"R'.length; // the 'P'
+
+// =====================================================================================
+// SHA-256: Web Crypto, with a pure-JS fallback giving identical digests
+const enc = new TextEncoder(), HEX = '0123456789abcdef';
+const toHex = b => Array.from(b, x => HEX[x >> 4] + HEX[x & 15]).join('');
+const bitOf = (b, i) => (b[i >> 3] >> (7 - (i & 7))) & 1;
+let ENGINE = (window.crypto && crypto.subtle) ? 'Web Crypto' : 'pure-JS';
+function sha256js(bytes) {
+  const K = new Uint32Array([0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2]);
+  const H = new Uint32Array([0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19]);
+  const l = bytes.length, nb = ((l + 9 + 63) >> 6) << 6, m = new Uint8Array(nb);
+  m.set(bytes); m[l] = 0x80; const bits = l * 8; for (let i = 0; i < 4; i++) m[nb - 1 - i] = (bits >>> (8 * i)) & 255;
+  const w = new Uint32Array(64), r = (x, n) => (x >>> n) | (x << (32 - n));
+  for (let o = 0; o < nb; o += 64) {
+    for (let i = 0; i < 16; i++) w[i] = (m[o + 4 * i] << 24) | (m[o + 4 * i + 1] << 16) | (m[o + 4 * i + 2] << 8) | m[o + 4 * i + 3];
+    for (let i = 16; i < 64; i++) { const s0 = r(w[i - 15], 7) ^ r(w[i - 15], 18) ^ (w[i - 15] >>> 3), s1 = r(w[i - 2], 17) ^ r(w[i - 2], 19) ^ (w[i - 2] >>> 10); w[i] = (w[i - 16] + s0 + w[i - 7] + s1) | 0; }
+    let [a, b, c, d, e, f, g, h] = H;
+    for (let i = 0; i < 64; i++) { const t1 = (h + (r(e, 6) ^ r(e, 11) ^ r(e, 25)) + ((e & f) ^ (~e & g)) + K[i] + w[i]) | 0; const t2 = ((r(a, 2) ^ r(a, 13) ^ r(a, 22)) + ((a & b) ^ (a & c) ^ (b & c))) | 0; h = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0; }
+    H[0] += a; H[1] += b; H[2] += c; H[3] += d; H[4] += e; H[5] += f; H[6] += g; H[7] += h;
+  }
+  const out = new Uint8Array(32); for (let i = 0; i < 8; i++) { out[4 * i] = H[i] >>> 24; out[4 * i + 1] = (H[i] >>> 16) & 255; out[4 * i + 2] = (H[i] >>> 8) & 255; out[4 * i + 3] = H[i] & 255; }
+  return out;
+}
+async function sha256(str) {
+  const b = enc.encode(str);
+  if (window.crypto && crypto.subtle) { try { return new Uint8Array(await crypto.subtle.digest('SHA-256', b)); } catch (e) { ENGINE = 'pure-JS'; } }
+  return sha256js(b);
+}
+async function chainFrom(texts, prev) { const out = []; for (const t of texts) { const h = await sha256(t + '|prev=' + prev); out.push({ h, hex: toHex(h), prev }); prev = toHex(h); } return out; }
+function flipChar(ch) { const c = ch.charCodeAt(0); for (const b of [1, 2, 4, 8, 16, 32]) { const d = c ^ b; if (d > 32 && d < 127 && d !== 34 && d !== 92) return { ch: String.fromCharCode(d), from: c, to: d }; } return null; }
+const short = h => h ? h.slice(0, 6) + '…' + h.slice(-4) : '—';
+let OLD_HEAD = '', STORED = [], SCRIPT_COMP = [], READY = false;
+
+// =====================================================================================
+// Timeline (31 s). Every frame of the attract loop is a pure function of t.
+const PERIOD = 31, HERO_T = 19.0;
+const K = { app0: 0.5, appStep: 0.98, gv0: 8.0, gvClick: 8.95, ver: 9.1, verStep: 0.2, ge0: 12.2, geArrive: 13.45, flip: 14.6,
+  gr0: 21.0, grClick: 22.6, ver2: 24.25, ver2Step: 0.16, fade0: 29.3, fade1: 30.5 };
+const CAPS = [
+  [0.3, 3.9, 'Every decision by an AI agent or a human is written to the ledger as it happens.'],
+  [4.0, 8.0, 'Each entry records who acted, under which policy, and the previous entry\'s hash.'],
+  [8.2, 12.0, 'Verify re-hashes every entry with SHA-256 and checks every link in the chain.'],
+  [12.2, 14.8, 'Now a quiet edit: someone changes who approved hunt H-77, from RP to RQ.'],
+  [14.9, 17.5, 'One flipped bit changes about half the digest. No edit can keep its hash.'],
+  [17.6, 21.0, 'Every later link breaks, so auditors see exactly which entry was altered.'],
+  [21.2, 29.2, 'Restore re-applies the gateway copy, and the chain verifies end to end again.'],
+];
+// a "model" holds event times; the script model is fixed, the live model is written by real input
+function blankModel() {
+  return { appearAt: Array(N).fill(-1e9), badAt: Array(N).fill(null), healAt: Array(N).fill(null), linkBreakAt: Array(N + 1).fill(null), linkHealAt: Array(N + 1).fill(null),
+    headBadAt: null, headHealAt: null, passes: [], badRec: Array(N).fill(null), restoreAt: null, busyUntil: 0 };
+}
+let SM = null;
+function buildScript() {
+  const M = blankModel();
+  M.appearAt = E.map((_, i) => K.app0 + i * K.appStep);
+  for (let j = TR; j < N; j++) {
+    M.badAt[j] = j === TR ? K.flip + 0.1 : K.flip + 1.9 + (j - TR - 1) * 0.9;
+    M.healAt[j] = K.grClick + 0.15 + (j - TR) * 0.4;
+    M.badRec[j] = SCRIPT_COMP[j].h;
+    if (j > TR) { M.linkBreakAt[j] = M.badAt[j] - 0.1; M.linkHealAt[j] = M.healAt[j] - 0.1; }
+  }
+  M.linkBreakAt[N] = M.badAt[N - 1] + 0.7; M.headBadAt = M.badAt[N - 1] + 0.8;
+  M.linkHealAt[N] = M.healAt[N - 1] + 0.3; M.headHealAt = M.healAt[N - 1] + 0.4;
+  M.passes = [{ at: K.ver, step: K.verStep }, { at: K.ver2, step: K.ver2Step }];
+  M.restoreAt = K.grClick;
+  M.flipShown = (i, now) => i === TR && now >= K.flip && now < M.healAt[TR] ? new Map([[TI, flipChar('P').ch]]) : null;
+  M.edited = (i, now) => i === TR && now >= K.flip && now < M.healAt[TR];
+  M.lastFlip = now => now >= K.flip && now < M.healAt[TR] + 0.6 ? { row: TR, idx: TI, at: K.flip } : null;
+  M.compHex = now => now >= K.flip && now < M.healAt[TR] ? SCRIPT_COMP.map(c => c.hex) : STORED.map(c => c.hex);
+  SM = M;
+}
+
+// =====================================================================================
+// Per-frame state from a model
+function rowSt(M, i, now) {
+  const a = M.appearAt[i];
+  const app = sstep(a, a + 0.35, now), mat = sat((now - a - 0.12) / 0.45);
+  const bA = M.badAt[i], hA = M.healAt[i];
+  const bad = bA != null && now >= bA && (hA == null || hA < bA || now < hA);
+  let rev = 0, healing = false;
+  const edited = bad && M.edited(i, now);
+  if (bad) rev = sat((now - bA) / (edited ? 1.0 : 0.6));
+  else if (bA != null && hA != null && hA > bA && now >= hA && now < hA + 0.6) { healing = true; rev = 1 - sat((now - hA) / 0.6); }
+  const since = Math.max(a + 0.35, hA != null && now >= hA ? hA : -1e9);
+  let ver = false, chk = false;
+  for (const p of M.passes) { const tc = p.at + i * p.step + 0.12; if (tc <= now && tc >= since) ver = true; if (now >= p.at + i * p.step - 0.06 && now < tc) chk = true; }
+  const restored = !bad && hA != null && now >= hA && !ver;
+  return { app, mat, bad, rev, healing, edited, ver: ver && !bad, chk: chk && !bad, restored, shake: bad && now - bA < 0.5 ? now - bA : -1, flash: app > 0 ? 1 - sat((now - a - 0.2) / 1.1) : 0 };
+}
+function linkSt(M, j, now) {
+  const at = j < N ? M.appearAt[j] : M.appearAt[N - 1] + 0.4;
+  const p = sstep(at - 0.05, at + 0.35, now);
+  const bA = M.linkBreakAt[j], hA = M.linkHealAt[j];
+  let u = 0;
+  if (bA != null && now >= bA) u = sstep(bA, bA + 0.25, now) * (hA != null && hA > bA ? 1 - sstep(hA, hA + 0.3, now) : 1);
+  return { p, u };
+}
+function headSt(M, now) {
+  const at = M.appearAt[N - 1] + 0.4;
+  const bad = M.headBadAt != null && now >= M.headBadAt && (M.headHealAt == null || M.headHealAt < M.headBadAt || now < M.headHealAt);
+  return { app: sstep(at, at + 0.35, now), bad };
+}
+function passSt(M, now) {
+  for (const p of M.passes) { const end = p.at + N * p.step; if (now >= p.at - 0.05 && now <= end + 0.35) return { f: (now - p.at) / p.step, op: sstep(p.at - 0.05, p.at + 0.1, now) * (1 - sstep(end + 0.05, end + 0.35, now)) }; }
+  return null;
+}
+
+// =====================================================================================
+// DOM
+const rowsEl = $('rows'), spine = $('spine'), list = $('list');
+const SVGNS = 'http://www.w3.org/2000/svg';
+const R = [];
+function jsonSpans(text) {
+  let html = '', inStr = false, isKey = false;
+  for (let j = 0; j < text.length; j++) {
+    const c = text[j]; let cls = '';
+    if (c === '"') { if (!inStr) { inStr = true; isKey = text[j - 1] === '{' || text[j - 1] === ','; cls = isKey ? 'k' : 's'; } else { cls = isKey ? 'k' : 's'; inStr = false; } }
+    else if (inStr) cls = isKey ? 'k' : 's';
+    else if (/[0-9.]/.test(c)) cls = 'n';
+    html += `<span data-c="${j}"${cls ? ` class="${cls}"` : ''}>${esc(c)}</span>`;
+  }
+  return html;
+}
+const actorIcon = e => e.human ? `<span class="av">${e.code}</span>` : `<span class="ag">${e.code}</span>`;
+function buildRows() {
+  E.forEach((e, i) => {
+    const el = document.createElement('div');
+    el.className = 'lg-row ' + (e.human ? 'human' : 'agent'); el.dataset.i = i;
+    const chips = `<span class="chip sm">${e.b}</span>${e.policy !== '—' ? `<span class="chip sm">${esc(e.policy)}</span>` : ''}`;
+    el.innerHTML = `<div class="lg-meta"><span class="l"><span class="lg-seq">#${e.seq}</span><span class="lg-time">${e.t}</span></span><span class="lg-who">${actorIcon(e)}${esc(e.name)}</span><span class="lg-stm"></span></div>
+      <div class="lg-body"><div class="lg-l1"><span class="lg-dec">${esc(e.decision)}</span>${chips}</div><div class="lg-json" aria-label="Canonical entry #${e.seq}; click a character to flip one bit">${jsonSpans(e.text)}</div></div>
+      <canvas class="lg-dig" aria-hidden="true"></canvas>
+      <div class="lg-st"><span class="lg-chip"><i></i><b>sealed</b></span><span class="lg-prev"></span></div>`;
+    rowsEl.appendChild(el);
+    R.push({ el, chars: el.querySelectorAll('.lg-json span'), json: el.querySelector('.lg-json'), cv: el.querySelector('canvas'), chip: el.querySelector('.lg-chip'), chipT: el.querySelector('.lg-chip b'),
+      prev: el.querySelector('.lg-prev'), stm: el.querySelector('.lg-stm'), key: '', cvKey: '', flipKey: '' });
+  });
+}
+// spine geometry
+let SP = null;
+function buildSpine() {
+  const lr = list.getBoundingClientRect(); if (!lr.height) return;
+  const spw = parseFloat(getComputedStyle(list).paddingLeft) || 40, cx = spw / 2;
+  const mid = el => { const b = el.getBoundingClientRect(); return b.top - lr.top + b.height / 2; };
+  const ys = [mid($('stub')), ...R.map(r => mid(r.el)), mid($('anchor'))];
+  if ($('stub').offsetParent === null) ys[0] = ys[1] - 30;
+  spine.setAttribute('width', spw); spine.setAttribute('height', lr.height); spine.setAttribute('viewBox', `0 0 ${spw} ${lr.height}`);
+  let s = `<path class="base" d="M${cx},${ys[0].toFixed(1)}V${ys[0].toFixed(1)}" stroke="#18232C" stroke-width="2" fill="none"/>`;
+  for (let k = 0; k <= N; k++) s += `<path class="lk" pathLength="1" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="1 1"/><path class="lk" pathLength="1" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="1 1"/>`;
+  for (let k = 0; k <= N + 1; k++) s += k === N + 1 ? `<rect class="nd" width="9" height="9" x="${cx - 4.5}" y="${(ys[k] - 4.5).toFixed(1)}" transform="rotate(45 ${cx} ${ys[k].toFixed(1)})" stroke="#0A0D11" stroke-width="2"/>` : `<circle class="nd" cx="${cx}" cy="${ys[k].toFixed(1)}" r="5" stroke="#0A0D11" stroke-width="2"/>`;
+  s += `<circle class="pulse" cx="${cx}" r="4.4" fill="#DDF6FF" opacity="0"/>`;
+  spine.innerHTML = s;
+  SP = { cx, ys, base: spine.querySelector('.base'), baseKey: '', links: spine.querySelectorAll('.lk'), nodes: spine.querySelectorAll('.nd'), pulse: spine.querySelector('.pulse'), keys: [] };
+}
+function linkNums(cx, ya, yb, part, br) {
+  const hw = 5.5, md = (ya + yb) / 2, k = Math.min(1, (yb - ya) / 40);
+  if (part === 0) { const top = ya;
+    return br ? [cx - hw - 4 * k, md - 9 * k, cx - hw - 1, top + hw - 3 * k, cx - hw - 1, top - 4.8, cx + hw - 1, top - 4.8, cx + hw - 1, top + hw - 3 * k, cx + hw + 2 * k, md - 11 * k]
+      : [cx - hw, md, cx - hw, top + hw, cx - hw, top - 1.8, cx + hw, top - 1.8, cx + hw, top + hw, cx + hw, md]; }
+  const bot = yb;
+  return br ? [cx - hw - 2 * k, md + 11 * k, cx - hw + 1, bot - hw + 3 * k, cx - hw + 1, bot + 4.8, cx + hw + 1, bot + 4.8, cx + hw + 1, bot - hw + 3 * k, cx + hw + 4 * k, md + 9 * k]
+    : [cx - hw, md, cx - hw, bot - hw, cx - hw, bot + 1.8, cx + hw, bot + 1.8, cx + hw, bot - hw, cx + hw, md];
+}
+const fmtPath = n => `M${n[0].toFixed(1)},${n[1].toFixed(1)}L${n[2].toFixed(1)},${n[3].toFixed(1)}C${n[4].toFixed(1)},${n[5].toFixed(1)} ${n[6].toFixed(1)},${n[7].toFixed(1)} ${n[8].toFixed(1)},${n[9].toFixed(1)}L${n[10].toFixed(1)},${n[11].toFixed(1)}`;
+const mixCol = (a, b, u) => { const p = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]; const x = p(a), y = p(b); return `rgb(${x.map((v, i) => Math.round(v + (y[i] - v) * u)).join(',')})`; };
+
+// bit grids
+const DPR = () => Math.min(2, window.devicePixelRatio || 1);
+function sizeCanvas(cv, css) { const px = Math.max(16, Math.round(css * DPR() / 16) * 16); if (cv.width !== px) { cv.width = px; cv.height = px; } cv.style.width = css + 'px'; cv.style.height = css + 'px'; }
+function drawGrid(cv, stored, rec, o) {
+  const x = cv.getContext('2d'), W = cv.width, c = W / 16, gap = c >= 6 ? Math.max(1, Math.round(c * 0.12)) : (c >= 3 ? 0.6 : 0);
+  x.fillStyle = '#070A0D'; x.fillRect(0, 0, W, W);
+  let changed = 0;
+  for (let i = 0; i < 256; i++) {
+    const r = i >> 4, q = i & 15, ord = i / 256, b0 = bitOf(stored, i);
+    let col;
+    if (ord >= o.mat) col = '#0C1218';
+    else if (rec && (o.healing ? ord >= 1 - o.rev : ord < o.rev)) { const b1 = bitOf(rec, i); if (b1 !== b0) { changed++; col = b1 ? '#FFD36B' : '#FF6A55'; } else col = b1 ? '#2A5466' : '#0C171D'; }
+    else col = o.dim ? (b0 ? '#24485A' : '#0E1C24') : (b0 ? '#7FD6EE' : '#123E52');
+    x.fillStyle = col; x.fillRect(q * c + gap / 2, r * c + gap / 2, c - gap, c - gap);
+  }
+  return changed;
+}
+
+// =====================================================================================
+// Render
+let focusChanged = false, focusBuilt = -1, focusKey = '', recChars = null, lastBanner = '', lastHead = '', lastDown = '', lastAvKey = '', capIdx = -2, lastAnchor = '';
+const avA = $('avA'), avB = $('avB');
+function focusHTML(i, M, now) {
+  const e = E[i], fl = M.flipShown(i, now), cur = fl ? E[i].text.split('').map((ch, j) => fl.has(j) ? fl.get(j) : ch).join('') : e.text;
+  let appr = '';
+  if (e.body.approved_by) { const m = cur.match(/"approved_by":"([^"]*)"/), who = m ? m[1] : e.body.approved_by, p = D.people[who];
+    appr = `<dt>Approved by</dt><dd class="${p ? '' : 'hot'}">${p ? `<b>${esc(who)}</b> · ${esc(p.name)}, ${esc(p.role)}` : `<b style="color:inherit">${esc(who)}</b> · not a known approver`}</dd>`; }
+  return `<div class="lg-ch"><span class="who">${actorIcon(e)}${esc(e.name)}${e.human ? ' <span class="t3" style="font:500 12px var(--sans)">human</span>' : ''}</span><span class="m">#${e.seq} · ${e.t} UTC</span></div>
+    <div class="lg-intent">${esc(e.intent)}</div>
+    <dl class="lg-kv"><dt>Policy</dt><dd><b>${esc(e.policy === '—' ? 'none needed' : e.policy)}</b> · ${esc(e.b)}</dd>${appr}<dt>Model</dt><dd class="wr">${esc(e.model)}</dd>
+      <dt class="opt opt2">Delegation</dt><dd class="opt opt2">${esc(e.delegation)}</dd><dt class="opt opt2">Outcome</dt><dd class="opt opt2">${esc(e.outcome)}</dd></dl>
+    <div class="lg-rec" data-row="${i}" aria-label="Canonical record #${e.seq}; click a character to flip one bit">${jsonSpans(e.text)}</div>`;
+}
+function render(M, now, o) {
+  if (!READY) return;
+  const fadeK = o.fadeK == null ? 1 : o.fadeK;
+  const rs = E.map((_, i) => rowSt(M, i, now));
+  const ls = Array.from({ length: N + 1 }, (_, j) => linkSt(M, j, now));
+  const hs = headSt(M, now), ps = passSt(M, now);
+  const comp = M.compHex(now);
+  // ---- rows
+  rs.forEach((s, i) => {
+    const r = R[i], e = E[i];
+    const sh = s.shake >= 0 ? Math.sin(s.shake * 60) * 3 * (1 - s.shake / 0.5) : 0;
+    r.el.style.opacity = (s.app * fadeK).toFixed(3);
+    r.el.style.transform = `translate(${sh.toFixed(2)}px,${((1 - s.app) * 10).toFixed(1)}px)`;
+    r.el.style.setProperty('--fl', s.flash.toFixed(3));
+    r.el.style.pointerEvents = s.app > 0.5 ? '' : 'none';
+    const linkBad = ls[i].u > 0.5;
+    const st = s.bad ? (s.edited ? 'ed' : 'bad') : s.chk ? 'chk' : s.ver ? 'ok' : s.restored ? 'rest' : 'seal';
+    const key = st + '|' + linkBad + '|' + (o.focus === i);
+    if (key !== r.key) {
+      r.key = key;
+      r.el.classList.toggle('bad', s.bad); r.el.classList.toggle('edited', s.bad && s.edited); r.el.classList.toggle('chk', st === 'chk'); r.el.classList.toggle('focus', o.focus === i);
+      const lab = { ed: 'edited', bad: 'link broken', chk: 'checking', ok: 'verified', rest: 'restored', seal: 'sealed' }[st];
+      r.chip.className = 'lg-chip ' + ({ ed: 'ed', bad: 'bad', chk: 'run', ok: 'ok', rest: 'run', seal: '' }[st]); r.chipT.textContent = lab;
+      r.stm.className = 'lg-stm ' + ({ ed: 'bad', bad: 'bad', chk: 'run', ok: 'ok', rest: 'run', seal: '' }[st]); r.stm.textContent = lab;
+      const pseq = i ? E[i - 1].seq : 7309;
+      r.prev.className = 'lg-prev' + (linkBad ? ' bad' : ''); r.prev.textContent = linkBad ? `prev ≠ #${pseq}` : (st === 'ok' || st === 'rest' || st === 'ed') ? `prev ✓ #${pseq}` : `prev → #${pseq}`;
+    }
+    // flipped characters
+    const fl = M.flipShown(i, now), fk = fl ? [...fl].join(';') : '';
+    if (fk !== r.flipKey) {
+      const old = r.flipKey ? r.flipKey.split(';').map(x => +x.split(',')[0]) : [];
+      old.forEach(j => { const c = r.chars[j]; c.classList.remove('fl'); c.textContent = e.text[j]; });
+      if (fl) fl.forEach((ch, j) => { const c = r.chars[j]; c.classList.add('fl'); c.textContent = ch; });
+      r.flipKey = fk;
+    }
+    // digest grid
+    const rec = (s.bad || s.healing) ? M.badRec[i] : null;
+    const cvKey = `${s.mat.toFixed(2)}|${rec ? 1 : 0}|${s.rev.toFixed(2)}|${s.healing}|${r.cv.width}`;
+    if (cvKey !== r.cvKey) { r.cvKey = cvKey; drawGrid(r.cv, STORED[i].h, rec, { mat: s.mat, rev: s.rev, healing: s.healing }); }
+  });
+  // ---- spine
+  if (SP) {
+    const { cx, ys, links, nodes, pulse } = SP;
+    for (let k = 0; k <= N; k++) {
+      const L = ls[k], ya = ys[k] + 7, yb = ys[k + 1] - 7, u = L.u;
+      const kk = `${L.p.toFixed(3)}|${u.toFixed(3)}|${(fadeK).toFixed(2)}`;
+      if (SP.keys[k] === kk) continue; SP.keys[k] = kk;
+      const col = mixCol('#2F93B5', '#FF6A55', sat(u * 1.6));
+      for (const part of [0, 1]) {
+        const a = linkNums(cx, ya, yb, part, false), b = linkNums(cx, ya, yb, part, true);
+        const p = links[k * 2 + part];
+        p.setAttribute('d', fmtPath(a.map((v, z) => lerp(v, b[z], u))));
+        p.setAttribute('stroke', col); p.setAttribute('stroke-dashoffset', (1 - L.p).toFixed(3));
+        p.setAttribute('opacity', fadeK.toFixed(3));
+      }
+    }
+    let lastVis = 0;
+    for (let k = 0; k <= N + 1; k++) {
+      const nd = nodes[k]; let fill, op = 1;
+      if (k === 0) fill = '#7FD6EE';
+      else if (k <= N) { const s = rs[k - 1]; op = s.app * fadeK; fill = s.bad ? (s.edited ? '#FFD36B' : '#FF6A55') : s.chk ? '#DDF6FF' : (s.ver ? '#7FD6EE' : '#2F93B5'); }
+      else { op = hs.app * fadeK; fill = hs.bad ? '#FF6A55' : (rs.every(s => s.ver) ? '#7FD6EE' : '#2F93B5'); }
+      nd.setAttribute('fill', fill); nd.setAttribute('opacity', op.toFixed(3));
+      if (op > 0.02) lastVis = k;
+    }
+    if (String(lastVis) !== SP.baseKey) { SP.baseKey = String(lastVis); SP.base.setAttribute('d', `M${cx},${ys[0].toFixed(1)}V${ys[lastVis].toFixed(1)}`); }
+    if (ps) {
+      const f = clamp(ps.f, 0, N + 0.0001), k0 = Math.floor(f), u = f - k0, y = k0 >= N ? ys[N + 1] : lerp(ys[k0 + 1], ys[k0 + 2], u);
+      pulse.setAttribute('cy', y.toFixed(1)); pulse.setAttribute('opacity', ps.op.toFixed(3));
+    } else pulse.setAttribute('opacity', '0');
+  }
+  // ---- head anchor + stub
+  const anchorTxt = hs.bad ? `<b>recomputed head ${short(SCRIPTHEAD(M, now))}</b> ≠ anchored ${short(STORED[N - 1].hex)} · RFC 3161, 02:47:00` :
+    `head #${E[N - 1].seq} · <b>${short(STORED[N - 1].hex)}</b> · anchored 02:47:00 UTC · RFC 3161`;
+  const ak = anchorTxt + hs.bad;
+  if (ak !== lastAnchor) { lastAnchor = ak; $('anchor').innerHTML = anchorTxt; $('anchor').classList.toggle('bad', hs.bad); }
+  $('anchor').style.opacity = (hs.app * fadeK).toFixed(3);
+  // ---- global status
+  const nPresent = rs.filter(s => s.app > 0.5).length, bads = rs.map((s, i) => s.bad ? i : -1).filter(i => i >= 0);
+  const allVer = rs.every(s => s.ver), anyHealing = rs.some(s => s.healing || s.restored);
+  let mode;
+  const lastBad = Math.max(-1e9, ...M.badAt.filter(x => x != null && x <= now));
+  const restoring = M.restoreAt != null && now >= M.restoreAt && M.restoreAt > lastBad;
+  if (restoring && (bads.length || anyHealing)) mode = 'rest';
+  else if (bads.length) mode = 'bad';
+  else if (anyHealing) mode = 'rest';
+  else if (ps) mode = 'run';
+  else if (nPresent === N && allVer) mode = 'ok';
+  else if (nPresent === N) mode = 'seal';
+  else mode = 'rec';
+  let bHTML;
+  const cur = ps ? clamp(Math.floor(ps.f), 0, N - 1) : 0;
+  if (mode === 'bad') bHTML = `<b>Chain broken at #${E[bads[0]].seq}</b> · ${bads.length} of ${N} entries fail${hs.bad ? ' · head ≠ anchor' : ''} <span class="m">· ${M.edited(bads[0], now) ? 'content edited after it was written' : 'prev hash no longer matches'}</span>`;
+  else if (mode === 'rest') bHTML = bads.length ? `<b>Restoring from the gateway copy</b> · ${bads.length} entr${bads.length === 1 ? 'y' : 'ies'} still to re-hash` : `<b>Restored from the gateway copy</b> · re-verifying the chain`;
+  else if (mode === 'run') bHTML = `<b>Verifying…</b> re-hashing #${E[cur].seq} <span class="m">· SHA-256(entry ‖ prev) · ${ENGINE}</span>`;
+  else if (mode === 'ok') bHTML = `<b>Verified</b> · ${N} of ${N} entries · head <span class="m">${short(STORED[N - 1].hex)}</span> matches the 02:47:00 anchor`;
+  else if (mode === 'seal') bHTML = `<b>${N} entries sealed</b> · each one hashed with the previous entry's hash`;
+  else bHTML = `<b>Recording</b> · ${nPresent} of ${N} decisions tonight on CASE-4127 <span class="m">· each sealed with the previous hash</span>`;
+  if (bHTML + mode !== lastBanner) { lastBanner = bHTML + mode; $('banner-t').innerHTML = bHTML; $('banner').className = 'lg-banner ' + ({ bad: 'bad', rest: 'run', run: 'run', ok: 'ok' }[mode] || ''); }
+  $('banner').style.opacity = (o.bannerK == null ? 1 : o.bannerK).toFixed(3);
+  const hT = mode === 'bad' ? `Broken at #${E[bads[0]].seq}` : mode === 'rest' ? 'Restoring…' : mode === 'run' ? 'Verifying…' : mode === 'ok' ? `Chain verified · ${N} entries` : mode === 'seal' ? `${N} entries sealed` : 'Recording decisions';
+  if (hT !== lastHead) { lastHead = hT; $('hstatus-t').textContent = hT; $('hstatus').className = 'cx-status ' + ({ bad: 'bad', rest: 'run', run: 'run', ok: 'ok' }[mode] || ''); }
+  // ---- inspector: focus record
+  const F = o.focus, fs = rs[F];
+  const fl = M.flipShown(F, now), fKey = F + '|' + (fl ? [...fl].join(';') : '');
+  if (fKey !== focusKey) {
+    focusKey = fKey;
+    $('focus').innerHTML = focusHTML(F, M, now); recChars = $('focus').querySelectorAll('.lg-rec span');
+    if (fl) fl.forEach((ch, j) => { const c = recChars[j]; if (c) { c.classList.add('fl'); c.textContent = ch; } });
+    focusChanged = true;
+  }
+  let focusChanged2 = focusChanged; focusChanged = false;
+  const fOp = (fs.app * fadeK).toFixed(3);
+  $('focus').style.opacity = fOp;
+  // ---- avalanche
+  const lf = M.lastFlip(now), edF = lf && lf.row === F ? lf : null;
+  const rec = (fs.bad || fs.healing) ? M.badRec[F] : null;
+  const verA = fs.ver || fs.bad || fs.healing || fs.restored;
+  const bReveal = rec ? fs.rev : 1;
+  const verK = (() => { let v = 0; for (const p of M.passes) { const tc = p.at + F * p.step; if (now >= tc - 0.05) v = Math.max(v, sat((now - tc + 0.05) / 0.4)); } return v; })();
+  const avKey = `${F}|${fs.mat.toFixed(2)}|${rec ? 1 : 0}|${bReveal.toFixed(3)}|${fs.healing}|${verA}|${verK.toFixed(2)}|${avA.width}|${avB.width}`;
+  let changed = 0;
+  if (avKey !== lastAvKey) {
+    lastAvKey = avKey;
+    drawGrid(avA, STORED[F].h, null, { mat: fs.mat });
+    changed = drawGrid(avB, STORED[F].h, rec, rec ? { mat: 1, rev: fs.rev, healing: fs.healing } : { mat: verA ? Math.max(verK, fs.ver ? 1 : 0, fs.restored ? 1 : 0) : 0 });
+    $('av-entry').textContent = `entry #${E[F].seq}`;
+    const cnt = $('av-count');
+    if (rec) { cnt.className = 'lg-count hot'; cnt.innerHTML = `${changed}<small>of 256 digest bits changed · ${(changed / 2.56).toFixed(1)}%</small>`; }
+    else if (verA && (fs.ver || fs.restored || verK > 0.99)) { cnt.className = 'lg-count'; cnt.innerHTML = `0<small>of 256 bits changed · recomputed = stored</small>`; }
+    else { cnt.className = 'lg-count'; cnt.innerHTML = `<small style="font-size:12.5px">Sealed at write time. Verify recomputes it.</small>`; }
+    $('avB-cap').textContent = rec ? (edF ? 'Recomputed after the edit' : 'Recomputed with new prev') : 'Recomputed now';
+    let dh;
+    if (rec && edF) {
+      const t0 = E[F].text, i0 = Math.max(t0.lastIndexOf(',"', edF.idx) + 1, t0.lastIndexOf('{"', edF.idx) + 1, 0), i1 = (() => { const a = t0.indexOf(',', edF.idx); return a < 0 ? t0.length - 1 : a; })();
+      const fromC = t0[edF.idx], toC = fl && fl.get(edF.idx) || flipChar(fromC).ch, ob = fromC.charCodeAt(0).toString(2).padStart(8, '0'), nb = toC.charCodeAt(0).toString(2).padStart(8, '0');
+      const ctx = esc(t0.slice(i0, edF.idx)) + `<span class="hot">${esc(toC)}</span>` + esc(t0.slice(edF.idx + 1, i1));
+      const bits = [...nb].map((b, k) => b !== ob[k] ? `<span class="hb">${b}</span>` : b);
+      dh = `<span class="k">byte</span><span>${esc(t0.slice(i0, edF.idx) + fromC + t0.slice(edF.idx + 1, i1))} → ${ctx}</span><span class="k">bits</span><span>${esc(fromC)} ${ob.slice(0, 4)} ${ob.slice(4)} → ${esc(toC)} ${bits.slice(0, 4).join('')} ${bits.slice(4).join('')}</span>`;
+    } else if (rec) dh = `<span class="calm">Content unchanged. Its stored prev no longer matches the recomputed #${E[F - 1] ? E[F - 1].seq : 7309}, so its own digest changes too.</span>`;
+    else if (verA) dh = `<span class="calm">No edit. The recomputed SHA-256 of this entry and its prev matches the stored digest.</span>`;
+    else dh = `<span class="calm">Digest = SHA-256(canonical entry ‖ previous entry's hash), written at the gateway.</span>`;
+    $('av-diff').innerHTML = dh;
+  }
+  $('aval').style.opacity = (Math.max(0.0, fs.app) * fadeK).toFixed(3);
+  // ---- downstream
+  let dn;
+  if (bads.length) {
+    const ed = bads.filter(i => M.edited(i, now)), br = bads.filter(i => !M.edited(i, now)), seqs = a => a.map(i => '#' + E[i].seq).join(', ');
+    dn = (ed.length ? `<li class="bad"><i></i><span><span class="m">${seqs(ed)}</span> content edited, digest changed</span></li>` : '')
+      + (br.length ? `<li class="bad"><i></i><span><span class="m">${seqs(br)}</span> prev hash no longer matches</span></li>` : '')
+      + (hs.bad ? '<li class="bad"><i></i><span>Head ≠ RFC 3161 anchor (02:47:00)</span></li>' : '');
+  } else dn = `<li><i></i><span>Each entry stores the SHA-256 of the one before it.</span></li><li class="calm2"><i></i><span>The head is timestamped outside the platform every minute (RFC 3161).</span></li><li class="calm2"><i></i><span>Entries are written by the policy gateway, not by the agents.</span></li>`;
+  const dt = bads.length ? 'What no longer verifies' : 'Why an edit cannot hide';
+  if (dn + dt !== lastDown) { lastDown = dn + dt; $('dn-list').innerHTML = dn; $('dn-title').textContent = dt; fitDown(); } else if (focusChanged2) fitDown();
+  $('down').style.opacity = fadeK.toFixed(3);
+  // ---- buttons reflect the frame
+  const canRestore = live ? liveEdits() > 0 : (now >= K.flip && now < K.grClick);
+  $('restoreBtn').setAttribute('aria-disabled', String(!canRestore));
+}
+function fitDown() {
+  const d = $('down'); d.style.display = ''; d.querySelectorAll('li').forEach(li => { li.style.display = ''; });
+  const items = [...d.querySelectorAll('li')];
+  const over = () => d.scrollHeight > d.clientHeight + 1 || d.getBoundingClientRect().bottom > d.parentElement.getBoundingClientRect().bottom + 1;
+  for (let k = items.length - 1; k >= 1 && over(); k--) items[k].style.display = 'none';
+  if (over() || d.clientHeight < 60) d.style.display = 'none';
+}
+function SCRIPTHEAD(M, now) { return M.badRec[N - 1] ? toHex(M.badRec[N - 1]) : M.compHex(now)[N - 1]; }
+
+// captions, ghost, loupe, progress: attract loop only
+const ghost = $('ghost'), loupe = $('loupe'), rip = $('rip'), capEl = $('cap');
+function charTarget() {
+  const c = R[TR].chars[TI], jb = R[TR].json.getBoundingClientRect(), b = c.getBoundingClientRect();
+  if (b.width > 0 && b.right <= jb.right - 8 && b.bottom <= jb.bottom + 1 && b.top >= jb.top - 1 && getComputedStyle(R[TR].json).display !== 'none') return c;
+  return recChars && recChars[TI] ? recChars[TI] : c;
+}
+function overlays(t) {
+  // captions
+  let ci = -1, op = 0;
+  CAPS.forEach((c, i) => { if (t >= c[0] && t < c[1]) { ci = i; op = sstep(c[0], c[0] + 0.3, t) * (1 - sstep(c[1] - 0.3, c[1], t)); } });
+  if (ci !== capIdx) { capIdx = ci; if (ci >= 0) capEl.textContent = CAPS[ci][2]; }
+  capEl.style.opacity = (ci >= 0 ? op : 0).toFixed(3);
+  $('prog').style.width = (t / PERIOD * 100).toFixed(2) + '%';
+  // ghost
+  let g = null;
+  if (t > K.gv0 && t < K.gvClick + 0.5) g = { el: $('verifyBtn'), t0: K.gv0, t1: K.gvClick - 0.12, click: K.gvClick, end: K.gvClick + 0.5, from: [0.55, 0.42] };
+  else if (t > K.ge0 && t < K.flip + 0.6) g = { el: charTarget(), t0: K.ge0, t1: K.geArrive, click: K.flip, end: K.flip + 0.6, from: [0.5, 0.88] };
+  else if (t > K.gr0 && t < K.grClick + 0.5) g = { el: $('restoreBtn'), t0: K.gr0, t1: K.grClick - 0.12, click: K.grClick, end: K.grClick + 0.5, from: [0.42, 0.5] };
+  $('verifyBtn').classList.toggle('press', t >= K.gvClick && t < K.gvClick + 0.18);
+  $('restoreBtn').classList.toggle('press', t >= K.grClick && t < K.grClick + 0.18);
+  if (g) {
+    const b = g.el.getBoundingClientRect(), ex = b.left + b.width * 0.5 - 3, ey = b.top + b.height * 0.55 - 2;
+    const sx = innerWidth * g.from[0], sy = innerHeight * g.from[1];
+    const k = 1 - Math.pow(1 - sstep(g.t0, g.t1, t), 3);
+    const x = lerp(sx, ex, k), y = lerp(sy, ey, k) - Math.sin(k * Math.PI) * 40;
+    const vis = sstep(g.t0, g.t0 + 0.3, t) * (1 - sstep(g.end - 0.3, g.end, t));
+    const c = t - g.click;
+    ghost.style.opacity = vis.toFixed(3);
+    ghost.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) scale(${c > 0 && c < 0.16 ? 0.86 : 1})`;
+    rip.style.opacity = c > 0 && c < 0.6 ? (1 - c / 0.6).toFixed(3) : '0';
+    rip.style.transform = `scale(${c > 0 ? (1 + c * 2.2).toFixed(3) : 1})`;
+  } else ghost.style.opacity = '0';
+  // the target character is hovered while the ghost rests on it
+  const hvOn = t >= K.geArrive && t < K.flip;
+  [R[TR].chars[TI], recChars && recChars[TI]].forEach(c => { if (c) c.classList.toggle('hv', hvOn); });
+  // loupe over the edited character
+  const lv = sstep(K.geArrive - 0.25, K.geArrive + 0.15, t) * (1 - sstep(K.flip + 1.1, K.flip + 1.5, t));
+  if (lv > 0.01) {
+    const b = charTarget().getBoundingClientRect(), flipped = t >= K.flip;
+    loupe.style.opacity = lv.toFixed(3);
+    loupe.style.transform = `translate(${Math.round(b.left + b.width / 2 - 60)}px,${Math.round(b.top - 116)}px)`;
+    const ch = flipped ? 'Q' : 'P', bits = ch.charCodeAt(0).toString(2).padStart(8, '0');
+    $('lp-g').textContent = ch; $('lp-g').style.color = flipped ? '#FFD36B' : '';
+    $('lp-b').innerHTML = bits.slice(0, 4) + ' ' + bits.slice(4, 7) + (flipped ? `<i>${bits[7]}</i>` : bits[7]);
+    $('lp-c').textContent = flipped ? 'one bit flipped' : '"approved_by": RP';
+    loupe.style.borderColor = flipped ? 'rgba(255,106,85,.8)' : 'rgba(127,214,238,.5)';
+  } else loupe.style.opacity = '0';
+}
+function scriptFocus(t) {
+  if (t >= K.ge0 - 0.4 && t < K.fade1) return TR;
+  let f = 0; for (let i = 0; i < N; i++) if (t >= SM.appearAt[i]) f = i; return f;
+}
+
+// =====================================================================================
+// Live take-over
+let live = null, liveTimer = 0;
+const nowS = () => performance.now() / 1000;
+function liveEdits() { return live ? live.texts.reduce((a, arr, i) => a + (arr.join('') !== E[i].text ? 1 : 0), 0) : 0; }
+function enterLive() {
+  if (live || !READY) return;
+  const now = nowS(), d = now - t, M = blankModel();
+  let k = 0;
+  M.appearAt = SM.appearAt.map(a => a <= t && t < K.fade0 ? a + d : now + 0.05 * (k++));
+  const inFlip = t >= K.flip && t < K.grClick && t < K.fade0;
+  M.texts = E.map((e, i) => { const a = e.text.split(''); if (inFlip && i === TR) a[TI] = flipChar('P').ch; return a; });
+  M.flips = E.map((_, i) => inFlip && i === TR ? new Map([[TI, flipChar('P').ch]]) : new Map());
+  M.lf = inFlip ? { row: TR, idx: TI, at: K.flip + d } : null;
+  if (inFlip) {
+    for (let j = 0; j < N; j++) { if (SM.badAt[j] != null) { M.badAt[j] = SM.badAt[j] + d; M.badRec[j] = SCRIPT_COMP[j].h; } }
+    for (let j = 0; j <= N; j++) if (SM.linkBreakAt[j] != null) M.linkBreakAt[j] = SM.linkBreakAt[j] + d;
+    M.headBadAt = SM.headBadAt + d;
+  }
+  M.passes = t < K.fade0 ? SM.passes.filter(p => p.at <= t && p.at < K.grClick).map(p => ({ at: p.at + d, step: p.step })) : [];
+  if (t >= K.fade0 || t < K.app0) M.passes = [];
+  M.comp = inFlip ? SCRIPT_COMP.map(c => c.hex) : STORED.map(c => c.hex);
+  M.flipShown = i => M.flips[i].size ? M.flips[i] : null;
+  M.edited = i => M.texts[i].join('') !== E[i].text;
+  M.lastFlip = () => M.lf;
+  M.compHex = () => M.comp;
+  M.focus = scriptFocus(t);
+  M.busyUntil = now + 2;
+  live = M;
+  playing = false; capIdx = -2; capEl.style.opacity = '0'; ghost.style.opacity = '0'; loupe.style.opacity = '0';
+  $('verifyBtn').classList.remove('press'); $('restoreBtn').classList.remove('press');
+  document.body.classList.add('live'); syncPlayUI();
+}
+function bumpIdle() {
+  clearTimeout(liveTimer);
+  if (!live) return;
+  liveTimer = setTimeout(() => { if (live && !hard && !document.hidden) softResume(); }, 15000);
+}
+function softResume() {
+  const st = $('stage'); st.classList.add('fading');
+  setTimeout(() => { live = null; document.body.classList.remove('live'); t = 0; resetCaches(); setPlaying(true); requestAnimationFrame(() => st.classList.remove('fading')); }, 420);
+}
+function busy(M, x) { M.busyUntil = Math.max(M.busyUntil, x); kick(); }
+function applyComp(M, comp, from, now) {
+  M.comp = comp.map(c => c.hex);
+  const isBad = j => M.badAt[j] != null && (M.healAt[j] == null || M.healAt[j] < M.badAt[j]);
+  let last = now;
+  for (let j = 0; j < N; j++) {
+    const bad = comp[j].hex !== STORED[j].hex;
+    if (bad) M.badRec[j] = comp[j].h;
+    if (bad && !isBad(j)) { M.badAt[j] = j <= from ? now + 0.1 : now + 1.9 + (j - from - 1) * 0.9; M.healAt[j] = null; last = Math.max(last, M.badAt[j]); }
+    else if (!bad && isBad(j)) { M.healAt[j] = now + 0.15 + Math.max(0, j - from) * 0.4; last = Math.max(last, M.healAt[j]); }
+  }
+  for (let j = 1; j <= N; j++) {
+    const upBad = comp[j - 1].hex !== STORED[j - 1].hex, broken = M.linkBreakAt[j] != null && (M.linkHealAt[j] == null || M.linkHealAt[j] < M.linkBreakAt[j]);
+    if (upBad && !broken) { M.linkBreakAt[j] = j < N ? (M.badAt[j] != null ? Math.max(now, M.badAt[j] - 0.1) : now) : Math.max(now, M.badAt[N - 1] + 0.7); M.linkHealAt[j] = null; }
+    else if (!upBad && broken) { M.linkHealAt[j] = j < N && M.healAt[j] != null ? M.healAt[j] - 0.1 : Math.max(now, (M.healAt[j - 1] || now) + 0.3); }
+  }
+  const hb = comp[N - 1].hex !== STORED[N - 1].hex, hWas = M.headBadAt != null && (M.headHealAt == null || M.headHealAt < M.headBadAt);
+  if (hb && !hWas) { M.headBadAt = M.linkBreakAt[N] + 0.1; M.headHealAt = null; last = Math.max(last, M.headBadAt); }
+  else if (!hb && hWas) { M.headHealAt = (M.linkHealAt[N] || now) + 0.1; last = Math.max(last, M.headHealAt); }
+  busy(M, last + 1.4);
+}
+async function liveFlip(row, idx) {
+  const M = live, orig = E[row].text[idx], m = M.flips[row];
+  if (m.has(idx)) { m.delete(idx); M.texts[row][idx] = orig; }
+  else { const f = flipChar(orig); if (!f) return; m.set(idx, f.ch); M.texts[row][idx] = f.ch; M.lf = { row, idx, at: nowS() }; }
+  if (!m.has(idx) && M.lf && M.lf.row === row && M.lf.idx === idx) { const nx = [...m.keys()].pop(); M.lf = nx != null ? { row, idx: nx, at: nowS() } : null; }
+  M.focus = row; resetFocus();
+  const comp = await chainFrom(M.texts.map(a => a.join('')), OLD_HEAD);
+  if (live !== M) return;
+  applyComp(M, comp, row, nowS());
+}
+async function liveRestore() {
+  const M = live; if (!M || !liveEdits()) return;
+  const from = M.texts.findIndex((a, i) => a.join('') !== E[i].text);
+  M.texts = E.map(e => e.text.split('')); M.flips = E.map(() => new Map()); M.restoreAt = nowS(); resetFocus();
+  applyComp(M, STORED, from, nowS());
+  const lastHeal = Math.max(...M.healAt.filter(x => x != null), nowS());
+  M.passes.push({ at: lastHeal + 0.6, step: 0.16 }); busy(M, lastHeal + 0.6 + N * 0.16 + 1);
+}
+async function liveVerify() {
+  const M = live; if (!M) return;
+  const comp = await chainFrom(M.texts.map(a => a.join('')), OLD_HEAD);   // a real recomputation
+  if (live !== M) return;
+  const now = nowS();
+  if (comp.some((c, i) => c.hex !== M.comp[i])) applyComp(M, comp, 0, now);
+  M.appearAt = M.appearAt.map(a => Math.min(a, now - 0.4));
+  M.passes.push({ at: now, step: 0.2 }); busy(M, now + N * 0.2 + 1);
+}
+
+// =====================================================================================
+// Loop, hooks, input
+let t = 0, playing = false, hard = false, raf = 0, lastTs = 0, slow = 0, wasPlaying = false;
+function resetCaches() { R.forEach(r => { r.key = ''; r.cvKey = ''; }); if (SP) SP.keys = []; lastBanner = lastHead = lastDown = lastAvKey = lastAnchor = ''; capIdx = -2; resetFocus(); }
+function resetFocus() { focusKey = ''; lastAvKey = ''; }
+function frameState() {
+  if (live) return { M: live, now: nowS(), o: { focus: live.focus, fadeK: 1, bannerK: 1 } };
+  const fadeK = 1 - sstep(K.fade0, K.fade1, t);
+  return { M: SM, now: t, o: { focus: scriptFocus(t), fadeK, bannerK: fadeK * sstep(0, 0.4, t) } };
+}
+function renderNow() {
+  if (!READY) return;
+  const f = frameState(); render(f.M, f.now, f.o);
+  if (!live) overlays(t);
+}
+function frame(ts) {
+  raf = 0;
+  const dt = Math.min(0.1, Math.max(0, (ts - lastTs) / 1000)); lastTs = ts;
+  if (dt > 0.03) slow++; else slow = Math.max(0, slow - 1);
+  if (slow > 90) document.body.classList.add('lq');
+  if (playing && !live) t = (t + dt) % PERIOD;
+  renderNow();
+  if ((playing && !live) || (live && nowS() < live.busyUntil)) raf = requestAnimationFrame(frame);
+}
+function kick() { if (!raf && !document.hidden) { lastTs = performance.now(); raf = requestAnimationFrame(frame); } }
+function stop() { if (raf) { cancelAnimationFrame(raf); raf = 0; } }
+function syncPlayUI() {
+  const on = playing && !live;
+  document.body.classList.toggle('paused', !on); document.body.classList.toggle('playing', on);
+  $('playIco').setAttribute('d', on ? 'M3 2h2v8H3zM7 2h2v8H7z' : 'M3 1.5l7 4.5-7 4.5z');
+  $('playBtn').setAttribute('aria-label', on ? 'Pause' : 'Play');
+}
+function setPlaying(p) {
+  playing = p; if (p) hard = false;
+  syncPlayUI();
+  if (p) kick(); else if (!live || nowS() >= live.busyUntil) stop();
+}
+function exitLive() { if (!live) return; live = null; clearTimeout(liveTimer); document.body.classList.remove('live'); resetCaches(); }
+function hardPause() { hard = true; clearTimeout(liveTimer); setPlaying(false); renderNow(); }
+function takeOver() { if (!READY) return; if (!live) { enterLive(); resetCaches(); } bumpIdle(); kick(); }
+window.__seek = x => { const v = Number(x) || 0; pendingSeek = v; if (!READY) return; exitLive(); t = ((v % PERIOD) + PERIOD) % PERIOD; hard = true; setPlaying(false); resetCaches(); renderNow(); };
+window.__play = () => { pendingPlay = true; if (!READY) return; exitLive(); setPlaying(true); };
+window.__state = () => {
+  const f = READY ? frameState() : null; if (!f) return { ready: false };
+  const rs = E.map((_, i) => rowSt(f.M, i, f.now));
+  return { ready: true, t, playing, live: !!live, hard, banner: $('banner-t').textContent, status: $('hstatus-t').textContent,
+    rows: rs.map((s, i) => ({ seq: E[i].seq, present: s.app > 0.5, bad: s.bad, edited: s.edited, verified: s.ver })),
+    nBad: rs.filter(s => s.bad).length, avCount: $('av-count').textContent, focus: E[f.o.focus].seq, caption: capEl.textContent, captionOpacity: +capEl.style.opacity || 0,
+    stored: STORED.map(s => s.hex), comp: f.M.compHex(f.now), engine: ENGINE, head7309: OLD_HEAD };
+};
+let pendingSeek = null, pendingPlay = false;
+
+// pointer / keyboard take-over (hover alone never takes over)
+const isPlayBtn = e => e.target && e.target.closest && e.target.closest('#playBtn');
+document.addEventListener('pointerdown', e => { if (isPlayBtn(e)) return; takeOver(); }, true);
+document.addEventListener('touchstart', e => { if (isPlayBtn(e)) return; takeOver(); }, { capture: true, passive: true });
+document.addEventListener('wheel', () => takeOver(), { passive: true });
+document.addEventListener('keydown', e => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.code === 'Space' || e.key === ' ') { const a = document.activeElement; if (a && a.tagName === 'BUTTON' && a.id !== 'playBtn') return; e.preventDefault(); togglePlay(); return; }
+  takeOver();
+  if (e.key === 'v' || e.key === 'V') liveVerify();
+  else if (e.key === 'r' || e.key === 'R') liveRestore();
+});
+function togglePlay() { if (playing && !live) hardPause(); else { exitLive(); setPlaying(true); } }
+$('playBtn').addEventListener('click', togglePlay);
+$('verifyBtn').addEventListener('click', () => { takeOver(); liveVerify(); });
+$('restoreBtn').addEventListener('click', () => { takeOver(); liveRestore(); });
+function charClick(e) {
+  const sp = e.target.closest('span[data-c]'); if (!sp || !live) return;
+  const host = sp.closest('.lg-json, .lg-rec'); if (!host) return;
+  const row = host.classList.contains('lg-rec') ? +host.dataset.row : +host.closest('.lg-row').dataset.i;
+  bumpIdle(); liveFlip(row, +sp.dataset.c);
+}
+$('rows').addEventListener('click', e => {
+  if (e.target.closest('span[data-c]')) { charClick(e); return; }
+  const r = e.target.closest('.lg-row'); if (r && live) { live.focus = +r.dataset.i; resetFocus(); busy(live, nowS() + 0.1); }
+});
+$('focus').addEventListener('click', charClick);
+// embedding protocol
+addEventListener('message', e => { const d = e.data; if (!d || typeof d !== 'object') return; if (d.corvid === 'pause') hardPause(); else if (d.corvid === 'play') { exitLive(); setPlaying(true); } });
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { wasPlaying = playing; stop(); playing = false; syncPlayUI(); }
+  else if (wasPlaying && !hard) { wasPlaying = false; setPlaying(true); }
+});
+
+// layout
+function layout() {
+  if (!READY) return;
+  const r0 = R[0].el.getBoundingClientRect().height;
+  const tier = r0 >= 66 ? 'rh-l' : r0 >= 55 ? 'rh-m' : r0 >= 41 ? 'rh-s' : 'rh-xs';
+  const L = $('list'); ['rh-l', 'rh-m', 'rh-s', 'rh-xs'].forEach(c => L.classList.toggle(c, c === tier));
+  const phone = innerWidth <= 700, dig = Math.round(phone ? clamp(r0 - 14, 22, 32) : clamp(r0 - 12, 24, 54));
+  L.style.setProperty('--digw', dig + 'px');
+  R.forEach(r => sizeCanvas(r.cv, dig));
+  const gw = Math.floor(avA.parentElement.getBoundingClientRect().width), gmax = parseFloat(getComputedStyle(avA).maxWidth) || 150;
+  const g = Math.max(48, Math.min(gw, gmax));
+  sizeCanvas(avA, g); sizeCanvas(avB, g);
+  buildSpine(); resetCaches(); renderNow(); fitDown();
+}
+let roT = 0;
+const ro = new ResizeObserver(() => { cancelAnimationFrame(roT); roT = requestAnimationFrame(layout); });
+ro.observe($('stage'));
+addEventListener('resize', () => { cancelAnimationFrame(roT); roT = requestAnimationFrame(layout); });
+
+// =====================================================================================
+// Boot: hash the real chain (older entries first, as in the app), the scripted tamper, then start
+(async function boot() {
+  buildRows();
+  let prev = toHex(await sha256('corvid-ledger|meridian-freight|2026-10-03|genesis'));
+  for (const o of OLDER) prev = toHex(await sha256(canon(o) + '|prev=' + prev));
+  OLD_HEAD = prev;
+  STORED = await chainFrom(E.map(e => e.text), OLD_HEAD);
+  SCRIPT_COMP = await chainFrom(E.map((e, i) => i === TR ? e.text.slice(0, TI) + flipChar(e.text[TI]).ch + e.text.slice(TI + 1) : e.text), OLD_HEAD);
+  buildScript();
+  $('stub-h').textContent = `head #7309 ${short(OLD_HEAD)}`;
+  READY = true;
+  if (document.fonts && document.fonts.ready) { try { await Promise.race([document.fonts.ready, new Promise(r => setTimeout(r, 1500))]); } catch (e) {} }
+  layout();
+  const qt = Q.get('t');
+  if (pendingSeek != null) window.__seek(pendingSeek);
+  else if (qt !== null && qt !== '' && isFinite(+qt)) window.__seek(+qt);
+  else if (REDUCED) window.__seek(HERO_T);
+  else { t = 0; setPlaying(true); }
+  if (pendingPlay) window.__play();
+  renderNow();
+})();
+})();
+</script>
+</body>
+</html>

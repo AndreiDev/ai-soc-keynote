@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="favicon.svg" type="image/svg+xml"><link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png"><link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The AI SOC, made visible</title>
+<meta name="description" content="Ten working components of an AI-native SIEM, each using modern web technology to make AI decisions explainable, investigations faster and autonomous response safe.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--ground:#080B0F;--panel:#10141A;--raised:#151A21;--line:#1E252E;--line2:#2C3540;--line3:#3A4656;--text:#ECEFF3;--text2:#AAB3BF;--text3:#7F8996;
+  --agent:#C6F36B;--mal:#FF7A66;--sus:#F2B53A;--ben:#4CC9A6;--link:#8AB4FF;--tech:#FF3DCB;--techt:#FFC6EE;
+  --sans:"Geist",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"Geist Mono",ui-monospace,"SF Mono",Menlo,monospace}
+*{box-sizing:border-box}
+html{background:var(--ground);scroll-behavior:smooth}
+body{margin:0;background:var(--ground);color:var(--text);font:400 15px/1.55 var(--sans);-webkit-font-smoothing:antialiased}
+a{color:var(--link);text-decoration:none}
+:focus-visible{outline:2px solid var(--agent);outline-offset:3px}
+.mono{font-family:var(--mono)}
+.btn{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 14px;border-radius:9px;border:1px solid var(--line2);background:var(--raised);color:var(--text);font:500 13px/1 var(--sans);cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--line3);background:#1A212B}
+.btn.pri{background:var(--agent);border-color:var(--agent);color:#0A0D11}
+.btn.pri:hover{background:#D6F88F}
+.btn.gh{background:transparent;border-color:transparent;color:var(--text2)}
+.btn.gh:hover{color:var(--text);background:var(--raised)}
+.kbd{display:inline-flex;align-items:center;height:19px;padding:0 6px;border:1px solid var(--line2);border-bottom-width:2px;border-radius:4px;font:500 11px/1 var(--mono);color:var(--text2)}
+
+/* top bar */
+.top{position:fixed;inset:0 0 auto 0;z-index:40;display:flex;align-items:center;gap:14px;height:58px;padding:0 clamp(16px,3vw,40px);background:linear-gradient(rgba(8,11,15,.92),rgba(8,11,15,.75));backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid rgba(255,255,255,.05)}
+.brand{display:flex;align-items:center;gap:10px;color:var(--text);font-weight:600;font-size:16px;letter-spacing:-.01em}
+.brand small{font:400 12px var(--mono);color:var(--text3)}
+.acts{display:flex;gap:2px;margin-left:auto;overflow-x:auto;scrollbar-width:none}
+.acts a{color:var(--text3);font-size:12.5px;font-weight:500;padding:6px 9px;border-radius:7px;white-space:nowrap}
+.acts a:hover,.acts a.on{color:var(--text);background:var(--raised)}
+.acts a b{font:600 11px var(--mono);color:var(--agent);margin-right:5px}
+.progress{position:fixed;left:0;top:58px;height:2px;background:var(--agent);z-index:41;width:0;transition:width .15s}
+
+/* hero */
+.hero{min-height:100vh;display:flex;flex-direction:column;justify-content:center;padding:110px clamp(20px,6vw,96px) 60px;position:relative;overflow:hidden}
+.hero .eyebrow{font:500 12.5px var(--mono);color:var(--agent);letter-spacing:.04em;margin-bottom:22px}
+.hero h1{margin:0;font-size:clamp(46px,7.6vw,120px);line-height:.98;letter-spacing:-.045em;font-weight:600;max-width:13ch}
+.hero h1 em{font-style:normal;color:var(--agent)}
+.hero p.lede{margin:30px 0 0;max-width:640px;font-size:clamp(17px,1.6vw,21px);line-height:1.5;color:var(--text2)}
+.hero .row{display:flex;flex-wrap:wrap;gap:12px;margin-top:36px;align-items:center}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(230px,100%),1fr));gap:1px;margin-top:64px;max-width:1100px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.facts div{background:var(--ground);padding:18px 20px}
+.facts b{display:block;font-size:26px;font-weight:600;letter-spacing:-.02em}
+.facts span{color:var(--text3);font-size:13px}
+.hero-mesh{position:absolute;right:-10vw;top:44%;width:min(56vw,800px);aspect-ratio:1;transform:translateY(-50%);opacity:.42;pointer-events:none;z-index:0}
+.hero>*:not(.hero-mesh){position:relative;z-index:1}
+
+/* acts and demos */
+.act{padding:120px clamp(20px,6vw,96px) 40px;scroll-margin-top:58px}
+.act .num{font:600 13px var(--mono);color:var(--agent);letter-spacing:.06em}
+.act h2{margin:10px 0 0;font-size:clamp(34px,4.6vw,64px);letter-spacing:-.035em;line-height:1.02;font-weight:600;max-width:18ch}
+.act p{margin:16px 0 0;color:var(--text2);max-width:640px;font-size:17px}
+.demo{display:grid;grid-template-columns:minmax(300px,0.68fr) minmax(0,1.85fr);gap:clamp(24px,3vw,48px);align-items:center;padding:48px clamp(20px,6vw,96px) 72px;scroll-margin-top:58px;min-height:calc(100vh - 58px)}
+.demo .txt{display:flex;flex-direction:column;gap:14px;min-width:0}
+.demo .k{display:flex;align-items:center;gap:10px;font:500 12px var(--mono);color:var(--text3)}
+.demo .k b{color:var(--agent);font-weight:600}
+.demo h3{margin:0;font-size:clamp(26px,2.5vw,38px);line-height:1.08;letter-spacing:-.03em;font-weight:600}
+.demo .problem{margin:0;color:var(--text2);font-size:16px}
+.demo .see{margin:0;font-size:15px;color:var(--text)}
+.demo .see::before{content:"What you're seeing";display:block;font:500 11px var(--mono);color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px}
+.tech{display:flex;flex-direction:column;gap:4px;padding:12px 14px;border-radius:12px;background:linear-gradient(180deg,rgba(255,61,203,.08),rgba(255,61,203,.03));border:1px solid rgba(255,61,203,.28)}
+.tech .tn{font:600 12px var(--mono);color:var(--techt)}
+.tech .tw{font-size:13.5px;color:var(--text2)}
+.matters{display:flex;gap:10px;align-items:flex-start;font-size:14.5px;color:var(--text)}
+.matters::before{content:"";flex:none;width:8px;height:8px;margin-top:7px;border-radius:2px;background:var(--agent);transform:rotate(45deg)}
+.stage{position:relative;aspect-ratio:16/10;border-radius:16px;overflow:hidden;background:#0B0F14;border:1px solid var(--line2);box-shadow:0 40px 120px -30px rgba(0,0,0,.8),0 0 0 1px rgba(255,255,255,.02) inset;min-width:0}
+.stage img.poster{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;transition:opacity .4s}
+.stage .ph{position:absolute;inset:0;display:grid;place-items:center;color:var(--text3);font:500 13px var(--mono)}
+.stage iframe{position:absolute;left:0;top:0;width:100%;height:100%;border:0;display:block;background:#0A0D11;opacity:0;transition:opacity .45s;transform-origin:0 0}
+.stage.live iframe{opacity:1}
+.stage.live img.poster{opacity:0}
+.stage .run{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:inline-flex;align-items:center;gap:10px;height:46px;padding:0 20px;border-radius:999px;border:1px solid rgba(198,243,107,.6);background:rgba(10,13,17,.78);backdrop-filter:blur(8px);color:var(--agent);font:600 14px var(--sans);cursor:pointer;transition:transform .15s}
+.stage .run:hover{transform:translate(-50%,-50%) scale(1.04)}
+.stage.live .run,.stage.loading .run{display:none}
+.stage .tools{position:absolute;right:10px;top:10px;display:flex;gap:6px;opacity:0;transition:opacity .2s;z-index:3}
+.stage:hover .tools,.stage:focus-within .tools{opacity:1}
+.stage .tools button,.stage .tools a{height:28px;padding:0 10px;border-radius:7px;border:1px solid var(--line2);background:rgba(10,13,17,.82);color:var(--text);font:500 12px var(--sans);cursor:pointer;display:inline-flex;align-items:center}
+.stage .spin{position:absolute;left:50%;top:50%;width:28px;height:28px;margin:-14px;border-radius:50%;border:2px solid rgba(198,243,107,.25);border-top-color:var(--agent);animation:spin 0.8s linear infinite;display:none}
+.stage.loading .spin{display:block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.stage:fullscreen{border-radius:0;border:0}
+.stage.phone{aspect-ratio:9/16}
+.stage:fullscreen .tools{opacity:1}
+.stage:fullscreen .tools [data-act=fs]{border-color:rgba(198,243,107,.6);color:var(--agent)}
+
+/* closing */
+.closing{padding:140px clamp(20px,6vw,96px) 80px}
+.closing h2{margin:0;font-size:clamp(36px,5vw,72px);letter-spacing:-.04em;line-height:1;font-weight:600;max-width:16ch}
+.closing h2 em{font-style:normal;color:var(--agent)}
+.pillars{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr));gap:14px;margin-top:48px}
+.pillar{padding:20px;border-radius:14px;background:var(--panel);border:1px solid var(--line)}
+.pillar h4{margin:0 0 6px;font-size:17px}
+.pillar p{margin:0;color:var(--text2);font-size:14px}
+.stack{display:flex;flex-wrap:wrap;gap:8px;margin-top:40px}
+.stack span{display:inline-flex;align-items:center;height:30px;padding:0 12px;border-radius:999px;border:1px solid rgba(255,61,203,.3);color:var(--techt);font:500 12.5px var(--mono);background:rgba(255,61,203,.05)}
+footer{padding:40px clamp(20px,6vw,96px) 60px;color:var(--text3);font-size:13px;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:12px 24px}
+
+/* presenter mode */
+body.present{overflow:hidden}
+body.present .top{opacity:0;pointer-events:none;transition:opacity .3s}
+body.present .top:hover{opacity:1;pointer-events:auto}
+body.present .progress{top:0}
+body.present #deck{height:100vh;overflow-y:auto;scroll-snap-type:y mandatory;scroll-behavior:smooth}
+body.present .slide{scroll-snap-align:start;min-height:100vh;height:100vh}
+body.present .demo{grid-template-columns:minmax(280px,0.62fr) minmax(0,1.9fr);padding:28px 3vw;min-height:100vh;align-items:center}
+body.present .demo .stage{max-height:calc(100vh - 56px);aspect-ratio:auto;height:min(calc(100vh - 56px),calc((100vw * 0.72) * 10 / 16))}
+body.present .act{display:flex;flex-direction:column;justify-content:center;padding:0 8vw}
+body.present .act h2{font-size:clamp(48px,6.5vw,104px)}
+body.present .hero{padding-top:60px}
+.pcount{position:fixed;right:18px;bottom:16px;z-index:45;font:500 12px var(--mono);color:var(--text3);display:none;gap:10px;align-items:center}
+body.present .pcount{display:flex}
+@media (max-width:960px){
+  .demo{grid-template-columns:1fr;min-height:0;padding-top:28px}
+  .demo .stage{order:-1}
+  .acts{display:none}
+  .hero-mesh{display:none}
+}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="#top">
+    <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><path d="M11 2l8 4.6v8.8L11 20l-8-4.6V6.6z" fill="none" stroke="#C6F36B" stroke-width="1.8"/><path d="M7 11.5l4-3.5 4 3.5-4 1.6z" fill="#C6F36B"/></svg>
+    AI SOC <small>keynote</small>
+  </a>
+  <nav class="acts" id="acts" aria-label="Acts"></nav>
+  <button class="btn" type="button" id="present" title="Presenter mode (P)">Present <span class="kbd">P</span></button>
+</header>
+<div class="progress" id="progress"></div>
+
+<div id="deck">
+  <section class="hero slide" id="top">
+    <svg class="hero-mesh" viewBox="0 0 600 600" aria-hidden="true">
+      <defs><radialGradient id="g" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#C6F36B" stop-opacity=".18"/><stop offset="1" stop-color="#C6F36B" stop-opacity="0"/></radialGradient></defs>
+      <circle cx="300" cy="300" r="290" fill="url(#g)"/>
+      <g fill="none" stroke="#C6F36B" stroke-opacity=".22" stroke-width="1.2">
+        <path d="M300 60l208 120v240L300 540 92 420V180z"/><path d="M300 130l147 85v170L300 470 153 385V215z"/><path d="M300 200l87 50v100l-87 50-87-50V250z"/>
+      </g>
+      <path d="M244 318l56-48 56 48-56 22z" fill="#C6F36B" fill-opacity=".55"/>
+    </svg>
+    <div class="eyebrow">AN AI-NATIVE SIEM · TEN WORKING COMPONENTS</div>
+    <h1>The AI SOC, <em>made visible.</em></h1>
+    <p class="lede">AI agents now triage, investigate and contain at machine speed. These ten components show what it takes for people to trust, steer and prove that work, each one built on web technology that runs entirely in the browser.</p>
+    <div class="row">
+      <a class="btn pri" href="#act-1">Start the walkthrough</a>
+      <button class="btn" type="button" id="present2">Presenter mode <span class="kbd">P</span></button>
+    </div>
+    <div class="facts">
+      <div><b>One incident, end to end</b><span>A realistic MFA-fatigue takeover that reaches AWS and finance data. Every component tells part of it.</span></div>
+      <div><b>Live, not video</b><span>Each component is the working thing: it plays its own story, then hands control to the audience.</span></div>
+      <div><b>Zero servers</b><span>AI models, GPU compute and cryptography all run client-side. No data leaves the browser.</span></div>
+    </div>
+  </section>
+  <div id="content"></div>
+  <section class="closing slide" id="closing">
+    <h2>Trust, speed and safety, <em>designed into the AI.</em></h2>
+    <div class="pillars">
+      <div class="pillar"><h4>Analysts trust what they can inspect</h4><p>Calibrated verdicts, explainable evidence and correlation you can follow turn the AI from a black box into a colleague.</p></div>
+      <div class="pillar"><h4>Autonomy needs guardrails people can see</h4><p>Injection firewalls, consequence simulation and tamper-evident decisions make machine-speed response safe to switch on.</p></div>
+      <div class="pillar"><h4>The browser is now a serious compute platform</h4><p>WebGPU, on-device models and modern rendering let the product explore millions of events and thousands of entities live.</p></div>
+    </div>
+    <div class="stack" id="stack"></div>
+    <div class="row" style="display:flex;gap:12px;margin-top:40px;flex-wrap:wrap">
+      <a class="btn pri" href="#top">Back to the top</a>
+    </div>
+  </section>
+  <footer>
+    <span>This is a concept product. Meridian Freight, CASE-4127 and all people, IPs and incidents are fictional.</span>
+    <span>Real public sources are named where used (CISA KEV, open models from Hugging Face).</span>
+    <span>Best in a recent Chrome or Edge (WebGPU); every component has a fallback.</span>
+  </footer>
+</div>
+<div class="pcount" id="pcount"><span id="pnum">1 / 1</span><span class="kbd">←</span><span class="kbd">→</span><span class="kbd">Esc</span></div>
+
+<script>
+const ACTS = [
+  { id: 'act-1', n: 'I', name: 'Trust the AI', title: "Trust the AI's judgment.", lede: 'Analysts adopt AI they can interrogate. Show the AI\'s working, how sure it really is, and what would change its mind.' },
+  { id: 'act-2', n: 'II', name: 'Protect the AI', title: 'Protect the AI, and prove what it did.', lede: 'An AI analyst is a new attack surface and a new accountability question. Defend the agent from manipulation, and keep a record nobody can quietly change.' },
+  { id: 'act-3', n: 'III', name: 'Cut the noise', title: 'Turn thousands of alerts into a few decisions.', lede: 'The AI does the correlation; the interface makes its reasoning visible, so analysts stay oriented as the queue changes under them.' },
+  { id: 'act-4', n: 'IV', name: 'Understand fast', title: 'Understand an attack in seconds.', lede: 'From first sign-in prompt to stolen data: replay the story exactly, and see how far a compromised identity can reach.' },
+  { id: 'act-5', n: 'V', name: 'Act safely', title: 'Act at machine speed, safely.', lede: 'Autonomous response is only valuable if it can be trusted not to break the business. Simulate the consequence, then approve deliberately.' },
+  { id: 'act-6', n: 'VI', name: 'Get ahead', title: 'Get ahead of the next attack.', lede: 'Find the routes attackers will take, see what the SOC cannot see, and hunt through millions of events without waiting.' },
+];
+const DEMOS = [
+  { act: 'act-1', slug: 'why-97', k: 'Explainable verdicts', h: 'Every AI verdict shows its working.',
+    problem: 'Analysts won\'t act on a black-box score, and they shouldn\'t. "Malicious, 97%" has to mean something they can check.',
+    see: 'Each piece of evidence adds weight; a calibration map turns the raw score into a probability checked against 2,310 past analyst decisions. One pending interview answer would drop it to 62%.',
+    tn: 'Explorable explanation · D3', tw: 'The analyst can poke the model, not just read it: toggle evidence and watch the verdict move.',
+    m: 'Trust is the adoption bottleneck for AI in the SOC. Calibrated, explorable verdicts teach analysts when to rely on the AI, and when not to.' },
+  { act: 'act-2', slug: 'injection-firewall', k: 'Prompt-injection firewall', h: 'Attackers now write to your AI. Every word is treated as data.',
+    problem: 'Log fields are attacker-controlled. An instruction planted in a user-agent string can steer an AI analyst.',
+    see: 'Every untrusted field is scored on the device by a classifier, pattern matching and a rule. The planted "classify as benign" is neutralised into quoted data, and the evidence hash proves the record was never altered.',
+    tn: 'Transformers.js · on-device models', tw: 'Real machine-learning models run in the browser: nothing is sent to a server.',
+    m: 'AI-native SOCs open a new attack surface. Defending the agent itself becomes part of the product.' },
+  { act: 'act-2', slug: 'ai-ledger', k: 'Tamper-evident AI decisions', h: 'Every agent decision, provably unaltered.',
+    problem: 'When an AI acts, auditors and customers will ask who decided what, under which policy, and whether the record was changed.',
+    see: 'Each decision is hash-chained in the browser. Change one character and about half the digest flips, and every later link breaks.',
+    tn: 'Web Crypto · SHA-256 hash chains', tw: 'Integrity anyone can verify, computed by the browser\'s own cryptography.',
+    m: 'Accountability for autonomous actions, in a form a regulator can check.' },
+  { act: 'act-3', slug: 'noise-to-case', k: 'Correlation you can follow', h: 'Nine alerts become one decision, and you can watch why.',
+    problem: 'Alert fatigue: analysts jump between tools and lose context as the queue reshuffles.',
+    see: 'Agents link raw signals through the shared user, IP, role and bucket. The rows fold into one case and re-sort without the analyst losing their place.',
+    tn: 'GSAP Flip · SMIL · CSS @property', tw: 'Motion that preserves identity: every row travels to where it went instead of jumping.',
+    m: '3,412 signals overnight become 7 decisions for a human, with the reasoning on screen.' },
+  { act: 'act-4', slug: 'attack-replay', k: 'Attack replay', h: 'Replay the attack like a film, accurate to the frame.',
+    problem: 'Timelines in tables hide the story, and executives need it in minutes, not hours.',
+    see: 'The AI-reconstructed incident plays from the first sign-in prompt to containment. Scrub to any second, or export the same frames as a 36-second briefing video.',
+    tn: 'Pure-function canvas rendering · Remotion', tw: 'Every frame is computed from time alone, so the in-app replay and the exported video match exactly.',
+    m: 'One artefact serves the analyst, the incident lead and the board.' },
+  { act: 'act-4', slug: 'blast-radius', k: 'Blast radius', h: 'See what a stolen identity can reach.',
+    problem: 'Graphs with thousands of entities turn into unreadable hairballs.',
+    see: '1,964 entities rendered as a navigable nebula: clusters from afar, names as you fly in. The attack path lights up hop by hop, and the blast radius comes from a real graph search.',
+    tn: 'Gaussian splatting · Spark', tw: 'Semantic zoom at a scale that ordinary DOM and SVG graphs cannot handle.',
+    m: 'Scoping a breach goes from hours of querying to one fly-through.' },
+  { act: 'act-5', slug: 'approve-simulation', k: 'Safe autonomous response', h: 'Before you approve, see what breaks.',
+    problem: 'Autonomous containment is fast, but a wrong action can stop the business.',
+    see: 'The AI\'s proposed action and the alternative run on the dependency graph. Disabling the role breaks five services and month-end close; revoking the session breaks nothing and still removes the attacker. Approval is a deliberate hold, with a signed receipt.',
+    tn: 'D3 simulation · CSS @property · Web Audio', tw: 'Consequences cascade visibly, and the press-and-hold confirms intent without a chain of dialogs.',
+    m: 'Human-in-the-loop that is fast enough to keep up with machine-speed response.' },
+  { act: 'act-6', slug: 'attack-paths', k: 'Attack paths', h: 'Find the routes to your crown jewels, and the fix that cuts the most.',
+    problem: 'Exposure tools list thousands of findings. They don\'t say which ones matter.',
+    see: 'A slime-mould network solver converges on the realistic routes, with CASE-4127\'s route ranked first. Toggle a fix and the network re-routes live; the exposure index falls from 100 to 62.',
+    tn: 'WebGPU compute · physarum solver', tw: 'Hundreds of thousands of GPU agents optimise the network in real time, in the browser.',
+    m: 'Remediation priorities backed by a simulation, not a spreadsheet.' },
+  { act: 'act-6', slug: 'blind-spots', k: 'Telemetry blind spots', h: 'An AI can\'t defend what it can\'t see.',
+    problem: 'Agents report "clean" on data they never received.',
+    see: 'Every telemetry source is a light: blind segments stay dark and late sources dim. Enabling one sensor floods the warehouse with light, reveals the beacon and turns an inconclusive case suspicious.',
+    tn: 'Radiance-cascade global illumination', tw: 'Visibility rendered literally as light, at real-time frame rates.',
+    m: 'Coverage gaps become an obvious, fixable decision for the SOC lead.' },
+  { act: 'act-6', slug: 'ten-million-events', k: 'Hunting at scale', h: 'Ten million sign-ins, explored live in the browser.',
+    problem: 'Hunting means waiting for queries, and bursts hide inside averages.',
+    see: 'Every event is binned on the GPU in milliseconds, keeping peaks so one user\'s 14-push burst stands out. Brush it and the SQL writes itself.',
+    tn: 'WebGPU compute shaders · Three.js TSL', tw: 'GPU aggregation of millions of rows per frame, with no round trip to a server.',
+    m: 'Hunters explore at the speed of thought, and the platform\'s power shows in the interface.' },
+];
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+let idx = 0;
+document.getElementById('content').innerHTML = ACTS.map(a => {
+  const ds = DEMOS.filter(d => d.act === a.id);
+  return `<section class="act slide" id="${a.id}"><div class="num">ACT ${a.n}</div><h2>${esc(a.title)}</h2><p>${esc(a.lede)}</p></section>` +
+    ds.map(d => { idx++; return `
+    <section class="demo slide" id="${d.slug}" data-slug="${d.slug}">
+      <div class="txt">
+        <div class="k"><b>${String(idx).padStart(2, '0')}</b>${esc(d.k)}</div>
+        <h3>${esc(d.h)}</h3>
+        <p class="problem">${esc(d.problem)}</p>
+        <p class="see">${esc(d.see)}</p>
+        <div class="tech"><span class="tn">${esc(d.tn)}</span><span class="tw">${esc(d.tw)}</span></div>
+        <div class="matters">${esc(d.m)}</div>
+      </div>
+      <div class="stage" data-src="components/${d.slug}.html">
+        <img class="poster" src="components/posters/${d.slug}.webp" alt="${esc(d.k)} preview" decoding="async" onerror="this.remove()">
+        <span class="ph">${esc(d.k)}</span>
+        <button class="run" type="button">▶ Run live</button>
+        <span class="spin" aria-hidden="true"></span>
+        <div class="tools"><button type="button" data-act="fs">Full screen</button><a href="components/${d.slug}.html" target="_blank" rel="noopener">Open alone</a><button type="button" data-act="stop">Stop</button></div>
+      </div>
+    </section>`; }).join('');
+}).join('');
+document.getElementById('acts').innerHTML = ACTS.map(a => `<a href="#${a.id}" data-act="${a.id}"><b>${a.n}</b>${esc(a.name)}</a>`).join('');
+document.getElementById('stack').innerHTML = ['WebGPU compute', 'Three.js TSL', 'Transformers.js', 'Gaussian splatting', 'Radiance cascades', 'Web Crypto', 'D3', 'GSAP Flip', 'CSS @property', 'Web Audio', 'Remotion'].map(t => `<span>${t}</span>`).join('');
+
+/* ---- live stages: only the visible component runs; at most two stay loaded ---- */
+const loaded = [];
+function post(stage, msg) { const f = stage.querySelector('iframe'); if (f && f.contentWindow) try { f.contentWindow.postMessage({ corvid: msg }, '*'); } catch (e) {} }
+/* Components are designed for >= 1280 x 800. Render the iframe at that design size and scale it to the stage,
+   so the embedded component looks exactly as designed; on phones, use the component's own phone layout instead. */
+const DESIGN_W = 1280;
+function fit(stage) {
+  const f = stage.querySelector('iframe'); const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return;
+  const phone = !document.fullscreenElement && innerWidth < 700; stage.classList.toggle('phone', phone);
+  if (!f) return;
+  if (phone) { f.style.width = '100%'; f.style.height = '100%'; f.style.transform = 'none'; return; }
+  const D = Math.max(DESIGN_W, w), k = w / D;
+  f.style.width = D + 'px'; f.style.height = (h / k) + 'px'; f.style.transform = k === 1 ? 'none' : `scale(${k})`;
+}
+const ro = new ResizeObserver(es => es.forEach(e => fit(e.target)));
+document.querySelectorAll('.stage').forEach(st => { ro.observe(st); fit(st); });
+addEventListener('resize', () => document.querySelectorAll('.stage').forEach(fit));
+function load(stage) {
+  if (stage.querySelector('iframe')) { post(stage, 'play'); return; }
+  stage.classList.add('loading');
+  const f = document.createElement('iframe'); f.src = stage.dataset.src; f.title = stage.closest('.demo').querySelector('h3').textContent;
+  f.allow = 'fullscreen; camera; microphone; autoplay; clipboard-write; cross-origin-isolated'; f.loading = 'eager';
+  f.addEventListener('load', () => { stage.classList.remove('loading'); stage.classList.add('live'); });
+  stage.appendChild(f); fit(stage); loaded.push(stage);
+  while (loaded.length > 2) unload(loaded.shift());
+}
+function unload(stage) { const f = stage.querySelector('iframe'); if (f) f.remove(); stage.classList.remove('live', 'loading'); const i = loaded.indexOf(stage); if (i >= 0) loaded.splice(i, 1); }
+document.querySelectorAll('.stage').forEach(st => {
+  st.querySelector('.run').addEventListener('click', () => load(st));
+  st.querySelector('[data-act=fs]').addEventListener('click', () => {
+    if (document.fullscreenElement === st) { document.exitFullscreen().catch(() => {}); return; }
+    load(st); (st.requestFullscreen || st.webkitRequestFullscreen).call(st);
+  });
+  st.querySelector('[data-act=stop]').addEventListener('click', () => unload(st));
+});
+const autoRun = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+const io = new IntersectionObserver(es => es.forEach(e => {
+  const st = e.target;
+  if (e.isIntersecting && e.intersectionRatio >= 0.55) { if (autoRun) load(st); }
+  else post(st, 'pause');
+}), { threshold: [0, 0.55] });
+document.querySelectorAll('.stage').forEach(st => io.observe(st));
+
+/* ---- act nav highlight + progress ---- */
+const scroller = () => document.body.classList.contains('present') ? document.getElementById('deck') : document.scrollingElement;
+function onScroll() {
+  const sc = scroller(), max = sc.scrollHeight - sc.clientHeight; document.getElementById('progress').style.width = (max > 0 ? sc.scrollTop / max * 100 : 0) + '%';
+  let cur = null; document.querySelectorAll('.demo,.act').forEach(s => { const r = s.getBoundingClientRect(); if (r.top < innerHeight * 0.5) cur = s; });
+  const actId = cur ? (cur.classList.contains('act') ? cur.id : DEMOS.find(d => d.slug === cur.id)?.act) : null;
+  document.querySelectorAll('#acts a').forEach(a => a.classList.toggle('on', a.dataset.act === actId));
+  const slides = [...document.querySelectorAll('.slide')]; const ci = slides.indexOf(currentSlide());
+  document.getElementById('pnum').textContent = `${Math.max(1, ci + 1)} / ${slides.length}`;
+}
+addEventListener('scroll', onScroll, { passive: true }); document.getElementById('deck').addEventListener('scroll', onScroll, { passive: true }); onScroll();
+
+/* ---- presenter mode: one slide per screen, arrow keys ---- */
+function setPresent(on) {
+  const cur = currentSlide(); document.body.classList.toggle('present', on);
+  requestAnimationFrame(() => { (cur || document.getElementById('top')).scrollIntoView({ behavior: 'instant', block: 'start' }); onScroll(); });
+  if (on && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
+  if (!on && document.fullscreenElement === document.documentElement) document.exitFullscreen().catch(() => {});
+}
+function currentSlide() { const mid = innerHeight * 0.5; const slides = [...document.querySelectorAll('.slide')]; return slides.find(s => { const r = s.getBoundingClientRect(); return r.top <= mid && r.bottom > mid; }) || slides[0]; }
+function go(d) { const slides = [...document.querySelectorAll('.slide')]; const i = slides.indexOf(currentSlide()); const n = slides[Math.max(0, Math.min(slides.length - 1, (i < 0 ? 0 : i) + d))]; n.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+document.getElementById('present').onclick = () => setPresent(!document.body.classList.contains('present'));
+document.getElementById('present2').onclick = () => setPresent(true);
+document.addEventListener('fullscreenchange', () => {
+  if (!document.fullscreenElement && document.body.classList.contains('present')) document.body.classList.remove('present');
+  /* each stage's button reads "Exit full screen" while that stage is full screen */
+  document.querySelectorAll('.stage').forEach(st => { const b = st.querySelector('[data-act=fs]'); const on = document.fullscreenElement === st; b.textContent = on ? 'Exit full screen' : 'Full screen'; b.setAttribute('aria-pressed', on); requestAnimationFrame(() => fit(st)); });
+});
+document.addEventListener('keydown', e => {
+  if (e.target.closest && e.target.closest('input,textarea,select,[contenteditable]')) return;
+  if (e.key === 'p' || e.key === 'P') { setPresent(!document.body.classList.contains('present')); e.preventDefault(); }
+  if (!document.body.classList.contains('present')) return;
+  if (['ArrowRight', 'ArrowDown', 'PageDown', ' '].includes(e.key)) { go(1); e.preventDefault(); }
+  if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(e.key)) { go(-1); e.preventDefault(); }
+  if (e.key === 'Escape') setPresent(false);
+});
+</script>
+</body>
+</html>

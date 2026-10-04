@@ -1,0 +1,978 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Approve with simulation</title>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="../shared/ui.css">
+<style>
+@property --conf{syntax:'<number>';inherits:true;initial-value:0}
+:root{--cardw:396px}
+html,body{height:100%;overflow:hidden}
+body{min-height:0;background:var(--ground)}
+.cmp{position:fixed;inset:0;display:grid;grid-template-rows:auto minmax(0,1fr) auto;background:var(--ground)}
+
+/* ---------- component header ---------- */
+.ch{display:flex;align-items:center;gap:8px 12px;padding:0 18px;min-height:54px;border-bottom:1px solid #1A2029;background:var(--side);min-width:0}
+.ch-id{display:flex;align-items:center;gap:10px;min-width:0}
+.ci{flex:none;width:30px;height:30px;border-radius:8px;display:grid;place-items:center;background:#131920;border:1px solid var(--line2)}
+.ch h1{font-size:15px;font-weight:600;white-space:nowrap;letter-spacing:-.01em}
+.ctx{font:500 11px/1 var(--mono);color:var(--text2);height:22px}
+.stt{display:inline-flex;align-items:center;gap:6px;font:500 11.5px var(--sans);color:var(--text2);white-space:nowrap}
+.stt .dot{color:var(--agent)}
+.stt.paused .dot{color:#5A6472;animation:none}
+.stt.inter .dot{color:var(--link);animation:none}
+.ch-r{margin-left:auto;display:flex;align-items:center;gap:10px;white-space:nowrap;font-size:12px;color:var(--text3)}
+.ch-r b{color:var(--text2);font-weight:500}
+.clock{font:500 12.5px var(--mono);color:var(--text2)}
+
+/* ---------- stage ---------- */
+.stage{position:relative;min-height:0;display:grid;grid-template-columns:var(--cardw) minmax(0,1fr);grid-template-rows:minmax(0,1fr) 50px;gap:0 14px;padding:12px 16px 0}
+.panel2{position:relative;min-height:0;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+
+/* approval card */
+.card{display:flex;flex-direction:column;padding:16px 18px 14px;gap:0}
+.c-head{display:flex;align-items:center;gap:7px;flex-wrap:nowrap;min-width:0}
+.aid{font:600 13px var(--mono);color:var(--text);white-space:nowrap}
+.c-head>.ag{width:20px;height:20px;font-size:7.5px}
+.c-head .chip{margin-left:auto}
+.c-head .chip{height:21px;font-size:11px}
+.c-by{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;color:var(--text3);white-space:nowrap;overflow:hidden}
+.c-st{display:flex;align-items:center;gap:7px;margin-top:9px;font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden}
+.c-st .dot{color:var(--sus)}
+.c-st.ok .dot{color:var(--ben)}
+.c-st b{font:500 12px var(--mono);color:var(--sus)}
+.c-st.ok b{color:var(--ben)}
+.c-verb{margin-top:10px;font-size:16.5px;font-weight:600;line-height:1.32;letter-spacing:-.01em}
+.c-target{margin-top:5px;font:12px var(--mono);color:var(--text2)}
+.c-why{display:flex;gap:10px;margin-top:12px;font-size:12.5px;line-height:1.5;color:var(--text2)}
+.lbl{flex:none;font:600 10.5px/1.9 var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--text3)}
+button.cite{height:17px;padding:0 5px;font-size:10.5px}
+button.cite[aria-expanded="true"],button.cite.press{background:rgba(138,180,255,.18);border-color:var(--link)}
+.panes{position:relative;flex:1;min-height:0;margin-top:14px}
+.pane{position:absolute;left:0;right:0;top:0;bottom:0;display:flex;flex-direction:column;gap:12px}
+.c-conf{display:flex;align-items:center;gap:13px;padding:11px 13px;border-radius:10px;background:rgba(255,106,85,.06);border:1px solid rgba(255,122,102,.26)}
+.c-conf .vt{display:flex;align-items:baseline;gap:7px}
+.c-conf .vl{font-size:16px;font-weight:600;color:var(--mal)}
+.c-conf .vp{font:600 15px var(--mono);color:var(--text)}
+.c-conf .vc{font:10.5px var(--mono);color:var(--text3)}
+.c-conf .cal{font-size:11.5px;color:var(--text2);line-height:1.4;margin-top:2px}
+.ring{--c:var(--mal);position:relative;width:46px;height:46px;flex:none;border-radius:50%}
+.ring::before{content:"";position:absolute;inset:3px;border-radius:50%;background:conic-gradient(var(--c) calc(var(--conf) * 1%),#232B35 0);
+  -webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 calc(100% - 4.5px));mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 calc(100% - 4.5px))}
+.ring i{--a:calc(var(--i) * 36deg - 90deg);position:absolute;width:3px;height:3px;border-radius:50%;background:var(--c);
+  left:calc(50% + cos(var(--a)) * 22.5px - 1.5px);top:calc(50% + sin(var(--a)) * 22.5px - 1.5px);opacity:clamp(.12,calc((var(--conf) - var(--i) * 10) / 10),1)}
+.blast{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;border-radius:9px;overflow:hidden;border:1px solid var(--line);background:var(--line)}
+.blast div{background:#11161D;padding:7px 9px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.blast .k{font-size:10.5px;color:var(--text3)}
+.blast .v{font:600 14px/1.2 var(--mono);color:var(--text);white-space:nowrap}
+.blast .s{font:10.5px var(--mono);color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.blast .v.good{color:var(--ben)}
+.c-pol{font-size:11.5px;color:var(--text3);line-height:1.45}
+.c-pol b{color:var(--text2);font:500 11.5px var(--mono)}
+.c-dry{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 11px;border-radius:9px;border:1px dashed var(--line3);font-size:12px;color:var(--text3);min-height:36px}
+.c-dry.ok{border-style:solid;border-color:rgba(76,201,166,.4);background:rgba(76,201,166,.05);color:var(--text2)}
+.c-dry b{font-weight:500;color:var(--ben)}
+.c-dry .ag{width:16px;height:16px;font-size:6.5px}
+.c-plan{display:none;flex-direction:column;gap:6px;font-size:12.5px;color:var(--text2)}
+.c-plan .cp-h{font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--text3);font-weight:500}
+.c-plan div{display:flex;gap:9px;align-items:baseline;font:12px/1.4 var(--mono);color:var(--text2)}
+.c-plan div i{font-style:normal;color:var(--text3);width:14px;flex:none}
+@media (min-height:900px) and (min-width:1300px){.c-plan{display:flex}}
+/* hold-to-approve: the fill is the typed --hold number from shared/ui.css */
+.hbtn{position:relative;display:flex;align-items:center;justify-content:center;gap:10px;width:100%;height:52px;border-radius:11px;border:1px solid rgba(76,201,166,.6);background:#0E1917;color:var(--text);font:600 14.5px var(--sans);cursor:pointer;overflow:hidden;isolation:isolate;user-select:none;-webkit-user-select:none;touch-action:none;margin-top:auto}
+.hbtn::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(76,201,166,.30),rgba(76,201,166,.58));transform-origin:0 50%;transform:scaleX(var(--hold))}
+.hbtn::after{content:"";position:absolute;left:0;bottom:0;height:2px;width:100%;background:var(--ben);transform-origin:0 50%;transform:scaleX(var(--hold));z-index:-1}
+.hbtn:hover{border-color:var(--ben)}
+.hbtn .hs{font:500 11.5px var(--mono);color:var(--ben);padding:2px 7px;border-radius:999px;border:1px solid rgba(76,201,166,.4)}
+.hbtn.press{transform:translateY(1px)}
+.hbtn.done{border-color:var(--ben);background:rgba(76,201,166,.16)}
+.c-alt{font-size:11.5px;color:var(--sus);text-align:center;min-height:16px;opacity:0;transition:opacity .25s}
+.c-alt.on{opacity:1}
+/* done pane: execution stream + signed receipt */
+.stream{display:flex;flex-direction:column;gap:4px;font:11px/1.4 var(--mono);color:var(--text2)}
+.stream div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stream div{display:flex;gap:8px;align-items:baseline;opacity:0}
+.stream div::before{content:"✓";color:var(--ben);font-weight:600}
+.rcpt{border-radius:11px;border:1px solid rgba(76,201,166,.4);background:linear-gradient(180deg,rgba(76,201,166,.07),rgba(76,201,166,.02));padding:10px 12px 10px;display:flex;flex-direction:column;gap:6px;opacity:0}
+.rc-h{display:flex;align-items:center;gap:8px}
+.rc-h b{font:600 14px var(--mono);color:var(--text);white-space:nowrap}
+.rc-h .sig{font-size:11.5px;color:var(--ben);display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.rc-h .btn{margin-left:auto;height:24px;font-size:11.5px;padding:0 9px}
+.rr{display:grid;grid-template-columns:78px minmax(0,1fr);gap:8px;font-size:12px;line-height:1.35}
+.rr .k{color:var(--text3);font-size:11px}
+.rr .v{color:var(--text);min-width:0}
+.rr .v small{color:var(--text3);font:10.5px var(--mono)}
+.rr .v.good{color:var(--ben)}
+.hash{font:500 11px/1.45 var(--mono);color:var(--text2);word-break:break-all;padding-top:7px;border-top:1px dashed rgba(76,201,166,.3)}
+.hash b{color:var(--ben);font-weight:500}
+.hash .pv{color:var(--text3)}
+.vfy{font-size:11.5px;color:var(--ben);min-height:15px}
+
+/* simulation panel */
+.sim{display:flex;flex-direction:column}
+.sim-h{display:flex;flex-direction:column;align-items:stretch;gap:10px;padding:12px 14px 12px;border-bottom:1px solid #1A2029}
+.sim-h .st{display:flex;align-items:center;gap:12px;min-width:0}
+.sim-h .st h2{flex:none}
+.sim-h h2{font-size:14px;display:flex;align-items:center;gap:8px;white-space:nowrap}
+.sim-h .sub{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text3);white-space:nowrap;overflow:hidden;min-width:0}
+.sim-h .sub .chip{flex:none}
+.sim-h .qq{overflow:hidden;text-overflow:ellipsis}
+.sim.exe .qq{display:none}
+.dry{height:20px;font-size:10.5px}
+.seg{display:flex;gap:3px;padding:3px;border-radius:10px;background:#0B0F14;border:1px solid var(--line2)}
+.seg button{flex:1 1 0}
+.seg button{display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:6px 11px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--text2);cursor:pointer;text-align:left;min-width:0}
+.seg button b{font-size:12.5px;font-weight:600;color:inherit;white-space:nowrap}
+.seg button small{font:10.5px var(--mono);color:var(--text3);white-space:nowrap}
+.sh-l{display:none}
+.seg button:hover{color:var(--text)}
+.seg button[aria-pressed="true"]{background:#151C25;color:var(--text)}
+.seg button.req[aria-pressed="true"]{border-color:rgba(76,201,166,.6)}
+.seg button.alt[aria-pressed="true"]{border-color:rgba(245,154,61,.65)}
+.seg button.press{transform:translateY(1px);background:#1B2430}
+.gwrap{position:relative;flex:1;min-height:0}
+#g{position:absolute;inset:0;width:100%;height:100%;display:block;overflow:visible}
+.exec{order:3;margin-left:auto;flex:none;display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:999px;border:1px solid rgba(76,201,166,.5);background:rgba(15,29,27,.92);color:var(--ben);font:500 11.5px var(--sans);opacity:0;pointer-events:none}
+svg .lane-l{font:600 10px var(--mono);fill:#6E7886;letter-spacing:.07em;text-transform:uppercase}
+svg .n text.l{font:500 12px var(--sans);fill:#E8EBEF}
+svg .n text.s{font:400 10.5px var(--mono);fill:#808A97}
+svg .n .tg text{font:600 9.5px var(--mono)}
+svg .e{fill:none;stroke-linecap:round}
+svg .scis text{font:700 12px var(--mono);fill:#FF6A55}
+.out{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border-top:1px solid var(--line)}
+.out div{background:#0E1218;padding:9px 13px;display:flex;flex-direction:column;gap:3px;min-width:0}
+.out .k{font-size:10.5px;color:var(--text3);letter-spacing:.02em}
+.out .v{font:500 12.5px/1.35 var(--mono);color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.out .v small{display:block;font:400 10.5px var(--mono);color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.out .v.good{color:var(--ben)}.out .v.bad{color:var(--mal)}.out .v.warn{color:var(--warn)}
+.note{padding:8px 14px 10px;font-size:12px;color:var(--text2);border-top:1px solid var(--line);min-height:36px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* captions, cursor, popover */
+.capbar{grid-column:1/3;display:flex;align-items:center;justify-content:center;min-width:0}
+.cap{max-width:100%;padding:8px 16px;border-radius:12px;background:#0D1116;border:1px solid rgba(170,179,191,.16);color:var(--text);font-size:14.5px;line-height:1.35;text-align:center;white-space:nowrap;opacity:0}
+.nocap .cap{display:none}
+.cap.hint{background:transparent;border-color:transparent;color:var(--text3);font-size:12.5px}
+.cursor{position:absolute;left:0;top:0;width:24px;height:24px;z-index:50;pointer-events:none;opacity:0;filter:drop-shadow(0 2px 5px rgba(0,0,0,.65));transform-origin:4px 3px}
+.pop{position:absolute;left:0;top:0;z-index:40;width:330px;padding:12px 14px;border-radius:12px;border:1px solid rgba(138,180,255,.45);background:#0F151D;box-shadow:0 18px 50px rgba(0,0,0,.6);font-size:12px;color:var(--text2);opacity:0;visibility:hidden}
+.pop .ph1{display:flex;align-items:center;gap:8px;font:600 11.5px var(--mono);color:var(--link)}
+.pop .ph1 span{color:var(--text3);font-weight:400}
+.pop .pt{margin-top:6px;font-size:13px;font-weight:500;color:var(--text)}
+.pop .pr{margin-top:6px;font:11.5px/1.45 var(--mono);color:var(--text2)}
+.pop .pf{display:flex;justify-content:space-between;gap:8px;margin-top:8px;padding-top:7px;border-top:1px solid var(--line);font:10.5px var(--mono);color:var(--text3)}
+
+/* footer */
+.cf{display:flex;align-items:center;gap:16px;height:42px;padding:0 16px;margin:0 16px 10px;border:1px solid var(--line);border-radius:12px;background:#0C1015;min-width:0}
+.lg{display:flex;align-items:center;gap:14px;font-size:11.5px;color:var(--text3);white-space:nowrap;min-width:0;overflow:hidden}
+.lg span{display:inline-flex;align-items:center;gap:6px}
+.lg svg{flex:none}
+.ctl{margin-left:auto;display:flex;align-items:center;gap:6px}
+.ctl .btn{height:26px;font-size:12px;padding:0 10px;border-radius:7px}
+.snd[aria-pressed="true"]{color:var(--ben);border-color:rgba(76,201,166,.5)}
+
+/* ---------- responsive ---------- */
+@media (max-width:1180px){:root{--cardw:306px}.card{padding:14px 15px 12px}.c-verb{font-size:15px}.blast .x{display:none}.blast{grid-template-columns:repeat(3,minmax(0,1fr))}.seg button small{display:none}.lg .lx{display:none}.byx,.dx{display:none}.c-conf{gap:11px;padding:10px 11px}}
+@media (min-height:900px) and (min-width:1300px){.c-verb{font-size:19px}.c-why{font-size:13.5px}.c-target{font-size:12.5px}.pane{gap:16px}.c-conf{padding:14px 15px}.c-conf .vl{font-size:18px}.c-conf .cal{font-size:12.5px}.blast div{padding:10px 11px}.blast .v{font-size:16px}.c-pol,.c-dry{font-size:12.5px}.hbtn{height:58px;font-size:15.5px}.stream{font-size:12px}.rr{font-size:13px}.out .v{font-size:13.5px}}
+@media (max-height:700px){.c-target,.c-pol,.blast,.done .stream,.rr-c{display:none!important}.exec .ex{display:none}.sim-h{gap:7px;padding:9px 12px}.seg button{padding:5px 10px}.c-why{margin-top:9px}.panes{margin-top:10px}.pane{gap:9px}.hbtn{height:46px}.ch{min-height:48px}.stage{grid-template-rows:minmax(0,1fr) 44px}.cap{font-size:13.5px;padding:6px 14px}.cf{height:38px}.note{min-height:30px;padding:6px 14px 7px}.out div{padding:7px 12px}.stream{gap:3px}.rcpt{gap:5px;padding:9px 12px}}
+@media (max-width:760px){
+  .ch{flex-wrap:wrap;padding:8px 12px;gap:6px 10px}
+  .ch-id{flex:1 1 100%;gap:8px}.ch h1{font-size:14px}.stt{margin-left:auto}
+  .ctx-x{display:none}
+  .ch-r{display:none}
+  .stage{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto;gap:8px;padding:8px 8px 0}
+  .capbar{grid-column:1}
+  .card{padding:12px 13px}
+  .c-head .chip.rv,.c-by,.c-target,.c-pol,.blast,.c-why,.c-alt,.c-dry{display:none!important}
+  .lg-l{display:none}.sh-l{display:inline}
+  .c-st{margin-top:6px}
+  .c-verb{font-size:14px;margin-top:6px}
+  .panes{flex:none;height:104px;margin-top:9px}
+  .pane{gap:8px}
+  .c-conf{padding:7px 10px;gap:10px}
+  .c-conf .cal{display:none}
+  .ring{width:34px;height:34px}
+  .ring::before{-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 4px),#000 calc(100% - 3.5px));mask:radial-gradient(farthest-side,transparent calc(100% - 4px),#000 calc(100% - 3.5px))}
+  .ring i{display:none}
+  .hbtn{height:44px;font-size:13.5px}
+  .done .stream{display:none}
+  .rcpt{padding:8px 11px;gap:4px}
+  .rr{display:none}
+  .rc-h .btn{display:none}
+  .sim-h{padding:9px 10px 8px}
+  .sim-h .st{display:none}
+  .seg{flex:1 1 100%}
+  .seg button{flex:1;align-items:center}
+  .seg button small{display:none}
+  .out{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .out div{padding:6px 9px}
+  .out .v{font-size:11.5px}
+  .out .v small{display:none}
+  .note{display:none}
+  .cap{white-space:normal;font-size:12.5px;padding:7px 12px}
+  .cf{margin:8px;padding:0 10px}
+  .lg{display:none}
+  .pop{width:calc(100vw - 32px)}
+}
+@media (prefers-reduced-motion:reduce){.c-alt{transition:none}}
+.nt *,.nt *::before,.nt *::after{transition:none!important}
+</style>
+</head>
+<body>
+<div class="cmp" id="cmp">
+  <header class="ch">
+    <div class="ch-id">
+      <span class="ci" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M9 1.8l5.6 2.2v4.3c0 3.4-2.4 5.9-5.6 7.3-3.2-1.4-5.6-3.9-5.6-7.3V4z" stroke="#808A97" stroke-width="1.4"/><path d="M6.2 9.1l2 2 3.8-4" stroke="#4CC9A6" stroke-width="1.8"/></svg></span>
+      <h1>Approve with simulation</h1>
+      <span class="chip ctx">APR-311<span class="ctx-x"> · CASE-4127 · Meridian Freight</span></span>
+      <span class="stt" id="stt"><span class="dot live"></span><span id="stt-t">Live</span></span>
+    </div>
+    <div class="ch-r"><span>Approving as <b>Ravi Patel</b>, IR lead</span><span class="clock" id="clock">02:48:52 UTC</span></div>
+  </header>
+
+  <main class="stage" id="stage">
+    <section class="panel2 card" id="card" aria-label="Approval APR-311">
+      <div class="c-head">
+        <span class="ag">RS</span><span class="aid">APR-311</span><span class="c-by"><span class="byx">from Responder · </span><span class="mono" id="req-at">02:41</span></span>
+        <span class="chip" id="pol-chip">AP-12 · L2 approve</span>
+      </div>
+      <div class="c-st" id="c-st"><span class="dot live"></span><span id="c-st-t">Awaiting you · escalates to SOC lead in <b id="cd">4m 08s</b></span></div>
+      <h2 class="c-verb" id="verb"></h2>
+      <div class="c-target" id="target"></div>
+      <div class="c-why"><span class="lbl">Why</span><p id="why"></p></div>
+      <div class="panes">
+        <div class="pane decide" id="decide">
+          <div class="c-conf">
+            <span class="ring" id="ring" style="--conf:0"><i style="--i:0"></i><i style="--i:1"></i><i style="--i:2"></i><i style="--i:3"></i><i style="--i:4"></i><i style="--i:5"></i><i style="--i:6"></i><i style="--i:7"></i><i style="--i:8"></i><i style="--i:9"></i></span>
+            <div style="min-width:0"><div class="vt"><span class="vl">Malicious</span><span class="vp" id="conf-v">97%</span><span class="vc">calibrated</span></div><div class="cal" id="cal"></div></div>
+          </div>
+          <div class="blast" id="blast"></div>
+          <div class="c-pol" id="pol"></div>
+          <div class="c-dry" id="c-dry"></div>
+          <div class="c-plan" id="c-plan"></div>
+          <button class="hbtn" type="button" id="hold" aria-describedby="hold-d"><span class="hl" id="hold-l">Hold to approve APR-311</span><span class="hs" id="hold-s">1.2 s</span></button>
+          <span class="sr-only" id="hold-d">Press and hold for 1.2 seconds to approve. Keyboard: hold Space or Enter.</span>
+          <div class="c-alt" id="altnote">Comparing only. Approval runs the requested action.</div>
+        </div>
+        <div class="pane done" id="done" aria-live="polite">
+          <div class="stream" id="stream"></div>
+          <div class="rcpt" id="rcpt">
+            <div class="rc-h"><b>RCPT-9922</b><span class="sig"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 6.3l2.2 2.2 4.8-5"/></svg>Signed<span class="byx"> receipt</span></span><button class="btn" type="button" id="verify">Verify hash</button></div>
+            <div class="rr"><span class="k">Action</span><span class="v" id="rc-act"></span></div>
+            <div class="rr"><span class="k">Approved</span><span class="v">Ravi Patel, IR lead · <span class="mono">02:49:12</span><br><small>held 1.2 s · AP-12 L2 · 1 of 1</small></span></div>
+            <div class="rr rr-c"><span class="k">Change</span><span class="v" id="rc-chg"></span></div>
+            <div class="rr"><span class="k">Verified</span><span class="v good">0 attacker sessions · pipelines healthy</span></div>
+            <div class="hash" id="hash"></div>
+            <div class="vfy" id="vfy"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel2 sim" id="sim" aria-label="Blast-radius simulation">
+      <div class="sim-h">
+        <div class="st"><h2>Simulate before you approve</h2><span class="exec" id="exec"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 6.3l2.2 2.2 4.8-5"/></svg>Executed 02:49:12<span class="ex"> · 0 attacker sessions</span></span><span class="sub"><span class="chip c-agent dry" id="dry"><span class="ag" style="width:14px;height:14px;font-size:6px">RS</span><span id="dry-t">dry-run ready</span></span><span class="qq">What breaks, and does the attacker lose access?</span></span></div>
+        <div class="seg" role="group" aria-label="Plan to simulate">
+          <button type="button" class="req" id="b-req" aria-pressed="false"><b><span class="lg-l">Requested: revoke j.alvarez's sessions</span><span class="sh-l">Revoke sessions</span></b><small>1 principal · the role keeps working</small></button>
+          <button type="button" class="alt" id="b-alt" aria-pressed="false"><b><span class="lg-l">Alternative: disable role ops-admin</span><span class="sh-l">Disable role</span></b><small>every principal that uses the role</small></button>
+        </div>
+      </div>
+      <div class="gwrap" id="gwrap">
+        <svg id="g" role="img" aria-label="Dependency graph: principal, access, service, business process"></svg>
+      </div>
+      <div class="out" id="out">
+        <div><span class="k">Attacker access</span><span class="v" id="o-att"></span></div>
+        <div><span class="k">Services broken</span><span class="v" id="o-svc"></span></div>
+        <div><span class="k">Business impact</span><span class="v" id="o-bp"></span></div>
+        <div><span class="k">Recovery</span><span class="v" id="o-rec"></span></div>
+      </div>
+      <div class="note" id="note"></div>
+    </section>
+
+    <div class="capbar"><div class="cap" id="cap" aria-live="polite"><span id="cap-t"></span></div></div>
+  </main>
+
+  <footer class="cf">
+    <div class="lg">
+      <span><svg width="22" height="8" aria-hidden="true"><path d="M1 4h20" stroke="#FF6A55" stroke-width="2"/></svg>attacker path</span>
+      <span><svg width="22" height="8" aria-hidden="true"><path d="M1 4h20" stroke="#FF6A55" stroke-width="1.8" stroke-dasharray="6 4"/></svg>breaks</span>
+      <span class="lx"><svg width="22" height="8" aria-hidden="true"><path d="M1 4h20" stroke="#2E6F62" stroke-width="1.8"/></svg>keeps running</span>
+      <span class="lx"><svg width="12" height="12" aria-hidden="true"><rect x="1" y="1" width="10" height="10" rx="3" fill="#0F1D1B" stroke="#4CC9A6"/></svg>attacker cut off</span>
+    </div>
+    <div class="ctl">
+      <button class="btn snd" type="button" id="b-snd" aria-pressed="false" title="Synthesised confirmation tones"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h2.5L9 3v10L5.5 10H3z"/><path id="snd-w" d="M11.5 5.5c1 .8 1 4.2 0 5M13.3 4c1.9 1.6 1.9 6.4 0 8" opacity=".35"/></svg><span id="snd-t">Sound off</span></button>
+      <button class="btn" type="button" id="b-play" aria-pressed="false">Pause</button>
+      <button class="btn" type="button" id="b-replay">Replay</button>
+    </div>
+  </footer>
+
+  <svg class="cursor" id="cursor" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 2.5l15 9.2-6.6 1.4 3.9 7.3-2.7 1.4-3.9-7.3L4.6 19z" fill="#E8EBEF" stroke="#0A0D11" stroke-width="1.2" stroke-linejoin="round"/></svg>
+  <div class="pop" id="pop" role="dialog" aria-label="Cited evidence"></div>
+</div>
+
+<script src="../shared/data.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+<script>
+(() => {
+'use strict';
+/* ==========================================================================
+   Storyboard (29 s, every frame is a pure function of t)
+   0.3–1.3   APR-311 card; the calibrated 97% ring sweeps (typed @property --conf)
+   1.8–3.2   Responder's dry-run of the requested action: the attacker edge is cut, nothing breaks
+   7.6–9.4   cursor picks the alternative: ops-admin disabled, the break cascades layer by layer
+   13.5–15.0 back to the requested action: the graph heals in the same order
+   15.6–18.1 citation [6] opens its CloudTrail record
+   19.0–20.2 press and hold: --hold fills; 20.4 execution stream; 21.9 signed receipt RCPT-9922
+   27.4 fade · 28.0 reset
+   ========================================================================== */
+const P = 29, HERO = 9.6, LIVE_T = 6.4;
+const T = { ring: 0.3, sim1: 1.8, alt: 7.6, req2: 13.5, cite: 15.6, citeOff: 18.1, hold0: 19.0, hold1: 20.2, stream: 20.45, rcpt: 21.95, fade: 27.4, reset: 28.0 };
+const PLAN_KEYS = [[0, 'none'], [T.sim1, 'req'], [T.alt, 'alt'], [T.req2, 'req'], [T.reset, 'none']];
+const HOLD_MS = 1200;
+const Q = new URLSearchParams(location.search);
+const $ = id => document.getElementById(id);
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const clamp = (x, a, b) => x < a ? a : x > b ? b : x;
+const sm = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+const D = window.CORVID;
+const cmp = $('cmp');
+if (Q.get('captions') === '0') cmp.classList.add('nocap');
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const setT = (el, v) => { if (el.textContent !== v) el.textContent = v; };
+const setH = (el, v) => { if (el.__h !== v) { el.innerHTML = v; el.__h = v; } };
+const tog = (el, c, on) => { if (el.classList.contains(c) !== !!on) el.classList.toggle(c, !!on); };
+
+/* ------------------------------------------------------------------ scenario (data.js + the app's APR-311 metadata) */
+const A = D.approvals.find(a => a.id === 'APR-311'), C27 = D.case4127;
+const M311 = {
+  verb: "Block j.alvarez's SSO access and revoke her active ops-admin STS sessions",
+  target: 'aws:ops-admin · session-scoped · assumed by j.alvarez',
+  why: 'Her session assumed ops-admin for the first time in 365 days, then read 1,284 objects (2.3 GB) from mf-finance-exports.', cites: [5, 6],
+  cells: [['Users', '1', 'j.alvarez', ''], ['Roles', '2', 'scoped', ''], ['Services', '0', 'role kept', 'good'], ['Reversible', 'Yes', 're-add SSO', 'x']],
+  policyRule: 'Cloud IAM write → 1 IR approver',
+  receipt: { action: 'Revoke ops-admin sessions · j.alvarez', before: '1 attacker session + SSO assignment', after: '0 sessions · assignment removed' },
+  stream: ['Policy AP-12 re-checked: unchanged', 'Identity Center: SSO assignment removed', 'IAM: deny sessions issued before 02:49:12', 'Verified: 0 active ops-admin sessions'],
+  sim: {
+    layers: ['Principal', 'Access', 'Service', 'Business process'],
+    nodes: [
+      { id: 'jalv', l: 0, label: 'j.alvarez (attacker)', sub: '203.0.113.77 · 02:21', hostile: true },
+      { id: 'etl', l: 0, label: 'svc-finance-etl', sub: 'service principal' },
+      { id: 'bill', l: 0, label: 'svc-billing-sync', sub: 'service principal' },
+      { id: 'life', l: 0, label: 'svc-s3-lifecycle', sub: 'service principal' },
+      { id: 'ci', l: 0, label: 'ci-runner', sub: 'STS session 10.40.2.18' },
+      { id: 'role', l: 1, label: 'Role ops-admin', sub: 'AWS mf-prod-data' },
+      { id: 'sfin', l: 2, label: 'finance-etl', sub: 'nightly 03:00 UTC' },
+      { id: 'sbil', l: 2, label: 'billing-sync', sub: 'every 15 min' },
+      { id: 'slif', l: 2, label: 's3-lifecycle', sub: 'hourly' },
+      { id: 'sdep', l: 2, label: 'deploys (prod-data)', sub: 'ci pipeline' },
+      { id: 'bkt', l: 2, label: 'mf-finance-exports', sub: 'Confidential data' },
+      { id: 'close', l: 3, label: 'Month-end close', sub: 'due 10-05' },
+      { id: 'inv', l: 3, label: 'Customer invoicing', sub: '15 min SLA' },
+      { id: 'cost', l: 3, label: 'Storage lifecycle', sub: 'cost policy' },
+      { id: 'rel', l: 3, label: 'Releases', sub: '2 today' },
+    ],
+    edges: [['jalv', 'role', 1], ['etl', 'role'], ['bill', 'role'], ['life', 'role'], ['ci', 'role'], ['role', 'sfin'], ['role', 'sbil'], ['role', 'slif'], ['role', 'sdep'], ['role', 'bkt', 1], ['sfin', 'close'], ['sbil', 'close'], ['sbil', 'inv'], ['slif', 'cost'], ['sdep', 'rel']],
+    req: { name: "Requested: revoke j.alvarez's sessions", cutEdges: [['jalv', 'role']], recovery: 'none needed', note: "Only the attacker's edge into ops-admin is cut. Every service principal still reaches the role, so nothing downstream changes." },
+    alt: { name: 'Alternative: disable role ops-admin', cutNodes: ['role'], recovery: 'about 40 min, manual', note: 'Disabling the role also cuts finance-etl, billing-sync, s3-lifecycle and ci-runner. Month-end close and customer invoicing stop.' },
+  },
+};
+const SIM = M311.sim, NODE = Object.fromEntries(SIM.nodes.map(n => [n.id, n]));
+// the app's dry-run analysis (response.html analyse): reachability with and without the plan's cuts
+function analyse(plan) {
+  const cutE = new Set((plan.cutEdges || []).map(e => e.join('>'))), cutN = new Set(plan.cutNodes || []);
+  const adj = {}; SIM.edges.forEach(([s, t]) => (adj[s] = adj[s] || []).push(t));
+  const reach = (sources, useCuts) => { const seen = new Set(), q = sources.filter(n => !(useCuts && cutN.has(n))); q.forEach(n => seen.add(n));
+    while (q.length) { const n = q.shift(); (adj[n] || []).forEach(t => { if (useCuts && (cutE.has(n + '>' + t) || cutN.has(t))) return; if (!seen.has(t)) { seen.add(t); q.push(t); } }); } return seen; };
+  const legit = SIM.nodes.filter(n => n.l === 0 && !n.hostile).map(n => n.id), hostile = SIM.nodes.filter(n => n.l === 0 && n.hostile).map(n => n.id);
+  const R0 = reach(legit, false), R1 = reach(legit, true), A0 = reach(hostile, false), A1 = reach(hostile, true);
+  const broken = new Set([...R0].filter(n => !R1.has(n) && !NODE[n].hostile));
+  const targets = new Set(SIM.edges.filter(e => e[2] && NODE[e[1]].l >= 2).map(e => e[1]).concat(SIM.nodes.filter(n => n.hostile && n.l > 0).map(n => n.id)));
+  const cutOff = new Set([...A0].filter(n => !A1.has(n) && targets.has(n)));
+  const still = [...targets].filter(n => A1.has(n) && !cutN.has(n)).length;
+  return { cutE, cutN, broken, cutOff, still };
+}
+const RES = { req: analyse(SIM.req), alt: analyse(SIM.alt) };
+
+/* ------------------------------------------------------------------ receipts: the app's SHA-256 hash chain (response.html) */
+const HEX = '0123456789abcdef', toHex = b => Array.from(b, x => HEX[x >> 4] + HEX[x & 15]).join('');
+function sha256js(bytes) {
+  const K = new Uint32Array([0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2]);
+  const H = new Uint32Array([0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19]);
+  const l = bytes.length, nb = ((l + 9 + 63) >> 6) << 6, m = new Uint8Array(nb);
+  m.set(bytes); m[l] = 0x80; const bl = l * 8; for (let i = 0; i < 8; i++) m[nb - 1 - i] = Math.floor(bl / Math.pow(2, 8 * i)) & 255;
+  const w = new Uint32Array(64), r = (x, n) => (x >>> n) | (x << (32 - n));
+  for (let o = 0; o < nb; o += 64) {
+    for (let i = 0; i < 16; i++) w[i] = (m[o + 4 * i] << 24) | (m[o + 4 * i + 1] << 16) | (m[o + 4 * i + 2] << 8) | m[o + 4 * i + 3];
+    for (let i = 16; i < 64; i++) { const s0 = r(w[i-15],7) ^ r(w[i-15],18) ^ (w[i-15] >>> 3), s1 = r(w[i-2],17) ^ r(w[i-2],19) ^ (w[i-2] >>> 10); w[i] = (w[i-16] + s0 + w[i-7] + s1) | 0; }
+    let [a,b,c,d,e,f,g,h] = H;
+    for (let i = 0; i < 64; i++) { const S1 = r(e,6) ^ r(e,11) ^ r(e,25), ch = (e & f) ^ (~e & g), t1 = (h + S1 + ch + K[i] + w[i]) | 0; const S0 = r(a,2) ^ r(a,13) ^ r(a,22), mj = (a & b) ^ (a & c) ^ (b & c), t2 = (S0 + mj) | 0; h = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0; }
+    H[0]+=a;H[1]+=b;H[2]+=c;H[3]+=d;H[4]+=e;H[5]+=f;H[6]+=g;H[7]+=h;
+  }
+  const out = new Uint8Array(32); for (let i = 0; i < 8; i++) { out[4*i] = H[i] >>> 24; out[4*i+1] = (H[i] >>> 16) & 255; out[4*i+2] = (H[i] >>> 8) & 255; out[4*i+3] = H[i] & 255; } return out;
+}
+const sha256s = str => toHex(sha256js(new TextEncoder().encode(str)));
+const canon = r => JSON.stringify({ id: r.id, ts: r.ts, action: r.action, target: r.target, actor: r.actor, policy: r.policy, ref: r.ref, before: r.before, after: r.after, prev: r.prev });
+const actorOf = by => by === 'RS' ? 'agent:responder' : by === 'LB' ? 'user:l.brandt' : by === 'TN' ? 'user:t.nguyen' : 'user:r.patel';
+const CHAIN = [
+  { id: 'RCPT-9874', ts: '2026-10-02 19:40:12', action: 'Rollback of RCPT-9869 · isolate FIN-LT-0391', target: 'FIN-LT-0391', actor: 'user:t.nguyen', policy: 'manual', ref: 'CASE-4098', before: 'isolated', after: 'online · reason: false positive, backup agent' },
+  ...D.containments.slice().sort((x, y) => (x.started.includes('yesterday') ? '0' : x.started).localeCompare(y.started.includes('yesterday') ? '0' : y.started)).map(c => ({
+    id: c.id, ts: (c.started.includes('yesterday') ? '2026-10-02 21:10' : '2026-10-03 ' + c.started) + ':00', action: c.action, target: c.target, actor: actorOf(c.by), policy: c.policy, ref: c.case,
+    before: { 'RCPT-9921': '3 active sessions', 'RCPT-9919': 'online', 'RCPT-9912': 'egress open (stratum)', 'RCPT-9913': 'schedulable', 'RCPT-9903': '41 copies', 'RCPT-9904': 'resolvable', 'RCPT-9890': '1 forward rule' }[c.id] || 'before', after: c.verify })),
+];
+CHAIN.forEach(r => r.ts = r.ts.replace(' ', 'T') + 'Z');
+{ let prev = '0'.repeat(64); for (const r of CHAIN) { r.prev = prev; r.hash = sha256s(canon(r)); prev = r.hash; } }
+const PREV = CHAIN[CHAIN.length - 1];
+const R9922 = { id: 'RCPT-9922', ts: '2026-10-03T02:49:12Z', action: M311.receipt.action, target: M311.target, actor: 'user:r.patel', policy: A.policy, ref: A.case, before: M311.receipt.before, after: M311.receipt.after, prev: PREV.hash };
+R9922.hash = sha256s(canon(R9922));
+const grp8 = h => h.match(/.{8}/g).join(' ');
+
+/* ------------------------------------------------------------------ static card content */
+$('verb').textContent = M311.verb;
+$('target').textContent = M311.target;
+$('why').innerHTML = esc(M311.why) + ' ' + M311.cites.map(n => `<button type="button" class="cite" data-n="${n}" aria-expanded="false" aria-controls="pop" title="Evidence ${n}">${n}</button>`).join('');
+$('pol-chip').textContent = `${A.policy} · ${A.level} approve`;
+$('req-at').textContent = A.at;
+$('cal').textContent = `Of ${C27.calibration.n.toLocaleString('en-US')} past verdicts at ${C27.calibration.band}, ${C27.calibration.confirmed}% were confirmed by analysts.`;
+$('conf-v').textContent = A.conf + '%';
+$('blast').innerHTML = M311.cells.map(([k, v, sub, c]) => `<div class="${c === 'x' ? 'x' : ''}"><span class="k">${k}</span><span class="v ${c === 'good' ? 'good' : ''}">${v}</span><span class="s">${sub}</span></div>`).join('');
+$('pol').innerHTML = `Policy <b>${A.policy}</b> · ${esc(M311.policyRule)} · ${A.level}. Approving as Ravi Patel, IR lead; written to the ledger and #ir-approvals.`;
+$('stream').innerHTML = M311.stream.map(l => `<div>${esc(l)}</div>`).join('');
+$('c-plan').innerHTML = '<span class="cp-h">On approval, Responder will</span>' + M311.stream.map((l, i) => `<div><i>${i + 1}</i>${esc(l.replace('Verified: ', 'Verify ').replace(' re-checked: unchanged', ' re-checked at approve time').replace('02:49:12', 'approval'))}</div>`).join('');
+$('rc-act').textContent = M311.receipt.action;
+$('rc-chg').innerHTML = `${esc(M311.receipt.before)} → <span style="color:var(--ben)">${esc(M311.receipt.after)}</span>`;
+$('hash').innerHTML = `sha256 <b>${grp8(R9922.hash)}</b><br><span class="pv">prev ${PREV.id} ${PREV.hash.slice(0, 16)}…</span>`;
+function evidenceHTML(n) {
+  const ev = C27.evidence.find(e => e.n === n), sg = C27.signals.find(s => s.n === n);
+  return `<div class="ph1">Evidence ${n} <span>· ${esc(ev.src)}</span></div><div class="pt">${esc(ev.title)}</div><div class="pr">${esc(sg.summary)}</div><div class="pf"><span>${esc(ev.range)} UTC</span><span>sha256 ${esc(ev.hash)}</span></div>`;
+}
+
+/* ------------------------------------------------------------------ Web Audio confirmation tones (muted by default) */
+const AU = {
+  ctx: null, on: false,
+  ensure() { if (!this.ctx) { const C = window.AudioContext || window.webkitAudioContext; if (C) this.ctx = new C(); } if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); return this.ctx; },
+  tone(freq, t0, dur, { type = 'sine', gain = 0.1, glide = 0 } = {}) {
+    const c = this.ctx; if (!c) return;
+    const o = c.createOscillator(), g = c.createGain(); o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (glide) o.frequency.exponentialRampToValueAtTime(freq * glide, t0 + dur);
+    g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(gain, t0 + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(c.destination); o.start(t0); o.stop(t0 + dur + 0.02);
+  },
+  // rising ticks while holding (pitch tracks the fill), a two-note confirm, a falling cancel
+  cue(name, p = 0) {
+    if (!this.on) return; const c = this.ensure(); if (!c) return; const t = c.currentTime + 0.01;
+    if (name === 'tick') this.tone(660 * Math.pow(2, p), t, 0.04, { gain: 0.045 });
+    else if (name === 'confirm') { this.tone(783.99, t, 0.16, { type: 'triangle', gain: 0.1 }); this.tone(1174.66, t + 0.11, 0.32, { type: 'triangle', gain: 0.1, glide: 1.02 }); }
+    else if (name === 'cancel') this.tone(523.25, t, 0.22, { gain: 0.07, glide: 0.62 });
+    else if (name === 'on') this.tone(1046.5, t, 0.16, { gain: 0.08, glide: 1.5 });
+  },
+};
+
+/* ------------------------------------------------------------------ the dependency graph (D3) */
+const svg = d3.select('#g');
+let G = null;   // geometry for the current size
+const NST = {
+  idle: { f: '#121821', s: '#2C3540', so: 1, d: 0 },
+  hostile: { f: '#1D1214', s: '#FF6A55', so: 0.85, d: 0, tag: 'attacker', tc: '#FF7A66' },
+  ok: { f: '#0F1917', s: '#2E6F62', so: 1, d: 0 },
+  cut: { f: '#2A1215', s: '#FF6A55', so: 1, d: 1, tag: 'disabled', tc: '#FF7A66' },
+  broken: { f: '#2A1215', s: '#FF6A55', so: 1, d: 0, tag: 'breaks', tc: '#FF7A66' },
+  cutoff: { f: '#0F1D1B', s: '#4CC9A6', so: 1, d: 0, tag: 'attacker cut off', tc: '#4CC9A6' },
+  revoked: { f: '#161315', s: '#FF6A55', so: 0.35, d: 0, tag: 'access revoked', tc: '#4CC9A6' },
+  lost: { f: '#161315', s: '#FF6A55', so: 0.35, d: 0, tag: 'cut off', tc: '#4CC9A6' },
+};
+const EST = {
+  idle: { c: '#3A4656', w: 1.5, o: 1, d: 0 },
+  hostile: { c: '#FF6A55', w: 2.1, o: 0.95, d: 0 },
+  ok: { c: '#2E6F62', w: 1.6, o: 1, d: 0 },
+  snip: { c: '#FF6A55', w: 1.6, o: 0.55, d: 2 },
+  cut: { c: '#FF6A55', w: 1.5, o: 0.6, d: 2 },
+  broken: { c: '#FF6A55', w: 1.9, o: 1, d: 1 },
+  dead: { c: '#FF6A55', w: 1.6, o: 0.2, d: 0 },
+};
+const DASH = ['', '6 4', '2 4'];
+function nodeState(n, plan) {
+  if (plan === 'none') return n.hostile ? 'hostile' : 'idle';
+  const R = RES[plan];
+  if (R.cutN.has(n.id)) return 'cut';
+  if (R.broken.has(n.id)) return 'broken';
+  if (R.cutOff.has(n.id)) return 'cutoff';
+  if (n.hostile) return plan === 'req' ? 'revoked' : 'lost';
+  if (n.l === 0 && SIM.edges.filter(e => e[0] === n.id).every(e => ['cut', 'snip'].includes(edgeState(e, plan)))) return 'idle';
+  return 'ok';
+}
+function edgeState(e, plan) {
+  const [s, t, h] = e;
+  if (plan === 'none') return h ? 'hostile' : 'idle';
+  const R = RES[plan];
+  if (R.cutE.has(s + '>' + t)) return 'snip';
+  if (R.cutN.has(s) || R.cutN.has(t)) return 'cut';
+  if (h) return 'dead';
+  if (R.broken.has(t)) return 'broken';
+  return 'ok';
+}
+const tagOf = (n, st) => st === 'broken' ? (n.l === 3 ? 'blocked' : 'breaks') : st === 'ok' ? (n.l === 2 ? 'running' : n.l === 3 ? 'on track' : '') : (NST[st].tag || '');
+const tagCol = st => st === 'ok' ? '#4CC9A6' : (NST[st].tc || '#808A97');
+// cascade timing: from the cut outward, layer by layer, so cause and effect read in order
+const idxIn = id => SIM.nodes.filter(n => n.l === NODE[id].l).findIndex(n => n.id === id);
+const nDelay = n => 0.06 + n.l * 0.27 + idxIn(n.id) * 0.06;
+const eDelay = e => 0.16 + NODE[e[0]].l * 0.27 + idxIn(e[1]) * 0.05;
+const DUR = 0.32, CASCADE = 1.75;
+
+function geom() {
+  const box = $('gwrap').getBoundingClientRect(), W = Math.max(200, box.width), H = Math.max(160, box.height);
+  const vertical = W < 560;
+  const pos = {};
+  let nw, nh, compact, lanes = [];
+  if (!vertical) {
+    const padX = 16, padT = 34, padB = 14;
+    const big = H > 560 && W > 900;
+    nw = clamp(Math.floor((W - padX * 2 - 3 * (big ? 80 : 46)) / 4), 112, big ? 236 : 196);
+    const gap = (W - padX * 2 - 4 * nw) / 3;
+    compact = nw < 150 || H < 300; nh = compact ? 38 : big ? 56 : 46;
+    [0, 1, 2, 3].forEach(l => {
+      const ns = SIM.nodes.filter(n => n.l === l), avail = H - padT - padB, slot = Math.min(avail / ns.length, nh + (big ? 40 : 24));
+      const y0 = padT + (avail - slot * ns.length) / 2, x = padX + l * (nw + gap);
+      ns.forEach((n, i) => pos[n.id] = { x, y: y0 + i * slot + (slot - nh) / 2 });
+      lanes.push({ x, y: 18, label: SIM.layers[l], anchor: 'start' });
+    });
+  } else {
+    const padX = 8, cols = 3, gx = 6, gy = 5, bandGap = 18;
+    const rows = [0, 1, 2, 3].map(l => Math.ceil(SIM.nodes.filter(n => n.l === l).length / cols));
+    const nRows = rows.reduce((a, r) => a + r, 0);
+    nw = Math.floor((W - padX * 2 - gx * (cols - 1)) / cols); compact = true;
+    nh = clamp(Math.floor((H - 16 - bandGap * 3 - gy * (nRows - 4)) / nRows), 22, 30);
+    const total = rows.reduce((a, r) => a + r * nh + (r - 1) * gy, 0) + bandGap * 3;
+    let y = Math.max(6, (H - total) / 2);
+    [0, 1, 2, 3].forEach(l => {
+      const ns = SIM.nodes.filter(n => n.l === l);
+      ns.forEach((n, i) => { const r = Math.floor(i / cols), inRow = Math.min(cols, ns.length - r * cols), c = i % cols; const rowW = inRow * nw + (inRow - 1) * gx; pos[n.id] = { x: (W - rowW) / 2 + c * (nw + gx), y: y + r * (nh + gy) }; });
+      y += rows[l] * nh + (rows[l] - 1) * gy + bandGap;
+    });
+  }
+  return { W, H, vertical, nw, nh, compact, pos, lanes, big: !vertical && H > 560 && W > 900 };
+}
+function edgePath(e) {
+  const a = G.pos[e[0]], b = G.pos[e[1]];
+  if (!G.vertical) return d3.linkHorizontal()({ source: [a.x + G.nw, a.y + G.nh / 2], target: [b.x, b.y + G.nh / 2] });
+  return d3.linkVertical()({ source: [a.x + G.nw / 2, a.y + G.nh], target: [b.x + G.nw / 2, b.y] });
+}
+const clip = (t, px, cw) => { const n = Math.floor(px / cw); return t.length > n ? t.slice(0, Math.max(1, n - 1)) + '…' : t; };
+function buildGraph() {
+  G = geom();
+  svg.attr('viewBox', `0 0 ${G.W} ${G.H}`).attr('width', G.W).attr('height', G.H);
+  svg.selectAll('*').remove();
+  svg.selectAll('text.lane-l').data(G.vertical ? [] : G.lanes).join('text').attr('class', 'lane-l').attr('x', d => d.x).attr('y', d => d.y).text(d => d.label);
+  svg.append('g').attr('class', 'edges').selectAll('path.e').data(SIM.edges, d => d[0] + '>' + d[1]).join('path').attr('class', 'e').attr('d', edgePath).each(function (d) { d.len = this.getTotalLength(); });
+  svg.append('g').attr('class', 'pulses').selectAll('circle').data(SIM.edges).join('circle').attr('r', 3.2).attr('opacity', 0);
+  const lab = G.vertical ? 10.5 : G.compact ? 11 : G.big ? 13.5 : 12, sub = G.big ? 11.5 : 10.5, cw = lab * 0.56;
+  const g = svg.append('g').attr('class', 'nodes').selectAll('g.n').data(SIM.nodes, d => d.id).join('g').attr('class', 'n').attr('transform', d => `translate(${G.pos[d.id].x},${G.pos[d.id].y})`);
+  g.append('rect').attr('rx', 8).attr('width', G.nw).attr('height', G.nh);
+  const tl2 = g.append('text').attr('class', 'l').attr('x', G.vertical ? G.nw / 2 : 11).attr('text-anchor', G.vertical ? 'middle' : 'start').style('font-size', lab + 'px');
+  tl2.each(function (d) {
+    const t = d3.select(this), label = G.vertical ? d.label.replace(' (attacker)', '').replace('Role ', '') : d.label, room = Math.floor((G.nw - (G.vertical ? 10 : 20)) / cw);
+    if (!G.compact) { t.attr('y', G.big ? 23 : 19).text(clip(label, G.nw - 18, cw)); return; }
+    if (label.length <= room || G.vertical) { t.attr('y', G.nh / 2 + lab * 0.36).text(clip(label, G.nw - 10, cw)); return; }
+    // two lines: break at the last space or hyphen that fits
+    let k = -1; for (let i = Math.min(room, label.length - 1); i > 2; i--) if (label[i] === ' ' || label[i - 1] === '-') { k = label[i] === ' ' ? i : i; break; }
+    const l1 = k > 0 ? label.slice(0, k).trim() : label.slice(0, room), l2 = k > 0 ? label.slice(k).trim() : label.slice(room);
+    t.append('tspan').attr('x', 11).attr('y', G.nh / 2 - 2).text(l1);
+    t.append('tspan').attr('x', 11).attr('y', G.nh / 2 + lab + 0.5).text(clip(l2, G.nw - 18, cw));
+  });
+  if (!G.compact) g.append('text').attr('class', 's').attr('x', 11).attr('y', G.big ? 41 : 34).style('font-size', sub + 'px').text(d => clip(d.sub, G.nw - 18, sub * 0.6));
+  g.append('title').text(d => d.label + ' · ' + d.sub);
+  const tg = g.append('g').attr('class', 'tg').attr('opacity', 0);
+  tg.append('rect').attr('rx', 8).attr('height', 16).attr('y', -9).attr('fill', '#0A0D11').attr('stroke-width', 1);
+  tg.append('text').attr('y', 2.5).attr('text-anchor', 'middle');
+  // scissors where the requested plan cuts an edge
+  const sc = svg.append('g').attr('class', 'scis').selectAll('g').data(SIM.edges.filter(e => RES.req.cutE.has(e[0] + '>' + e[1]))).join('g').attr('opacity', 0)
+    .attr('transform', function (d) { const p = svg.selectAll('path.e').filter(x => x === d).node(); const m = p.getPointAtLength(p.getTotalLength() * 0.5); return `translate(${m.x},${m.y})`; });
+  sc.append('circle').attr('r', 9).attr('fill', '#0A0D11').attr('stroke', '#FF6A55').attr('stroke-width', 1.2);
+  sc.append('text').attr('text-anchor', 'middle').attr('y', 4.2).text('✕');
+}
+// render the graph at dt seconds after switching from plan a to plan b (a pure function of its inputs)
+function renderGraph(a, b, dt) {
+  if (!G) return;
+  const ip = d3.interpolateRgb;
+  svg.selectAll('g.n').each(function (n) {
+    const s0 = nodeState(n, a), s1 = nodeState(n, b), p = s0 === s1 ? 1 : sm(nDelay(n), nDelay(n) + DUR, dt);
+    const A0 = NST[s0], B1 = NST[s1], el = d3.select(this);
+    el.select('rect').attr('fill', ip(A0.f, B1.f)(p)).attr('stroke', ip(A0.s, B1.s)(p)).attr('stroke-opacity', A0.so + (B1.so - A0.so) * p)
+      .attr('stroke-width', s1 === 'broken' || s1 === 'cut' ? 1 + 0.4 * p : 1).attr('stroke-dasharray', (p < 0.5 ? A0.d : B1.d) ? '4 3' : null);
+    const t0 = tagOf(n, s0), t1 = tagOf(n, s1), show = p < 0.5 ? t0 : t1, op = t0 === t1 ? (t1 ? 1 : 0) : (p < 0.5 ? 1 - p * 2 : (p - 0.5) * 2);
+    const tg = el.select('g.tg');
+    if (show) {
+      const col = tagCol(p < 0.5 ? s0 : s1), w = show.length * 5.9 + 12;
+      tg.attr('transform', G.vertical ? `translate(${G.nw / 2 - w / 2},0)` : `translate(${G.nw - w - 6},0)`);
+      tg.select('rect').attr('width', w).attr('stroke', col); tg.select('text').attr('x', w / 2).attr('fill', col).text(show);
+    }
+    tg.attr('opacity', show ? op : 0);
+  });
+  svg.selectAll('path.e').each(function (e) {
+    const s0 = edgeState(e, a), s1 = edgeState(e, b), p = s0 === s1 ? 1 : sm(eDelay(e), eDelay(e) + DUR, dt);
+    const A0 = EST[s0], B1 = EST[s1];
+    d3.select(this).attr('stroke', ip(A0.c, B1.c)(p)).attr('stroke-width', A0.w + (B1.w - A0.w) * p).attr('opacity', A0.o + (B1.o - A0.o) * p).attr('stroke-dasharray', DASH[p < 0.5 ? A0.d : B1.d] || null);
+  });
+  // a pulse travels each edge as its state changes: red where the break spreads, teal where it heals
+  const paths = svg.selectAll('path.e').nodes();
+  svg.select('g.pulses').selectAll('circle').each(function (e, i) {
+    const s0 = edgeState(e, a), s1 = edgeState(e, b), el = d3.select(this);
+    const spreading = s1 === 'broken' || s1 === 'cut', healing = (s0 === 'broken' || s0 === 'cut') && s1 === 'ok';
+    if (s0 === s1 || !(spreading || healing) || reduce) { el.attr('opacity', 0); return; }
+    const k = clamp((dt - eDelay(e) + 0.12) / 0.44, 0, 1);
+    if (k <= 0 || k >= 1) { el.attr('opacity', 0); return; }
+    const pth = paths[i], pt = pth.getPointAtLength(pth.getTotalLength() * k);
+    el.attr('cx', pt.x).attr('cy', pt.y).attr('fill', spreading ? '#FF6A55' : '#4CC9A6').attr('opacity', Math.sin(k * Math.PI));
+  });
+  const sOn = b === 'req' ? sm(0.02, 0.2, dt) : a === 'req' ? 1 - sm(0.02, 0.2, dt) : 0;
+  svg.selectAll('g.scis g').attr('opacity', sOn);
+}
+// outcome strip and note, measured from the same analysis
+function renderOutcome(a, b, dt) {
+  const svc = [], bp = [];
+  const doneN = n => nodeState(n, a) === nodeState(n, b) || dt >= nDelay(n) + DUR * 0.5;
+  SIM.nodes.forEach(n => { const st = nodeState(n, doneN(n) ? b : a); if (st === 'broken' || st === 'cut') { if (n.l === 2) svc.push(n.label); if (n.l === 3) bp.push(n.label); } });
+  const att = nodeState(NODE.jalv, doneN(NODE.jalv) ? b : a);
+  const o = (id, html, cls) => { const e = $(id); setH(e, html); e.className = 'v ' + (cls || ''); };
+  if (b === 'none' && a === 'none') { o('o-att', 'Active<small>1 session from 203.0.113.77</small>', 'bad'); o('o-svc', 'Not simulated', ''); o('o-bp', 'Not simulated', ''); o('o-rec', '—', ''); setT($('note'), "The Responder's request is ready. Run the dry-run to see what it touches."); return; }
+  o('o-att', att === 'hostile' ? 'Active<small>1 session from 203.0.113.77</small>' : 'Removed<small>' + (b === 'alt' ? 'role disabled for all' : "j.alvarez's sessions denied") + '</small>', att === 'hostile' ? 'bad' : 'good');
+  o('o-svc', svc.length ? `${svc.length} broken<small>${esc(svc.slice(0, 2).join(', '))}${svc.length > 2 ? ' +' + (svc.length - 2) : ''}</small>` : '0 broken<small>all keep their role</small>', svc.length ? 'bad' : 'good');
+  const short = { 'Month-end close': 'month-end close', 'Customer invoicing': 'invoicing', 'Storage lifecycle': 'storage', 'Releases': 'releases' };
+  const bpTxt = bp.length ? bp.slice(0, 2).map(x => short[x] || x).join(', ') + (bp.length > 2 ? ' +' + (bp.length - 2) : '') : '';
+  o('o-bp', bp.length ? `${bp.length} blocked<small>${esc(bpTxt)}</small>` : 'None<small>month-end close on track</small>', bp.length ? 'bad' : 'good');
+  const done = dt >= CASCADE - 0.4, plan = done ? b : a;
+  if (plan === 'none') o('o-rec', '—', '');
+  else o('o-rec', plan === 'alt' ? 'About 40 min<small>manual: re-enable, restart</small>' : 'None needed<small>nothing to restore</small>', plan === 'alt' ? 'warn' : 'good');
+  setT($('note'), SIM[plan === 'none' ? 'req' : plan].note);
+}
+
+/* ------------------------------------------------------------------ layout + GSAP timeline (cursor, hold fill, popover, receipt) */
+let tl = null, built = false, CUR = {};
+const rel = el => { const r = el.getBoundingClientRect(), c = cmp.getBoundingClientRect(); return { x: r.left - c.left, y: r.top - c.top, w: r.width, h: r.height }; };
+const center = (el, fx = 0.5, fy = 0.55) => { const r = rel(el); return { x: r.x + r.w * fx, y: r.y + r.h * fy }; };
+function placePop(n) {
+  const b = rel(document.querySelector(`button.cite[data-n="${n}"]`)), pop = $('pop'), cw = cmp.clientWidth, pw = Math.min(330, cw - 24);
+  pop.style.left = clamp(b.x - 30, 12, cw - pw - 12) + 'px'; pop.style.top = (b.y + b.h + 8) + 'px';
+}
+function build() {
+  if (tl) { tl.kill(); tl = null; }
+  buildGraph();
+  const hold = $('hold'), ring = $('ring'), pop = $('pop'), cur = $('cursor');
+  $('pop').innerHTML = evidenceHTML(6); placePop(6);
+  const segAlt = center($('b-alt')), segReq = center($('b-req')), cite = center(document.querySelector('button.cite[data-n="6"]'), 0.5, 0.6), holdC = center(hold, 0.62, 0.6);
+  const gw = rel($('gwrap')), svcPt = { x: gw.x + gw.w * 0.6, y: gw.y + gw.h * 0.55 }, rest = { x: gw.x + gw.w * 0.72, y: gw.y + gw.h * 0.92 };
+  CUR = { segAlt, segReq, cite, holdC };
+  const init = () => {
+    gsap.set(ring, { '--conf': 0 }); gsap.set(hold, { '--hold': 0 });
+    gsap.set(cur, { x: rest.x, y: rest.y, opacity: 0, scale: 1 });
+    gsap.set(pop, { autoAlpha: 0, y: 4 });
+    gsap.set('#decide', { autoAlpha: 1 }); gsap.set('#done', { autoAlpha: 0 });
+    gsap.set('#stream div', { opacity: 0, x: -6 }); gsap.set('#rcpt', { opacity: 0, y: 10 }); gsap.set('#exec', { opacity: 0, y: -4 });
+    gsap.set(cmp.querySelector('.stage'), { opacity: 1 });
+  };
+  init();
+  tl = gsap.timeline({ paused: true, defaults: { ease: 'power2.out' } });
+  tl.fromTo(ring, { '--conf': 0 }, { '--conf': A.conf, duration: 1.0, ease: 'power3.out', immediateRender: false }, T.ring);
+  const press = (t0, p, dur = 0.7) => {
+    tl.to(cur, { x: p.x, y: p.y, duration: dur, ease: 'power3.inOut' }, t0 - dur - 0.05)
+      .to(cur, { scale: 0.82, duration: 0.07 }, t0 - 0.05).to(cur, { scale: 1, duration: 0.18, ease: 'back.out(3)' }, t0 + 0.05);
+  };
+  tl.to(cur, { opacity: 1, duration: 0.3 }, T.alt - 1.3);
+  press(T.alt, segAlt, 0.8);
+  tl.to(cur, { x: svcPt.x, y: svcPt.y, duration: 1.1, ease: 'power2.inOut' }, T.alt + 0.35);
+  press(T.req2, segReq, 0.9);
+  press(T.cite, cite, 0.9);
+  tl.to(pop, { autoAlpha: 1, y: 0, duration: 0.25 }, T.cite + 0.08).to(pop, { autoAlpha: 0, y: 4, duration: 0.2 }, T.citeOff);
+  // press and hold: the cursor stays down while the typed --hold property fills the button
+  tl.to(cur, { x: holdC.x, y: holdC.y, duration: 0.85, ease: 'power3.inOut' }, T.hold0 - 0.95)
+    .to(cur, { scale: 0.82, duration: 0.08 }, T.hold0 - 0.06)
+    .to(hold, { '--hold': 1, duration: (HOLD_MS / 1000), ease: 'none' }, T.hold0)
+    .to(cur, { scale: 1, duration: 0.18, ease: 'back.out(3)' }, T.hold1)
+    .to(cur, { opacity: 0, duration: 0.35 }, T.hold1 + 0.6);
+  // execution stream, then the signed receipt
+  tl.to('#decide', { autoAlpha: 0, duration: 0.25 }, T.stream - 0.1).to('#done', { autoAlpha: 1, duration: 0.2 }, T.stream - 0.05);
+  tl.to('#stream div', { opacity: 1, x: 0, duration: 0.25, stagger: 0.36 }, T.stream);
+  tl.to('#rcpt', { opacity: 1, y: 0, duration: 0.45, ease: 'power3.out' }, T.rcpt);
+  tl.to('#exec', { opacity: 1, y: 0, duration: 0.35 }, T.stream + 1.2);
+  tl.to(cmp.querySelector('.stage'), { opacity: 0, duration: 0.5, ease: 'power1.in' }, T.fade);
+  tl.set(ring, { '--conf': 0 }, T.reset).set(hold, { '--hold': 0 }, T.reset).set(cur, { x: rest.x, y: rest.y, opacity: 0, scale: 1 }, T.reset)
+    .set('#decide', { autoAlpha: 1 }, T.reset).set('#done', { autoAlpha: 0 }, T.reset).set('#stream div', { opacity: 0, x: -6 }, T.reset)
+    .set('#rcpt', { opacity: 0, y: 10 }, T.reset).set('#exec', { opacity: 0, y: -4 }, T.reset);
+  tl.to(cmp.querySelector('.stage'), { opacity: 1, duration: 0.55 }, T.reset + 0.05);
+  tl.to({}, { duration: 0.001 }, P - 0.001);
+  tl.time(P - 0.002, true); tl.time(0, true);
+  built = true;
+}
+
+/* ------------------------------------------------------------------ discrete state, a pure function of t */
+const CAPS = [
+  [0.3, 3.55, 'The Responder agent proposes a containment. Before anyone approves, the system simulates it.'],
+  [3.6, 7.45, "Requested: revoke j.alvarez's sessions. The attacker loses access; nothing else breaks."],
+  [7.5, 11.5, 'The blunt alternative, disabling ops-admin, breaks 5 services and blocks month-end close.'],
+  [11.55, 15.45, 'Both cut the attacker off. Only one also halts finance for about 40 minutes.'],
+  [15.5, 18.4, 'Every claim is cited: the 2.3 GB read opens its CloudTrail record and hash.'],
+  [18.45, 21.2, "Approving is a deliberate press and hold, so a stray click can't contain anything."],
+  [21.25, 27.3, 'Done in seconds: a signed receipt, RCPT-9922, hash-chained to the audit ledger.'],
+];
+const CLOCK0 = 2 * 3600 + 48 * 60 + 52, ESC_AT = 2 * 3600 + 53 * 60;      // 02:48:52 at t=0; escalates to SOC lead at 02:53 (requested 02:41 + 12 m)
+const hms = s => { s = Math.floor(s); return `${String(Math.floor(s / 3600)).padStart(2, '0')}:${String(Math.floor(s / 60) % 60).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; };
+function planAt(t) {
+  let i = 0; for (let k = 0; k < PLAN_KEYS.length; k++) if (t >= PLAN_KEYS[k][0]) i = k;
+  return { a: i ? PLAN_KEYS[i - 1][1] : 'none', b: PLAN_KEYS[i][1], dt: t - PLAN_KEYS[i][0] };
+}
+let mode = 'attract', playing = false, curT = 0, lastCap = -2;
+const LV = { a: 'req', b: 'req', t0: -10, approved: false, pop: null, streamAt: 0, clock: CLOCK0 + LIVE_T };
+function syncDiscrete(t) {
+  const live = mode === 'live';
+  const st = live ? { a: LV.a, b: LV.b, dt: (performance.now() - LV.t0) / 1000 } : planAt(t);
+  renderGraph(st.a, st.b, st.dt); renderOutcome(st.a, st.b, st.dt);
+  const plan = st.b;
+  $('b-req').setAttribute('aria-pressed', String(plan === 'req')); $('b-alt').setAttribute('aria-pressed', String(plan === 'alt'));
+  tog($('b-alt'), 'press', !live && t >= T.alt - 0.06 && t < T.alt + 0.14);
+  tog($('b-req'), 'press', !live && t >= T.req2 - 0.06 && t < T.req2 + 0.14);
+  const cite = document.querySelector('button.cite[data-n="6"]');
+  tog(cite, 'press', !live && t >= T.cite - 0.06 && t < T.citeOff);
+  setT($('dry-t'), plan === 'none' ? 'dry-run ready' : 'dry-run · 02:48:54');
+  const ran = live || (t >= T.sim1 + 1.2 && t < T.reset);
+  tog($('c-dry'), 'ok', ran);
+  setH($('c-dry'), ran ? '<span class="ag">RS</span><span class="dx">Dry-run:</span> <b>attacker removed</b> · <b>0 services broken</b>' : '<span class="ag">RS</span>Dry-run not run yet');
+  tog($('altnote'), 'on', plan === 'alt' && !(live ? LV.approved : t >= T.hold1 && t < T.reset));
+  // clock, escalation countdown, approval state
+  const clock = live ? LV.clock : CLOCK0 + t;
+  setT($('clock'), hms(clock) + ' UTC');
+  const approved = live ? LV.approved : t >= T.hold1 && t < T.reset;
+  const cs = $('c-st');
+  tog(cs, 'ok', approved); tog($('sim'), 'exe', approved);
+  if (approved) setH($('c-st-t'), 'Approved by Ravi Patel · <b>02:49:12</b>');
+  else { const left = Math.max(0, ESC_AT - clock); setH($('c-st-t'), `Awaiting you · escalates to SOC lead in <b>${Math.floor(left / 60)}m ${String(Math.floor(left % 60)).padStart(2, '0')}s</b>`); }
+  if (!live) {
+    const holding = t >= T.hold0 && t < T.hold1;
+    setT($('hold-l'), approved ? 'Approved' : holding ? 'Keep holding' : 'Hold to approve APR-311');
+    setT($('hold-s'), approved ? '✓' : holding ? (Math.max(0, T.hold1 - t)).toFixed(1) + ' s' : (HOLD_MS / 1000).toFixed(1) + ' s');
+    tog($('hold'), 'done', approved);
+    tog($('hold'), 'press', holding);
+  }
+  // captions
+  let ci = -1, al = 0;
+  if (!live) CAPS.forEach(([a0, a1], i) => { if (t >= a0 && t < a1) { ci = i; al = Math.min(sm(a0, a0 + 0.3, t), 1 - sm(a1 - 0.3, a1, t)); } });
+  else { ci = 99; al = 1; }
+  if (ci !== lastCap) { setT($('cap-t'), ci === 99 ? (LV.approved ? 'Approved and verified. Replay restarts the story; it also resumes after 15 s idle.' : 'Compare the two plans, open a citation, then press and hold to approve.') : ci >= 0 ? CAPS[ci][2] : ''); lastCap = ci; }
+  if (ci === 99 && LV.approved && !$('cap-t').textContent.startsWith('Approved')) setT($('cap-t'), 'Approved and verified. Replay restarts the story; it also resumes after 15 s idle.');
+  tog($('cap'), 'hint', ci === 99);
+  $('cap').style.opacity = ci >= 0 ? al.toFixed(3) : '0';
+}
+
+/* ------------------------------------------------------------------ playback */
+function frame(t) { t = ((+t % P) + P) % P; curT = t; tl.pause().seek(t, false); syncDiscrete(t); }
+let raf = 0, base = 0, t0 = 0, posterMode = Q.has('t') || reduce;
+function loop(now) { frame(base + (now - t0) / 1000); raf = requestAnimationFrame(loop); }
+function setStatus() {
+  const s = $('stt'), live = playing || posterMode;
+  s.className = 'stt' + (mode === 'live' ? ' inter' : live ? '' : ' paused');
+  setT($('stt-t'), mode === 'live' ? 'Interactive' : live ? 'Live' : 'Paused');
+  $('b-play').textContent = playing ? 'Pause' : 'Play'; $('b-play').setAttribute('aria-pressed', String(!playing));
+  document.querySelectorAll('.dot.live').forEach(d => d.style.animationPlayState = playing ? 'running' : 'paused');
+}
+function play() {
+  if (!built) return;
+  posterMode = false;
+  if (mode === 'live') leaveLive();
+  if (playing) return;
+  playing = true; base = curT; t0 = performance.now(); cancelAnimationFrame(raf); raf = requestAnimationFrame(loop); setStatus();
+}
+const sleepTicker = () => { try { gsap.ticker.sleep(); } catch (e) { } };     // GPU/CPU off while paused: GSAP's ticker would otherwise idle for ~120 frames
+function pause() { posterMode = false; playing = false; cancelAnimationFrame(raf); raf = 0; cancelAnimationFrame(liveRaf); liveRaf = 0; sleepTicker(); setStatus(); }
+window.__seek = t => { if (!built) { window.__pendingSeek = t; return; } leaveLive(); playing = false; cancelAnimationFrame(raf); cmp.classList.add('nt'); frame(+t || 0); void cmp.offsetWidth; cmp.classList.remove('nt'); sleepTicker(); setStatus(); };
+window.__play = () => play();
+window.__state = () => ({ t: +curT.toFixed(3), mode, playing, plan: mode === 'live' ? LV.b : planAt(curT).b, approved: mode === 'live' ? LV.approved : curT >= T.hold1 && curT < T.reset, hold: +parseFloat(getComputedStyle($('hold')).getPropertyValue('--hold') || 0).toFixed(2), pop: mode === 'live' ? LV.pop : (curT > T.cite && curT < T.citeOff ? 6 : null), sound: AU.on, svc: $('o-svc').textContent, pressing: !!holdTimer });
+
+/* ------------------------------------------------------------------ interactive mode (real input) */
+let idle = null, liveRaf = 0;
+function liveTick() { syncDiscrete(curT); if ((performance.now() - LV.t0) / 1000 < CASCADE + 0.1) liveRaf = requestAnimationFrame(liveTick); else liveRaf = 0; }
+function kickLive() { if (!liveRaf) liveRaf = requestAnimationFrame(liveTick); }
+function enterLive() {
+  if (!built) return;
+  if (mode !== 'live') {
+    posterMode = false; playing = false; cancelAnimationFrame(raf); raf = 0;
+    frame(LIVE_T);                                   // requested plan simulated, nothing approved yet
+    mode = 'live';
+    Object.assign(LV, { a: 'req', b: 'req', t0: -10, approved: false, pop: null, clock: CLOCK0 + LIVE_T });
+    gsap.set('#cursor', { opacity: 0 }); gsap.set('#pop', { autoAlpha: 0 });
+    resetHoldUI();
+    syncDiscrete(curT); setStatus();
+  }
+  bumpIdle();
+}
+function leaveLive() {
+  if (mode !== 'live') return;
+  mode = 'attract'; clearTimeout(idle); cancelAnimationFrame(liveRaf); liveRaf = 0; holdCancel(true);
+  gsap.killTweensOf(['#decide', '#done', '#stream div', '#rcpt', '#exec', '#pop', '#hold']);
+  $('hold').style.transition = ''; $('vfy').textContent = '';
+  document.querySelectorAll('button.cite').forEach(b => b.setAttribute('aria-expanded', 'false'));
+}
+function bumpIdle() {
+  clearTimeout(idle);
+  idle = setTimeout(() => {
+    if (holdTimer) { bumpIdle(); return; }
+    gsap.to(cmp, { opacity: 0, duration: 0.45, ease: 'power1.in', onComplete: () => { leaveLive(); frame(0); gsap.to(cmp, { opacity: 1, duration: 0.6 }); play(); } });
+  }, 15000);
+}
+function setPlan(p) {
+  enterLive();
+  if (LV.b === p) return;
+  const dt = (performance.now() - LV.t0) / 1000;
+  LV.a = dt < CASCADE ? LV.a : LV.b; LV.b = p; LV.t0 = reduce ? -10 : performance.now();
+  kickLive(); syncDiscrete(curT);
+}
+function setPop(n) {
+  enterLive();
+  LV.pop = LV.pop === n ? null : n;
+  document.querySelectorAll('button.cite').forEach(b => b.setAttribute('aria-expanded', String(+b.dataset.n === LV.pop)));
+  if (LV.pop) { $('pop').innerHTML = evidenceHTML(n); placePop(n); gsap.to('#pop', { autoAlpha: 1, y: 0, duration: 0.2 }); }
+  else gsap.to('#pop', { autoAlpha: 0, y: 4, duration: 0.15 });
+}
+// press and hold: the typed --hold property transitions to 1 over 1.2 s; letting go early rewinds it
+let holdTimer = null, holdIv = null, holdT0 = 0, holdRaf = 0;
+function resetHoldUI() {
+  const h = $('hold'); h.style.transition = 'none'; h.style.setProperty('--hold', '0'); void h.offsetWidth; h.style.transition = '';
+  tog(h, 'done', false); tog(h, 'press', false); setT($('hold-l'), 'Hold to approve APR-311'); setT($('hold-s'), (HOLD_MS / 1000).toFixed(1) + ' s');
+  gsap.set('#decide', { autoAlpha: 1 }); gsap.set('#done', { autoAlpha: 0 }); gsap.set('#stream div', { opacity: 0, x: -6 }); gsap.set('#rcpt', { opacity: 0, y: 10 }); gsap.set('#exec', { opacity: 0, y: -4 });
+}
+function holdStart(e) {
+  if (e.type === 'keydown') { if (e.key !== ' ' && e.key !== 'Enter') return; e.preventDefault(); if (e.repeat) return; }
+  if (e.type === 'pointerdown' && e.button > 0) return;
+  enterLive();
+  if (LV.approved || holdTimer) return;
+  const h = $('hold');
+  holdT0 = performance.now();
+  h.style.transition = `--hold ${reduce ? 0 : HOLD_MS}ms linear`; h.style.setProperty('--hold', '1');
+  tog(h, 'press', true); setT($('hold-l'), 'Keep holding');
+  const upd = () => { const left = Math.max(0, HOLD_MS - (performance.now() - holdT0)); setT($('hold-s'), (left / 1000).toFixed(1) + ' s'); if (holdTimer) holdRaf = requestAnimationFrame(upd); };
+  holdRaf = requestAnimationFrame(upd);
+  holdIv = setInterval(() => AU.cue('tick', clamp((performance.now() - holdT0) / HOLD_MS, 0, 1)), 150);
+  holdTimer = setTimeout(holdDone, HOLD_MS);
+  if (e.pointerId != null && h.setPointerCapture) { try { h.setPointerCapture(e.pointerId); } catch (x) { } }
+}
+function holdCancel(silent) {
+  if (!holdTimer) return;
+  clearTimeout(holdTimer); clearInterval(holdIv); cancelAnimationFrame(holdRaf); holdTimer = null;
+  const h = $('hold'); h.style.transition = '--hold 220ms ease-out'; h.style.setProperty('--hold', '0');
+  tog(h, 'press', false); setT($('hold-l'), 'Hold to approve APR-311'); setT($('hold-s'), (HOLD_MS / 1000).toFixed(1) + ' s');
+  if (!silent) { AU.cue('cancel'); bumpIdle(); }
+}
+function holdDone() {
+  clearInterval(holdIv); cancelAnimationFrame(holdRaf); holdTimer = null;
+  const h = $('hold'); tog(h, 'press', false); tog(h, 'done', true); setT($('hold-l'), 'Approved'); setT($('hold-s'), '✓');
+  AU.cue('confirm'); if (navigator.vibrate) { try { navigator.vibrate([18, 40, 18]); } catch (x) { } }
+  LV.approved = true; LV.clock = 2 * 3600 + 49 * 60 + 12;
+  if (LV.b !== 'req') setPlan('req');
+  syncDiscrete(curT);
+  const q = reduce ? 0 : 1;
+  gsap.to('#decide', { autoAlpha: 0, duration: 0.25 * q, delay: 0.25 * q });
+  gsap.to('#done', { autoAlpha: 1, duration: 0.2 * q, delay: 0.3 * q });
+  gsap.to('#stream div', { opacity: 1, x: 0, duration: 0.25 * q, stagger: 0.36 * q, delay: 0.4 * q });
+  gsap.to('#rcpt', { opacity: 1, y: 0, duration: 0.45 * q, delay: 1.9 * q, ease: 'power3.out' });
+  gsap.to('#exec', { opacity: 1, y: 0, duration: 0.35 * q, delay: 1.6 * q });
+  bumpIdle();
+}
+const hb = $('hold');
+hb.addEventListener('pointerdown', holdStart);
+hb.addEventListener('keydown', holdStart);
+['pointerup', 'pointercancel', 'lostpointercapture', 'blur'].forEach(ev => hb.addEventListener(ev, () => holdCancel()));
+hb.addEventListener('keyup', e => { if (e.key === ' ' || e.key === 'Enter') holdCancel(); });
+hb.addEventListener('click', e => e.preventDefault());
+hb.addEventListener('contextmenu', e => e.preventDefault());
+$('b-req').addEventListener('click', () => setPlan('req'));
+$('b-alt').addEventListener('click', () => setPlan('alt'));
+document.querySelectorAll('button.cite').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); setPop(+b.dataset.n); }));
+$('verify').addEventListener('click', async () => {
+  enterLive();
+  const out = $('vfy'); out.textContent = 'Re-hashing in this browser…';
+  const str = canon(R9922); let h = sha256s(str), how = 'bundled SHA-256';
+  if (window.crypto && crypto.subtle && window.isSecureContext) { try { h = toHex(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str)))); how = 'Web Crypto SHA-256'; } catch (x) { } }
+  const prevOk = sha256s(canon(PREV)) === PREV.hash;
+  out.textContent = h === R9922.hash && prevOk ? `✓ Hash and link to ${PREV.id} verified (${how})` : '✗ Hash mismatch';
+});
+$('b-snd').addEventListener('click', () => {
+  AU.on = !AU.on; if (AU.on) { AU.ensure(); AU.cue('on'); }
+  $('b-snd').setAttribute('aria-pressed', String(AU.on)); setT($('snd-t'), AU.on ? 'Sound on' : 'Sound off');
+  $('snd-w').setAttribute('opacity', AU.on ? '1' : '.35');
+});
+$('b-play').addEventListener('click', () => { playing ? pause() : play(); });
+$('b-replay').addEventListener('click', () => { leaveLive(); playing = false; frame(0); play(); });
+cmp.addEventListener('pointerdown', e => {
+  if (e.target.closest('.ctl')) return;
+  if (mode === 'live' && LV.pop && !e.target.closest('#pop') && !e.target.closest('button.cite')) setPop(LV.pop);
+  enterLive();
+}, true);
+cmp.addEventListener('wheel', () => enterLive(), { passive: true });
+$('b-snd').addEventListener('pointerdown', () => enterLive());
+addEventListener('keydown', e => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const k = e.key, onBtn = document.activeElement && document.activeElement.tagName === 'BUTTON';
+  if (k === ' ' && !onBtn) { e.preventDefault(); playing ? pause() : play(); return; }
+  if (['1', '2', 'ArrowLeft', 'ArrowRight', 'Escape', 'Tab', 'Enter'].includes(k)) {
+    enterLive();
+    if (k === '1' || k === 'ArrowLeft') setPlan('req');
+    else if (k === '2' || k === 'ArrowRight') setPlan('alt');
+    else if (k === 'Escape' && LV.pop) setPop(LV.pop);
+  }
+});
+
+/* ------------------------------------------------------------------ embedding protocol */
+let extPaused = false, visPaused = false;
+addEventListener('message', e => {
+  const d = e.data; if (!d || typeof d !== 'object' || !d.corvid) return;
+  if (d.corvid === 'pause') { extPaused = true; if (mode === 'live') clearTimeout(idle); pause(); }
+  else if (d.corvid === 'play') { extPaused = false; if (mode === 'live') bumpIdle(); else play(); }
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { visPaused = playing; clearTimeout(idle); pause(); }
+  else if (visPaused && !extPaused) { visPaused = false; play(); }
+  else if (mode === 'live') bumpIdle();
+});
+
+/* ------------------------------------------------------------------ resize */
+let rz = null, lastW = 0, lastH = 0;
+new ResizeObserver(() => {
+  const w = innerWidth, h = innerHeight; if (w === lastW && h === lastH) return; lastW = w; lastH = h;
+  clearTimeout(rz);
+  rz = setTimeout(() => {
+    if (!built) return;
+    const wasLive = mode === 'live', snap = { ...LV };
+    build();
+    if (wasLive) {
+      mode = 'attract'; frame(LIVE_T); mode = 'live'; Object.assign(LV, snap);
+      gsap.set('#cursor', { opacity: 0 });
+      if (LV.approved) { gsap.set('#decide', { autoAlpha: 0 }); gsap.set('#done', { autoAlpha: 1 }); gsap.set('#stream div', { opacity: 1, x: 0 }); gsap.set('#rcpt', { opacity: 1, y: 0 }); gsap.set('#exec', { opacity: 1, y: 0 }); gsap.set('#hold', { '--hold': 1 }); }
+      if (LV.pop) { placePop(LV.pop); gsap.set('#pop', { autoAlpha: 1, y: 0 }); } else gsap.set('#pop', { autoAlpha: 0 });
+      syncDiscrete(curT);
+    } else frame(curT);
+    if (playing) { base = curT; t0 = performance.now(); }
+  }, 140);
+}).observe(document.documentElement);
+
+/* ------------------------------------------------------------------ boot */
+(async function boot() {
+  if (!(window.gsap && window.d3 && D)) {
+    setT($('cap-t'), 'A library could not load, so the simulation cannot run here. The outcome table is exact.'); $('cap').style.opacity = 1;
+    window.__seek = () => {}; window.__play = () => {}; window.__ready = true; return;
+  }
+  try {
+    const f = Promise.all(['400 13px "Geist"', '500 13px "Geist"', '600 16px "Geist"', '400 11px "Geist Mono"', '500 12px "Geist Mono"', '600 13px "Geist Mono"'].map(s => document.fonts.load(s))).then(() => document.fonts.ready);
+    await Promise.race([f, new Promise(r => setTimeout(r, 3000))]);
+  } catch (e) { }
+  lastW = innerWidth; lastH = innerHeight;
+  build();
+  window.__ready = true;
+  if (window.__pendingSeek != null) window.__seek(window.__pendingSeek);
+  else if (Q.has('t')) window.__seek(parseFloat(Q.get('t')) || 0);
+  else if (reduce) window.__seek(HERO);
+  else { frame(0); play(); }
+})();
+})();
+</script>
+</body>
+</html>

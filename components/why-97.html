@@ -1,0 +1,781 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Why 97%?</title>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="../shared/ui.css">
+<!--
+  Keynote component: "Why 97%?", the explainable AI verdict for CASE-4127.
+  One model drives every pixel: the base-rate prior and evidence weights in bits come from
+  CORVID.verdictModel (data.js), the isotonic calibration map turns the raw score into a probability,
+  and the reliability bands (90 days of analyst-reviewed verdicts) check whether that probability is honest.
+  Attract loop (32 s, a pure function of t): evidence lights up one by one, the log-odds waterfall builds,
+  the gauge settles at 97%, the pending interview is answered and the verdict flips to Suspicious 62%, reset.
+  Hooks: window.__seek(t), window.__play(), ?t=12.5, ?captions=0, postMessage {corvid:'pause'|'play'}.
+-->
+<style>
+html{font-size:clamp(12.5px,min(1.25vw,2vh),24px)}
+html,body{height:100%;overflow:hidden;background:var(--ground)}
+body{font:400 .8125rem/1.45 var(--sans);color:var(--text)}
+#app{position:fixed;inset:0;display:flex;flex-direction:column}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* ---------- component header */
+.hd{flex:none;display:flex;align-items:center;gap:.75rem;height:3.25rem;padding:0 1.125rem;border-bottom:1px solid #1C222B;background:linear-gradient(180deg,#0E1218,#0B0E13)}
+.hx{display:inline-flex;align-items:center;justify-content:center;flex:none;width:1.6rem;height:1.6rem;color:#0A0D11;background:var(--agent);clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);font:700 .56rem/1 var(--mono)}
+.hd h1{font-size:.98rem;font-weight:600;letter-spacing:-.015em;white-space:nowrap}
+.hd .sub{color:var(--text3);font-size:.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.cchip{display:inline-flex;align-items:center;height:1.45rem;padding:0 .6rem;border-radius:999px;border:1px solid var(--line2);font:500 .7rem/1 var(--mono);color:var(--text2);white-space:nowrap;flex:none}
+.hd .sp{flex:1}
+.status{display:inline-flex;align-items:center;gap:.45rem;font-size:.74rem;color:var(--text2);white-space:nowrap}
+.status .dot{width:.45rem;height:.45rem;color:var(--agent)}
+.live{will-change:opacity}
+
+/* ---------- stage */
+#stage{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 27.5rem;gap:.875rem;padding:.875rem 1rem .75rem;transition:opacity .45s ease}
+#stage.dim{opacity:.0}
+.card{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:.75rem;min-width:0;min-height:0;contain:layout paint}
+.card-h{display:flex;align-items:baseline;gap:.6rem;padding:.75rem 1rem .1rem;min-width:0}
+.card-h h2{font-size:.86rem;font-weight:600;letter-spacing:-.01em;white-space:nowrap}
+.card-h .k{font-size:.72rem;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.card-h .sp{flex:1}
+.lg{display:inline-flex;align-items:center;gap:.4rem;font-size:.7rem;color:var(--text3);white-space:nowrap}
+.lg i{display:inline-block;width:.85rem;height:.45rem;border-radius:2px}
+
+/* ---------- evidence + waterfall */
+#ev{display:flex;flex-direction:column}
+.wf{flex:1;min-height:0;display:grid;padding:.2rem 1rem .85rem;column-gap:.625rem;
+  grid-template-columns:2rem 11.4rem 4.7rem minmax(0,1fr) 3.4rem;
+  grid-template-rows:1.3rem repeat(9,1.72rem) .55rem 2.45rem 1.85rem 1.35rem minmax(0,1fr)}
+.wf>*{min-width:0}
+.ov{grid-column:4;grid-row:1/15;position:relative;pointer-events:none;z-index:0}
+.band{position:absolute;top:1.3rem;bottom:1.35rem}
+.band.b-ben{background:rgba(76,201,166,.055)}
+.band.b-sus{background:rgba(242,181,58,.045)}
+.band.b-mal{background:rgba(255,106,85,.07)}
+.blab{position:absolute;top:.28rem;transform:translateX(-50%);font:500 .62rem/1 var(--mono);letter-spacing:.04em;text-transform:uppercase;white-space:nowrap}
+.zero{position:absolute;top:1.3rem;bottom:1.35rem;width:1px;background:#3A4350}
+.scl{position:absolute;top:1.3rem;bottom:0;width:2px;margin-left:-1px;will-change:transform;background:linear-gradient(180deg,rgba(232,235,239,.35),rgba(232,235,239,.85));box-shadow:0 0 10px rgba(232,235,239,.35);z-index:2}
+.cell{position:relative;display:flex;align-items:center;z-index:1}
+.c-sw{justify-content:flex-start}
+.c-lab{font-size:.78rem;color:var(--text);cursor:pointer;user-select:none;white-space:nowrap;overflow:hidden}
+.c-lab .tx{overflow:hidden;text-overflow:ellipsis}
+.ts{display:none}
+.c-lab .two{display:flex;flex-direction:column;line-height:1.25;min-width:0}
+.c-lab .two small{font-size:.66rem;color:var(--text3);overflow:hidden;text-overflow:ellipsis}
+.c-src{gap:.3rem}
+.src{display:inline-flex;align-items:center;height:1.1rem;padding:0 .35rem;border-radius:.25rem;border:1px solid var(--line2);font:500 .6rem/1 var(--mono);color:var(--text3);white-space:nowrap}
+.src.xp{display:none;color:var(--cold3);border-color:rgba(127,214,238,.45);background:rgba(47,147,181,.12)}
+.c-trk{position:relative}
+.wb{position:absolute;top:50%;height:.72rem;margin-top:-.36rem;border-radius:3px;min-width:0}
+.cn{position:absolute;top:calc(50% + .36rem);height:1rem;width:0;border-left:1px dashed #56606E}
+.c-bits{justify-content:flex-end;font:500 .74rem/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--text2)}
+.row-bg{grid-column:1/-1;border-radius:.4rem;z-index:0;pointer-events:none;will-change:opacity;margin:0 -.5rem;background:linear-gradient(90deg,rgba(232,235,239,.075),rgba(232,235,239,.02) 70%,transparent);opacity:0}
+.c-lab.off .tx,.c-bits.off{color:#5E6875}
+.c-src.off .src{color:#4E5764;border-color:#232A33}
+.c-lab.sup .tx{color:#5E6875;text-decoration:line-through;text-decoration-color:rgba(127,214,238,.7)}
+.c-src.sup .src.base{display:none}.c-src.sup .src.xp{display:inline-flex}
+.c-bits.sup{color:#5E6875;text-decoration:line-through}
+/* prior */
+.pdot{width:.55rem;height:.55rem;border-radius:50%;background:var(--cold2);margin-left:.55rem;box-shadow:0 0 0 3px rgba(47,147,181,.18)}
+/* interview row */
+.ivbox{position:relative;grid-column:1/-1;grid-row:12;border:1px dashed rgba(127,214,238,.35);border-radius:.5rem;margin:0 -.5rem;z-index:0;pointer-events:none}
+.ivbox.on{background:rgba(47,147,181,.09);border-color:rgba(127,214,238,.7);border-style:solid}
+.ivtag{position:absolute;left:.55rem;top:-.52rem;padding:0 .4rem;background:var(--panel);font:600 .58rem/1rem var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--cold3)}
+.c-lab.r-iv .tx{color:var(--cold3)}
+.c-lab.r-iv.off .tx{color:#A9C6CF}
+.c-bits.r-iv{color:var(--cold3)}
+.c-bits.r-iv.off{color:#4C7584}
+/* total */
+.c-lab.r-tot{font-weight:600;color:var(--text);cursor:default}
+.c-bits.r-tot{font-weight:600;color:var(--text);font-size:.8rem}
+.wb.tot{height:.95rem;margin-top:-.475rem;background:transparent!important;border:1.5px solid #E8EBEF;border-radius:4px}
+.axis{grid-column:4;grid-row:14;position:relative;border-top:1px solid #2C3540}
+.axis span{position:absolute;top:.28rem;transform:translateX(-50%);font:500 .62rem/1 var(--mono);color:var(--text3);white-space:nowrap}
+.axu{grid-column:5;grid-row:14;font:500 .62rem/1 var(--mono);color:var(--text3);padding-top:.28rem;text-align:right}
+/* switch */
+.sw{position:relative;display:inline-flex;align-items:center;cursor:pointer;flex:none}
+.sw input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer;width:100%;height:100%}
+/* the knob follows the model's eased presence (--p), so a seeked frame is exact */
+.sw{--p:0;--on:#E8EBEF;--onbg:rgba(232,235,239,.16);--onbd:rgba(232,235,239,.55)}
+.sw.cold{--on:#7FD6EE;--onbg:rgba(47,147,181,.34);--onbd:#2F93B5}
+.sw .tr{width:1.9rem;height:1.1rem;border-radius:999px;position:relative;
+  background:color-mix(in srgb,var(--onbg) calc(var(--p)*100%),#232A34);border:1px solid color-mix(in srgb,var(--onbd) calc(var(--p)*100%),#3A4350)}
+.sw .tr::after{content:"";position:absolute;left:.12rem;top:.12rem;width:.74rem;height:.74rem;border-radius:50%;
+  transform:translateX(calc(var(--p)*.8rem));background:color-mix(in srgb,var(--on) calc(var(--p)*100%),#7C8693)}
+.sw input:focus-visible+.tr{outline:2px solid var(--link);outline-offset:2px}
+/* calibration (isotonic) */
+.iso-info{grid-column:1/4;grid-row:15;display:flex;flex-direction:column;justify-content:center;gap:.35rem;padding:.6rem .4rem .2rem 0;min-height:0}
+.eb{font:600 .6rem/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--text3)}
+.iso-info h3{font-size:.86rem;font-weight:600;letter-spacing:-.01em}
+.iso-info p{font-size:.72rem;color:var(--text3);line-height:1.45;max-width:17rem}
+.ro{display:grid;grid-template-columns:1.1rem auto 1fr;align-items:center;column-gap:.5rem;row-gap:.25rem;margin-top:.35rem;font-size:.74rem;color:var(--text2)}
+.ro i{display:block;height:2px;width:1.1rem}
+.ro i.dash{background:repeating-linear-gradient(90deg,#808A97 0 .25rem,transparent .25rem .45rem)}
+.ro i.sol{background:var(--link);height:2px}
+.ro b{font:600 .9rem/1.2 var(--mono);font-variant-numeric:tabular-nums;justify-self:end}
+.ro b.nv{color:var(--text3);font-weight:500}
+#isowrap{grid-column:4/6;grid-row:15;position:relative;min-height:0}
+#isowrap svg{position:absolute;left:0;top:0;display:block;overflow:visible}
+#isowrap text{font:500 .62rem var(--mono);fill:var(--text3)}
+/* static chart ink and moving markers live on separate layers, so a moving marker never re-rasters the curves */
+.lay{will-change:transform}
+
+/* ---------- right column */
+#right{display:flex;flex-direction:column;gap:.875rem;min-height:0;min-width:0}
+#vcard{flex:none;padding-bottom:.85rem;overflow:hidden}
+#vcard::before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(90% 70% at 50% 18%,var(--vglow,rgba(255,106,85,.16)),transparent 70%)}
+.vc-h{position:relative;display:flex;align-items:center;gap:.5rem;padding:.75rem 1rem 0;font-size:.76rem;color:var(--text2)}
+.vc-h .hx{width:1.15rem;height:1.15rem;font-size:.46rem}
+.vc-h .sp{flex:1}
+.vc-h .mono{color:var(--text3);font-size:.68rem}
+.gwrap{position:relative;display:flex;flex-direction:column;align-items:center;margin-top:.1rem}
+#gauge{display:block;width:16.5rem;height:auto;overflow:visible}
+.gside{display:flex;flex-direction:column;align-items:center}
+.vchip{display:inline-flex;align-items:center;gap:.4rem;height:1.75rem;padding:0 .85rem;margin-top:-.15rem;border-radius:999px;border:1px solid;font-size:.88rem;font-weight:600;letter-spacing:-.01em}
+.vchip.mal{color:var(--mal);border-color:rgba(255,122,102,.5);background:rgba(255,122,102,.12)}
+.vchip.sus{color:var(--sus);border-color:rgba(242,181,58,.5);background:rgba(242,181,58,.12)}
+.vchip.ben{color:var(--ben);border-color:rgba(76,201,166,.5);background:rgba(76,201,166,.12)}
+.vsub{position:relative;text-align:center;margin-top:.45rem;font:500 .72rem/1.3 var(--mono);color:var(--text3)}
+.vsub b{color:var(--text2);font-weight:600}
+.vsen{position:relative;margin:.7rem 1rem 0;padding-top:.65rem;border-top:1px solid var(--line);font-size:.8rem;color:var(--text2);line-height:1.45;min-height:3.1rem}
+.vsen b{color:var(--text);font-weight:600}
+.vsen.emph{color:var(--text)}
+.vcf{position:relative;display:flex;align-items:center;gap:.55rem;margin:.6rem 1rem 0;padding:.45rem .65rem;border-radius:.5rem;border:1px dashed rgba(127,214,238,.4);font-size:.74rem;color:var(--text2);line-height:1.35}
+.vcf .ic{flex:none;width:.5rem;height:.5rem;border-radius:50%;background:var(--cold3);box-shadow:0 0 0 3px rgba(127,214,238,.15)}
+.vcf b{font-weight:600}
+#relcard{flex:1;display:flex;flex-direction:column;min-height:0}
+#relcard.emph{border-color:#36414E}
+#rel{flex:1;min-height:0;position:relative}
+#rel svg{position:absolute;inset:0;display:block;overflow:visible}
+#rel text{font:500 .62rem var(--mono);fill:var(--text3)}
+#rel .tick line,#rel .domain{stroke:#2C3540}
+.relf{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .9rem;padding:.1rem 1rem .75rem;font-size:.7rem;color:var(--text3)}
+.relf span{display:inline-flex;align-items:center;gap:.35rem;white-space:nowrap}
+.relf i{display:inline-block}
+.relf .ece{display:block;flex-basis:100%;color:var(--text2);white-space:normal}
+
+/* ---------- caption + control bar */
+.cap{flex:none;position:relative;display:flex;align-items:center;gap:1rem;height:2.9rem;padding:0 1.125rem;border-top:1px solid #1C222B;background:#0B0E13}
+.prog{position:absolute;left:0;top:-1px;height:2px;width:100%;transform-origin:0 50%;background:rgba(232,235,239,.35)}
+#captxt{flex:1;min-width:0;font-size:.95rem;font-weight:500;letter-spacing:-.005em;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#captxt.in{animation:capin .5s ease-out}
+@keyframes capin{from{opacity:0;transform:translateY(.3rem)}to{opacity:1;transform:none}}
+#captxt.hint{color:var(--text3);font-size:.82rem;font-weight:400}
+body.nocap #captxt{visibility:hidden}
+.ctl{display:flex;align-items:center;gap:.6rem;flex:none}
+.ctl .md{font-size:.72rem;color:var(--text3);white-space:nowrap}
+.pbtn{display:inline-flex;align-items:center;gap:.4rem;height:1.75rem;padding:0 .7rem;border-radius:.45rem;border:1px solid var(--line2);background:var(--raised);color:var(--text);font:500 .74rem/1 var(--sans);cursor:pointer}
+.pbtn:hover{border-color:var(--line3)}
+.pbtn svg{width:.7rem;height:.7rem}
+
+/* ---------- tooltip + ghost cursor */
+.tip{position:fixed;z-index:40;max-width:19rem;padding:.55rem .7rem;border-radius:.5rem;background:#161C24;border:1px solid var(--line2);box-shadow:0 12px 30px rgba(0,0,0,.5);font-size:.74rem;color:var(--text2);line-height:1.45;pointer-events:none}
+.tip b{color:var(--text);font-weight:600}
+.tip .m{font-family:var(--mono);font-size:.7rem;color:var(--text)}
+.ghost{position:fixed;left:0;top:0;z-index:50;width:0;height:0;pointer-events:none;opacity:0;will-change:transform}
+.ghost i{position:absolute;left:-.9rem;top:-.9rem;width:1.8rem;height:1.8rem;border-radius:50%;border:2px solid rgba(232,235,239,.8);transition:transform .12s,background .12s}
+.ghost svg{position:absolute;left:.1rem;top:.15rem;width:1rem;height:1.25rem;filter:drop-shadow(0 1px 3px rgba(0,0,0,.8))}
+.ghost.down i{transform:scale(.62);background:rgba(127,214,238,.35)}
+
+/* ---------- phone */
+@media (max-width:700px){
+  html{font-size:14px}
+  .hd{height:3rem;padding:0 .75rem;gap:.55rem}
+  .hd .sub,.status .tx2{display:none}
+  .hd h1{font-size:.92rem}
+  #stage{grid-template-columns:1fr;grid-template-rows:auto auto minmax(0,1fr);padding:.6rem .6rem .5rem;gap:.6rem}
+  #right{display:contents}
+  #vcard{order:1}#ev{order:2}#relcard{order:3}
+  .vc-h{display:none}
+  .gwrap{flex-direction:row;justify-content:center;gap:.4rem;padding:.55rem .6rem 0}
+  #gauge{width:10.5rem}
+  .gside{display:flex;flex-direction:column;align-items:flex-start;gap:.35rem}
+  .vsub{text-align:left;margin-top:0}
+  .vsen{margin:.5rem .75rem 0;padding-top:.45rem;font-size:.76rem;min-height:0}
+  .vcf{display:none}
+  .card-h{padding:.55rem .75rem 0}
+  .card-h .lgs,.card-h .k{display:none}
+  .wf{padding:.1rem .75rem .5rem;column-gap:.4rem;grid-template-columns:1.85rem 8.4rem 0 minmax(0,1fr) 2.7rem;
+    grid-template-rows:1.15rem repeat(9,1.42rem) .35rem 2.15rem 1.5rem 1.15rem 0}
+  .c-src,.iso-info,#isowrap{display:none!important}
+  .c-lab{font-size:.74rem}
+  .tl{display:none}.ts{display:inline}
+  .axis .mn{display:none}
+  .blab{font-size:.56rem;letter-spacing:0}
+  .c-bits{font-size:.7rem}
+  .cn{height:.7rem}
+  .relf .lgx{display:none}
+  .cap{height:auto;min-height:3.4rem;padding:.4rem .75rem}
+  #captxt{white-space:normal;font-size:.84rem;line-height:1.3}
+  .ctl .md{display:none}
+}
+@media (max-width:700px) and (max-height:700px){ #relcard{display:none} }
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="hd">
+    <span class="hx" aria-hidden="true">IN</span>
+    <h1>Why 97%?</h1>
+    <span class="sub">Explainable verdict · weight of evidence, calibrated</span>
+    <span class="cchip">CASE-4127 · Meridian Freight</span>
+    <span class="sp"></span>
+    <span class="status"><span class="dot live"></span><span class="tx2">Investigator v4 ·</span> live</span>
+  </header>
+
+  <main id="stage">
+    <section class="card" id="ev" aria-label="Evidence and log-odds waterfall">
+      <div class="card-h"><h2>Weight of evidence</h2><span class="k">bits: log₂ of how much likelier each finding is in an attack</span><span class="sp"></span>
+        <span class="lgs" style="display:inline-flex;gap:.8rem"><span class="lg"><i style="background:#FF7A66"></i>toward malicious</span><span class="lg"><i style="background:#7FD6EE"></i>toward benign</span></span></div>
+      <div class="wf" id="wf"></div>
+    </section>
+
+    <aside id="right">
+      <section class="card" id="vcard" aria-label="Calibrated verdict">
+        <div class="vc-h"><span class="hx" aria-hidden="true">IN</span><span>Investigator verdict</span><span class="sp"></span><span class="mono">v4 · 02:41 UTC</span></div>
+        <div class="gwrap">
+          <svg id="gauge" viewBox="0 0 264 150" role="img" aria-label="Calibrated confidence gauge"></svg>
+          <div class="gside"><span class="vchip mal" id="vchip" aria-live="polite">Malicious</span><div class="vsub" id="vsub"></div></div>
+        </div>
+        <p class="vsen" id="vsen"></p>
+        <div class="vcf" id="vcf"><span class="ic"></span><span id="vcftx"></span></div>
+      </section>
+      <section class="card" id="relcard" aria-label="Reliability of past verdicts">
+        <div class="card-h"><h2 id="relh">Is 97% honest?</h2><span class="k">stated vs. confirmed by analysts · 90 days</span></div>
+        <div id="rel"></div>
+        <div class="relf"><span><i style="width:1.1rem;height:0;border-top:1.5px dashed #808A97"></i>perfect calibration</span><span class="lgx"><i style="width:.55rem;height:.55rem;border-radius:50%;background:#8AB4FF"></i>past verdicts, sized by count</span><span><i style="width:.55rem;height:.55rem;border-radius:50%;background:#E8EBEF;box-shadow:0 0 0 2px #10141A,0 0 0 3.5px #E8EBEF"></i>this case</span><span class="ece" id="ece"></span></div>
+      </section>
+    </aside>
+  </main>
+
+  <footer class="cap" id="capbar">
+    <div class="prog" id="prog"></div>
+    <div id="captxt" aria-live="polite"></div>
+    <div class="ctl" id="ctl">
+      <span class="md" id="md">Auto-play</span>
+      <button type="button" class="pbtn" id="pp" aria-pressed="false"><svg viewBox="0 0 10 10" aria-hidden="true"><path id="ppi" d="M2 1h2v8H2zM6 1h2v8H6z" fill="currentColor"/></svg><span id="ppt">Pause</span></button>
+    </div>
+  </footer>
+</div>
+<div class="tip" id="tip" hidden></div>
+<div class="ghost" id="ghost" aria-hidden="true"><i></i><svg viewBox="0 0 15 19"><path d="M1.2 1.2v14.4l3.6-3.4 2.6 6 2.6-1.1-2.6-5.9h5.1z" fill="#E8EBEF" stroke="#0A0D11" stroke-width="1.4" stroke-linejoin="round"/></svg></div>
+
+<script src="../shared/data.js"></script>
+<script src="assets/why-97-d3.min.js"></script>
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const D = window.CORVID, VM = D.verdictModel;
+const qs = new URLSearchParams(location.search);
+const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const HAS_D3 = typeof window.d3 === 'object' && typeof d3.scaleLinear === 'function';
+const clamp = (x, a, b) => x < a ? a : x > b ? b : x;
+const lerp = (a, b, k) => a + (b - a) * k;
+const ease = k => { k = clamp(k, 0, 1); return k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2; };
+const smooth = (a, b, x) => { const u = clamp((x - a) / (b - a), 0, 1); return u * u * (3 - 2 * u); };
+const r2 = x => Math.round(x * 100) / 100;
+const sgn = x => { const v = r2(x); return (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(2); };
+const fmt = n => n.toLocaleString('en-US');
+const rootFs = () => parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+if (qs.get('captions') === '0') document.body.classList.add('nocap');
+
+// =====================================================================
+// 1. The model (one source of truth): data.js verdictModel + reliability bands
+// =====================================================================
+const KN = VM.calib;                                   // isotonic map, raw bits → calibrated %
+function calibrate(s) {
+  if (s <= KN[0][0]) return KN[0][1];
+  for (let i = 1; i < KN.length; i++) if (s <= KN[i][0]) { const [a, pa] = KN[i - 1], [b, pb] = KN[i]; return pa + (pb - pa) * (s - a) / (b - a); }
+  return KN[KN.length - 1][1];
+}
+function invCal(p) { for (let i = 1; i < KN.length; i++) if (p <= KN[i][1]) { const [a, pa] = KN[i - 1], [b, pb] = KN[i]; return a + (b - a) * (p - pa) / (pb - pa); } return KN[KN.length - 1][0]; }
+const T_MAL = 85, T_BEN = 15, B_MAL = invCal(T_MAL), B_BEN = invCal(T_BEN);
+const naive = s => 100 / (1 + Math.pow(2, -s));
+const PRIOR = { n: 1800, mal: 72, bits: VM.priorBits };             // 72 / 1,800 = 1 : 24 = −4.58 bits
+const EV = VM.evidence.filter(e => !e.pending);
+const IV = VM.evidence.find(e => e.id === 'interview');
+const SUPER = new Set(['travel', 'notravel']);                       // explained by the interview
+const INFO = {
+  push: ['Push bombing, then approval', '14 denied Okta Verify pushes in 2 m 39 s, then one accepted'],
+  asn: ['New IP on a hosting ASN', '203.0.113.77 in AS64500, never seen for this user in 180 days'],
+  travel: ['Impossible travel', 'Austin to Amsterdam, 8,170 km in under 6 hours'],
+  assume: ['First AssumeRole, ops-admin', 'sts:AssumeRole into ops-admin, first time in 365 days for this identity'],
+  egress: ['Bulk S3 download, 2.3 GB', '1,284 s3:GetObject from mf-finance-exports to the same IP'],
+  inbox: ['Inbox rule hides payments', 'New-InboxRule “zz-rss” moves invoice and payment mail to RSS Feeds'],
+  inject: ['Instructions in user agent', 'Text addressed to an AI analyst inside client.userAgent, counted as an adversary indicator'],
+  notravel: ['No travel on record', 'Workday shows j.alvarez in the Austin office this week'],
+  interview: ['j.alvarez confirms the login', 'Slack interview sent 02:39, no reply yet. Switch on to simulate a call-back-verified yes.'],
+};
+const SHORT = { push: 'Push bombing', asn: 'New hosting IP', travel: 'Impossible travel', assume: 'AssumeRole admin', egress: '2.3 GB S3 egress', inbox: 'Hiding inbox rule', inject: 'Planted instruction', notravel: 'No travel record', interview: 'She confirms it' };
+// reliability: 90 days of analyst-reviewed verdicts, grouped by stated confidence (exact counts)
+const BANDS = [
+  { a: 50, b: 60, n: 412, ok: 239 }, { a: 60, b: 70, n: 538, ok: 355 }, { a: 70, b: 80, n: 701, ok: 540 },
+  { a: 80, b: 90, n: 1120, ok: 963 }, { a: 90, b: 95, n: 1486, ok: 1382 },
+  { a: 95, b: 98, n: 2310, ok: 2248 }, { a: 98, b: 100, n: 2602, ok: 2547 },
+];
+(() => { // mean stated confidence per band, from the per-1% distribution (verdicts cluster at each band's low end)
+  for (const B of BANDS) {
+    const w = [], span = B.b - B.a;
+    for (let p = B.a; p < B.b; p++) w.push(span >= 10 ? 1.6 - 0.12 * (p - B.a) : span === 5 ? 1.4 - 0.15 * (p - B.a) : span === 3 ? 1.3 - 0.2 * (p - B.a) : 1 + 0.1 * (p - B.a));
+    const ws = w.reduce((s, x) => s + x, 0); let left = B.n, m = 0;
+    w.forEach((x, i) => { const n = i === w.length - 1 ? left : Math.round(B.n * x / ws); left -= n; m += n * (B.a + i + 0.5); });
+    B.mean = m / B.n; B.obs = 100 * B.ok / B.n;
+  }
+})();
+const N_ALL = BANDS.reduce((s, B) => s + B.n, 0);                                         // 9,169
+const ECE = BANDS.reduce((s, B) => s + B.n * Math.abs(B.obs - B.mean), 0) / N_ALL;       // 1.4 points
+const UNDER = BANDS.filter(B => B.obs > B.mean).length;
+const bandOf = p => p < 50 ? null : BANDS.find(B => p >= B.a && (p < B.b || B.b === 100));
+function bandSentence(p) {
+  const B = bandOf(p);
+  if (!B) return 'Below 50%, the AI never auto-closes or auto-contains. <b>An analyst decides.</b>';
+  return `Of <b>${fmt(B.n)}</b> past verdicts stated at ${B.a}–${B.b}%, <b>${B.obs.toFixed(1)}%</b> were confirmed by analysts.`;
+}
+const VNAME = { mal: 'Malicious', sus: 'Suspicious', ben: 'Benign' };
+const VCOL = { mal: '#FF7A66', sus: '#F2B53A', ben: '#4CC9A6' };
+const verdictOf = cal => cal >= T_MAL ? 'mal' : cal >= T_BEN ? 'sus' : 'ben';
+const heat = b => b > 3 ? '#FF7A66' : b > 1.9 ? '#F59A3D' : b > 1 ? '#FFC36B' : '#E8D9B0';
+
+// score for any presence map P (0..1 per evidence id, plus interview)
+function compute(P) {
+  let cum = PRIOR.bits;
+  const rows = EV.map(e => {
+    const sup = SUPER.has(e.id) ? P.interview : 0, eff = P[e.id] * (1 - sup), bits = e.bits * eff;
+    const r = { e, eff, a: cum, b: cum + bits, bits }; cum += bits; return r;
+  });
+  const ib = IV.bits * P.interview, iv = { a: cum, b: cum + ib, bits: ib }; cum += ib;
+  const score = cum, cal = calibrate(score);
+  return { P, rows, iv, score, cal, verdict: verdictOf(cal) };
+}
+
+// =====================================================================
+// 2. State: attract script (pure function of t) or the viewer's own toggles
+// =====================================================================
+const PERIOD = 32, DUR = 0.8, RESET = 30.9;
+const ON_AT = { push: 1.7, asn: 2.6, travel: 3.5, assume: 4.4, egress: 5.3, inbox: 6.2, inject: 7.1, notravel: 8.0 };
+const IV_AT = 20.4, IV_DUR = 1.1;
+const KEYS = [...EV.map(e => e.id), 'interview'];
+const CAPS = [
+  [0, 2.3, 'The AI starts from the base rate: 72 of 1,800 past push-burst cases were real.'],
+  [2.3, 6.0, 'Each piece of evidence adds weight in bits. One bit doubles the odds.'],
+  [6.0, 9.9, 'Identity, cloud, mailbox and HR evidence add up to a raw score of +14.63 bits.'],
+  [9.9, 14.0, 'Raw math would claim 99.996%. Calibrated on analyst outcomes, it is 97%.'],
+  [14.0, 18.4, '97% is checkable: of 2,310 past verdicts at 95–98%, 97.3% were confirmed.'],
+  [18.4, 21.3, 'What would change its mind? j.alvarez confirms she approved the login.'],
+  [21.3, 25.6, 'Travel is explained and the score falls to +4.99 bits: Suspicious, 62%.'],
+  [25.6, 32, 'No black box: the analyst sees what the AI weighed, and what would flip it.'],
+];
+const attractTarget = (k, tt) => tt >= RESET ? 0 : k === 'interview' ? (tt >= IV_AT ? 1 : 0) : (tt >= ON_AT[k] ? 1 : 0);
+const attractP = (k, tt) => tt >= RESET ? 0 : k === 'interview' ? ease((tt - IV_AT) / IV_DUR) : ease((tt - ON_AT[k]) / DUR);
+const bump = (tt, a, b, fin = 0.25, fout = 0.5) => smooth(a, a + fin, tt) * (1 - smooth(b - fout, b, tt));
+
+let mode = 'attract', t = 0, playing = !RM, autoResume = true, embedPaused = false;
+let uclock = 0, lastInput = 0, idleTimer = 0, fading = false;
+const user = {}; KEYS.forEach(k => user[k] = { from: 0, to: 0, at: -99 });
+function presence(k) {
+  if (mode === 'attract') return attractP(k, t);
+  const u = user[k]; return u.from + (u.to - u.from) * ease((uclock - u.at) / DUR);
+}
+const target = k => mode === 'attract' ? attractTarget(k, t) : user[k].to;
+function userAnimating() { return KEYS.some(k => uclock - user[k].at < DUR + 0.05); }
+
+// =====================================================================
+// 3. Build the DOM once
+// =====================================================================
+const XD = [-12, 20];
+const xp = b => (clamp(b, XD[0], XD[1]) - XD[0]) / (XD[1] - XD[0]) * 100;
+const wf = $('wf');
+const ROWH = 1.72;
+function el(tag, cls, html) { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
+function place(e, col, row) { e.style.gridColumn = col; e.style.gridRow = row; wf.appendChild(e); return e; }
+// overlay: verdict bands in raw-bit space, zero line, live score line
+const ov = place(el('div', 'ov'), '4', '1 / 15'); ov.id = 'ov';
+ov.innerHTML = `<div class="band b-ben" style="left:0;width:${xp(B_BEN)}%"></div>
+  <div class="band b-sus" style="left:${xp(B_BEN)}%;width:${xp(B_MAL) - xp(B_BEN)}%"></div>
+  <div class="band b-mal" style="left:${xp(B_MAL)}%;right:0"></div>
+  <span class="blab" style="left:${xp(B_BEN) / 2}%;color:rgba(76,201,166,.8)"><span class="tl">Benign</span><span class="ts">Ben</span></span>
+  <span class="blab" style="left:${(xp(B_BEN) + xp(B_MAL)) / 2}%;color:rgba(242,181,58,.8)"><span class="tl">Suspicious</span><span class="ts">Susp</span></span>
+  <span class="blab" style="left:${(xp(B_MAL) + 100) / 2}%;color:rgba(255,122,102,.85)"><span class="tl">Malicious</span><span class="ts">Mal</span></span>
+  <div class="zero" style="left:${xp(0)}%"></div><div class="scl" id="scl"></div>`;
+const R = {};   // row refs by key
+function addRow(key, rowIdx, { sw, lab, src, cls = '', connH = 1.0 }) {
+  const bg = place(el('div', 'row-bg'), '1 / -1', String(rowIdx));
+  const cSw = place(el('div', 'cell c-sw'), '1', String(rowIdx));
+  const cLab = place(el(sw ? 'label' : 'div', 'cell c-lab', lab), '2', String(rowIdx));
+  const cSrc = place(el('div', 'cell c-src', src || ''), '3', String(rowIdx));
+  const cTrk = place(el('div', 'cell c-trk'), '4', String(rowIdx));
+  const cBits = place(el('div', 'cell c-bits'), '5', String(rowIdx));
+  const bar = el('div', 'wb'); cTrk.appendChild(bar);
+  const cn = el('div', 'cn'); cn.style.height = connH + 'rem'; cTrk.appendChild(cn);
+  let input = null, swEl = null;
+  if (sw) {
+    const s = el('label', 'sw' + (sw === 'cold' ? ' cold' : ''), `<input type="checkbox" role="switch" data-k="${key}" aria-label="${sw === 'cold' ? 'Simulate the interview answer: ' : 'Use evidence: '}${INFO[key][0]}"><span class="tr"></span>`);
+    cSw.appendChild(s); input = s.querySelector('input'); input.id = 'sw-' + key; cLab.htmlFor = input.id; swEl = s;
+  } else if (key === 'prior') cSw.appendChild(el('span', 'pdot'));
+  const all = [bg, cSw, cLab, cSrc, cTrk, cBits];
+  all.forEach(n => { n.classList.add('r'); if (cls) cls.split(' ').forEach(c => n.classList.add(c)); n.dataset.k = key; });
+  R[key] = { all, bg, cLab, cSrc, cTrk, cBits, bar, cn, input, swEl, cache: {} };
+}
+addRow('prior', 2, { lab: '<span class="tx"><span class="tl">Base rate · 72 of 1,800 real</span><span class="ts">Base rate 72/1,800</span></span>', src: '<span class="src base">90 days</span>' });
+EV.forEach((e, i) => addRow(e.id, 3 + i, {
+  sw: true, lab: `<span class="tx"><span class="tl">${INFO[e.id][0]}</span><span class="ts">${SHORT[e.id]}</span></span>`,
+  src: `<span class="src base">${e.src}</span><span class="src xp">explained</span>`,
+  connH: i === EV.length - 1 ? 1.915 : 1.0,
+}));
+const ivbox = place(el('div', 'ivbox', '<span class="ivtag">What would change it</span>'), '1 / -1', '12');
+addRow('interview', 12, { sw: 'cold', cls: 'r-iv', connH: 1.315,
+  lab: `<span class="two"><span class="tx"><span class="tl">${INFO.interview[0]}</span><span class="ts">${SHORT.interview}</span></span><small id="ivsub">Interview · pending since 02:39</small></span>`,
+  src: `<span class="src base">${IV.src}</span>` });
+addRow('total', 13, { cls: 'r-tot', lab: '<span class="tx">Raw score</span>' });
+R.total.bar.classList.add('tot'); R.total.cn.remove();
+const axis = place(el('div', 'axis'), '4', '14');
+axis.innerHTML = [-12, -8, -4, 0, 4, 8, 12, 16, 20].map(b => `<span${b % 8 ? ' class="mn"' : ''} style="left:${xp(b)}%">${b > 0 ? '+' + b : b === 0 ? '0' : '−' + Math.abs(b)}</span>`).join('');
+place(el('div', 'axu', 'bits'), '5', '14');
+const isoInfo = place(el('div', 'iso-info', `<span class="eb">Calibration</span><h3>Raw score → probability</h3>
+  <p>An isotonic map fitted to analyst-confirmed outcomes, refit weekly. More evidence never lowers confidence.</p>
+  <div class="ro"><i class="dash"></i><span>Naive Bayes</span><b class="nv" id="ro-n"></b><i class="sol"></i><span>Calibrated</span><b id="ro-c"></b></div>`), '1 / 4', '15');
+const isoWrap = place(el('div'), '4 / 6', '15'); isoWrap.id = 'isowrap';
+isoWrap.setAttribute('role', 'img'); isoWrap.setAttribute('aria-label', 'Isotonic calibration map from raw evidence score in bits to calibrated probability, with the naive posterior for comparison');
+
+// ---------- gauge (static parts)
+const G = { cx: 132, cy: 128, r: 104 };
+const gAng = v => Math.PI - clamp(v, 0, 100) / 100 * Math.PI;
+const gPt = (v, r = G.r) => [G.cx + r * Math.cos(gAng(v)), G.cy - r * Math.sin(gAng(v))];
+function gArc(a, b, r = G.r) { const [x0, y0] = gPt(a, r), [x1, y1] = gPt(b, r); return `M${x0.toFixed(2)} ${y0.toFixed(2)}A${r} ${r} 0 0 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`; }
+$('gauge').innerHTML = `
+  <path d="${gArc(0, 100)}" fill="none" stroke="#1B222B" stroke-width="15"/>
+  <path id="gz-ben" d="${gArc(0.3, 14.7)}" fill="none" stroke="#4CC9A6" stroke-width="13"/>
+  <path id="gz-sus" d="${gArc(15.3, 84.7)}" fill="none" stroke="#F2B53A" stroke-width="13"/>
+  <path id="gz-mal" d="${gArc(85.3, 99.7)}" fill="none" stroke="#FF7A66" stroke-width="13"/>
+  ${[15, 85].map(v => { const [x0, y0] = gPt(v, G.r - 10), [x1, y1] = gPt(v, G.r + 10), [tx, ty] = gPt(v, G.r + 19); return `<line x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}" stroke="#0A0D11" stroke-width="2.5"/><text x="${tx}" y="${ty + 3}" text-anchor="middle" style="font:500 10px var(--mono);fill:#808A97">${v}</text>`; }).join('')}
+  <text x="${G.cx - G.r}" y="${G.cy + 17}" text-anchor="middle" style="font:500 10px var(--mono);fill:#5E6875">0</text>
+  <text x="${G.cx + G.r}" y="${G.cy + 17}" text-anchor="middle" style="font:500 10px var(--mono);fill:#5E6875">100</text>
+  <g id="gneedle"><line id="gnl" stroke="#E8EBEF" stroke-width="2.5" stroke-linecap="round"/><circle id="gnc" r="7.5" fill="#E8EBEF" stroke="#10141A" stroke-width="3"/></g>
+  <text id="gnum" x="${G.cx - 6}" y="${G.cy - 6}" text-anchor="middle" style="font:600 62px var(--sans);letter-spacing:-3px;fill:#E8EBEF">97</text>
+  <text id="gpct" x="${G.cx + 40}" y="${G.cy - 8}" style="font:500 24px var(--sans);fill:#AAB3BF">%</text>`;
+
+// ---------- reliability chart (D3, rebuilt on resize)
+let REL = null;
+function buildRel() {
+  const box = $('rel'); box.innerHTML = '';
+  if (!HAS_D3) { box.innerHTML = '<p class="t3" style="padding:1rem;font-size:.75rem">The chart library did not load. The verdict sentence above is still exact.</p>'; return; }
+  const W = box.clientWidth, H = box.clientHeight; if (W < 40 || H < 40) { REL = null; return; }
+  const fs = rootFs(), m = { l: 2.7 * fs, r: 1.1 * fs, t: 1.0 * fs, b: 1.6 * fs };
+  const x = d3.scaleLinear().domain([50, 100]).range([m.l, W - m.r]);
+  const y = d3.scaleLinear().domain([50, 100]).range([H - m.b, m.t]);
+  const svg = d3.select(box).append('svg').attr('class', 'lay').attr('width', W).attr('height', H).attr('viewBox', `0 0 ${W} ${H}`)
+    .attr('role', 'img').attr('aria-label', 'Reliability diagram: share of past verdicts confirmed by analysts against the confidence the AI stated, seven bands');
+  svg.append('g').selectAll('line').data([60, 70, 80, 90, 100]).join('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', d => y(d)).attr('y2', d => y(d)).attr('stroke', '#1A2029');
+  svg.append('g').attr('transform', `translate(0,${H - m.b})`).call(d3.axisBottom(x).tickValues([50, 60, 70, 80, 90, 100]).tickFormat(d => d + '%').tickSize(3).tickSizeOuter(0));
+  svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).tickValues([50, 60, 70, 80, 90, 100]).tickFormat(d => d + '%').tickSize(3).tickSizeOuter(0));
+  svg.append('text').attr('x', m.l + 6).attr('y', m.t + 4).attr('dy', '.35em').text('confirmed by analysts');
+  svg.append('line').attr('x1', x(50)).attr('y1', y(50)).attr('x2', x(100)).attr('y2', y(100)).attr('stroke', '#808A97').attr('stroke-width', 1.5).attr('stroke-dasharray', '5 5');
+  svg.append('path').attr('d', d3.line().x(B => x(B.mean)).y(B => y(B.obs))(BANDS)).attr('fill', 'none').attr('stroke', '#8AB4FF').attr('stroke-opacity', .35).attr('stroke-width', 1.5);
+  const dyn = d3.select(box).append('svg').attr('class', 'lay').attr('width', W).attr('height', H).attr('viewBox', `0 0 ${W} ${H}`).attr('aria-hidden', 'true').style('pointer-events', 'none');
+  const caseLine = dyn.append('line').attr('stroke', '#E8EBEF').attr('stroke-opacity', .55).attr('stroke-dasharray', '2 3').attr('y1', m.t).attr('y2', H - m.b);
+  const rad = B => fs * (0.2 + Math.sqrt(B.n) / 150);
+  const halo = dyn.append('circle').attr('fill', 'none').attr('stroke', '#E8EBEF').attr('stroke-width', 1.5).attr('opacity', 0);
+  const dots = dyn.append('g').selectAll('circle').data(BANDS).join('circle')
+    .attr('cx', B => x(B.mean)).attr('cy', B => y(B.obs)).attr('r', rad).attr('fill', '#8AB4FF').attr('stroke', '#10141A').attr('stroke-width', 2);
+  // callout in the empty upper-left of the plot, with a leader to the highlighted band
+  const lab = dyn.append('g').attr('pointer-events', 'none');
+  const lead = lab.append('path').attr('fill', 'none').attr('stroke', '#E8EBEF').attr('stroke-opacity', .45).attr('stroke-width', 1);
+  const cx0 = m.l + 0.7 * fs, cy0 = m.t + 2.35 * fs;
+  const lab1 = lab.append('text').attr('x', cx0).attr('y', cy0).style('font', `600 ${0.74 * fs}px var(--sans)`).style('fill', '#E8EBEF');
+  const lab2 = lab.append('text').attr('x', cx0).attr('y', cy0 + 1.05 * fs).style('font', `500 ${0.64 * fs}px var(--mono)`).style('fill', '#AAB3BF');
+  const caseTxt = dyn.append('text').attr('y', H - m.b - 0.55 * fs).style('fill', '#E8EBEF');
+  // hover layer: hit targets larger than the marks
+  dyn.append('g').selectAll('circle').data(BANDS).join('circle').attr('cx', B => x(B.mean)).attr('cy', B => y(B.obs)).attr('r', B => rad(B) + 7).attr('fill', 'transparent').style('cursor', 'default').style('pointer-events', 'all')
+    .on('pointerenter pointermove', (ev, B) => showTip(`<b>${B.a}–${B.b}% stated</b><br><span class="m">${fmt(B.n)}</span> verdicts · <span class="m">${fmt(B.ok)}</span> confirmed · <b>${B.obs.toFixed(1)}%</b>`, ev.clientX, ev.clientY))
+    .on('pointerleave', hideTip);
+  REL = { x, y, caseLine, dots, halo, lab1, lab2, lead, caseTxt, rad, fs, W, H, m, cx0, cy0 };
+}
+$('ece').innerHTML = `Average gap between stated and confirmed: <b style="color:var(--text)">${ECE.toFixed(1)} points</b> over ${fmt(N_ALL)} verdicts. In ${UNDER} of ${BANDS.length} bands analysts confirmed more often than the AI claimed.`;
+
+// ---------- isotonic map (D3, rebuilt on resize)
+let ISO = null;
+function buildIso() {
+  isoWrap.innerHTML = '';
+  const rb = isoWrap.getBoundingClientRect(), W = rb.width, H = rb.height;
+  const svg = HAS_D3 ? d3.select(isoWrap).append('svg').attr('class', 'lay') : null;
+  const trk = $('ov').getBoundingClientRect().width;
+  if (!svg || W < 40 || H < 40) { ISO = null; return; }
+  const fs = rootFs(), m = { t: 0.9 * fs, b: 0.55 * fs };
+  svg.attr('width', W).attr('height', H).attr('viewBox', `0 0 ${W} ${H}`);
+  const x = d3.scaleLinear().domain(XD).range([0, trk]);
+  const y = d3.scaleLinear().domain([0, 100]).range([H - m.b, m.t]);
+  // verdict zones as a vertical gauge strip on the right edge
+  const zx = trk + 0.35 * fs, zw = 0.32 * fs;
+  [[0, T_BEN, '#4CC9A6'], [T_BEN, T_MAL, '#F2B53A'], [T_MAL, 100, '#FF7A66']].forEach(([a, b, c]) =>
+    svg.append('rect').attr('x', zx).attr('width', zw).attr('y', y(b) + 1).attr('height', Math.max(0, y(a) - y(b) - 2)).attr('rx', 1.5).attr('fill', c).attr('fill-opacity', .55));
+  [0, T_BEN, 50, T_MAL, 100].forEach(v => svg.append('text').attr('x', zx + zw + 0.35 * fs).attr('y', y(v)).attr('dy', '.35em').text(v + '%'));
+  svg.append('rect').attr('x', 0).attr('y', m.t).attr('width', trk).attr('height', H - m.t - m.b).attr('fill', '#0D1116').attr('rx', 4);
+  [T_BEN, T_MAL].forEach(v => svg.append('line').attr('x1', 0).attr('x2', trk).attr('y1', y(v)).attr('y2', y(v)).attr('stroke', '#3A4350').attr('stroke-dasharray', '2 4'));
+  svg.append('line').attr('x1', 0).attr('x2', trk).attr('y1', y(50)).attr('y2', y(50)).attr('stroke', '#1C232C');
+  svg.append('line').attr('x1', x(0)).attr('x2', x(0)).attr('y1', m.t).attr('y2', H - m.b).attr('stroke', '#2A323C');
+  const xs = d3.range(XD[0], XD[1] + 0.001, 0.1);
+  svg.append('path').attr('d', d3.line().x(d => x(d)).y(d => y(naive(d)))(xs)).attr('fill', 'none').attr('stroke', '#808A97').attr('stroke-width', 1.5).attr('stroke-dasharray', '5 5');
+  const kn = [[XD[0], calibrate(XD[0])], ...KN.filter(k => k[0] > XD[0] && k[0] < XD[1]), [XD[1], calibrate(XD[1])]];
+  svg.append('path').attr('d', d3.line().x(d => x(d[0])).y(d => y(d[1]))(kn)).attr('fill', 'none').attr('stroke', '#8AB4FF').attr('stroke-width', 2).attr('stroke-linejoin', 'round');
+  const dyn = d3.select(isoWrap).append('svg').attr('class', 'lay').attr('width', W).attr('height', H).attr('viewBox', `0 0 ${W} ${H}`).attr('aria-hidden', 'true');
+  const vline = dyn.append('line').attr('stroke', '#E8EBEF').attr('stroke-width', 2).attr('stroke-opacity', .85);
+  const hline = dyn.append('line').attr('stroke', '#E8EBEF').attr('stroke-width', 1.2).attr('stroke-dasharray', '3 3').attr('stroke-opacity', .6);
+  const pN = dyn.append('circle').attr('r', 0.27 * fs).attr('fill', '#0A0D11').attr('stroke', '#AAB3BF').attr('stroke-width', 1.8);
+  const pC = dyn.append('circle').attr('r', 0.36 * fs).attr('stroke', '#10141A').attr('stroke-width', 2.5);
+  const tN = dyn.append('text').style('font', `500 ${0.64 * fs}px var(--mono)`).style('fill', '#AAB3BF').attr('paint-order', 'stroke').attr('stroke', '#0D1116').attr('stroke-width', 4);
+  const tC = dyn.append('text').style('font', `600 ${0.7 * fs}px var(--mono)`).attr('paint-order', 'stroke').attr('stroke', '#0D1116').attr('stroke-width', 4);
+  const mk = dyn.append('path').attr('fill', '#E8EBEF');
+  ISO = { x, y, vline, hline, pN, pC, tN, tC, mk, trk, zx, fs, m };
+}
+
+// =====================================================================
+// 4. Render one frame from the model
+// =====================================================================
+function setStyle(node, cache, key, prop, val) { if (!node || cache[key] === val) return; cache[key] = val; if (prop.startsWith('--')) node.style.setProperty(prop, val); else node.style[prop] = val; }
+function setText(node, txt) { if (node.__t !== txt) { node.__t = txt; node.textContent = txt; } }
+function setHTML(node, h) { if (node.__h !== h) { node.__h = h; node.innerHTML = h; } }
+let lastCap = -2;
+function render() {
+  const P = {}; KEYS.forEach(k => P[k] = presence(k));
+  const S = compute(P), A = mode === 'attract';
+  const T = {}; KEYS.forEach(k => T[k] = !!target(k));
+  KEYS.forEach(k => { const Rr = R[k]; setStyle(Rr.swEl, Rr.cache, 'p', '--p', P[k].toFixed(3)); });
+  // ---- rows
+  const rowSet = (key, a, b, color, bitsTxt, on, act) => {
+    const Rr = R[key], c = Rr.cache, lo = Math.min(a, b), hi = Math.max(a, b);
+    setStyle(Rr.bar, c, 'l', 'left', xp(lo).toFixed(3) + '%');
+    setStyle(Rr.bar, c, 'w', 'width', Math.max(0, xp(hi) - xp(lo)).toFixed(3) + '%');
+    if (color) setStyle(Rr.bar, c, 'bg', 'background', color);
+    if (Rr.cn.isConnected) { setStyle(Rr.cn, c, 'cl', 'left', xp(b).toFixed(3) + '%'); setStyle(Rr.cn, c, 'co', 'opacity', Math.abs(b - a) > 0.02 || key === 'prior' ? '1' : '0'); }
+    setText(Rr.cBits, bitsTxt);
+    if (c.on !== on) { c.on = on; Rr.all.forEach(n => n.classList.toggle('off', !on)); }
+    setStyle(Rr.bg, c, 'act', 'opacity', (act || 0).toFixed(3));
+  };
+  rowSet('prior', 0, PRIOR.bits, '#2F93B5', sgn(PRIOR.bits), true, A ? bump(t, 0, 1.6, .2, .6) : 0);
+  S.rows.forEach(r => {
+    const id = r.e.id, sup = SUPER.has(id) && T.interview;
+    rowSet(id, r.a, r.b, heat(r.e.bits), sgn(r.e.bits), T[id], A ? bump(t, ON_AT[id], ON_AT[id] + 1.15, .15, .7) : 0);
+    const Rr = R[id]; if (Rr.cache.sup !== sup) { Rr.cache.sup = sup; Rr.all.forEach(n => n.classList.toggle('sup', sup)); }
+    if (Rr.input.checked !== T[id]) Rr.input.checked = T[id];
+  });
+  rowSet('interview', S.iv.a, S.iv.b, '#7FD6EE', sgn(IV.bits), T.interview, A ? bump(t, IV_AT - 1.7, IV_AT + 1.6, .3, .6) : 0);
+  if (R.interview.input.checked !== T.interview) R.interview.input.checked = T.interview;
+  ivbox.classList.toggle('on', T.interview);
+  setText($('ivsub'), T.interview ? 'Simulated yes · call-back verified' : 'Interview · pending since 02:39');
+  { const Rr = R.total, c = Rr.cache; setStyle(Rr.bar, c, 'l', 'left', xp(Math.min(0, S.score)).toFixed(3) + '%'); setStyle(Rr.bar, c, 'w', 'width', Math.abs(xp(S.score) - xp(0)).toFixed(3) + '%'); setText(Rr.cBits, sgn(S.score)); }
+  $('scl').style.left = xp(S.score).toFixed(3) + '%';
+  // ---- isotonic map
+  const nv = naive(S.score), nvTxt = nv > 99.9 && nv < 100 ? nv.toFixed(3) + '%' : nv.toFixed(1) + '%';
+  setText($('ro-n'), nvTxt); setText($('ro-c'), S.cal.toFixed(1) + '%'); $('ro-c').style.color = VCOL[S.verdict];
+  const isoE = A ? bump(t, 9.9, 14.2, .4, .6) : 0;
+  isoInfo.style.opacity = (0.82 + 0.18 * isoE).toFixed(3);
+  if (ISO) {
+    const sx = ISO.x(clamp(S.score, XD[0], XD[1])), yn = ISO.y(nv), yc = ISO.y(S.cal), fs = ISO.fs;
+    ISO.vline.attr('x1', sx).attr('x2', sx).attr('y1', -0.2 * fs).attr('y2', yc);
+    ISO.hline.attr('x1', sx).attr('x2', ISO.zx - 2).attr('y1', yc).attr('y2', yc);
+    ISO.mk.attr('d', `M${ISO.zx - 1} ${yc}l-${0.42 * fs} -${0.3 * fs}v${0.6 * fs}z`).attr('fill', VCOL[S.verdict]);
+    ISO.pN.attr('cx', sx).attr('cy', yn).attr('opacity', Math.abs(yn - yc) > 4 ? 1 : 0);
+    ISO.pC.attr('cx', sx).attr('cy', yc).attr('fill', VCOL[S.verdict]);
+    const leftSide = sx > ISO.trk * 0.6, dx = leftSide ? -0.7 * fs : 0.7 * fs, anc = leftSide ? 'end' : 'start';
+    const apart = Math.abs(yn - yc) > 1.5 * fs;
+    ISO.tN.attr('x', sx + dx).attr('y', yn - 0.55 * fs < ISO.m.t + 0.2 * fs ? yn + 1.15 * fs : yn - 0.55 * fs).attr('text-anchor', anc).attr('opacity', apart ? 1 : 0).text('naive ' + nvTxt);
+    ISO.tC.attr('x', sx + dx).attr('y', yc + 1.25 * fs).attr('text-anchor', anc).style('fill', VCOL[S.verdict]).text('calibrated ' + S.cal.toFixed(1) + '%');
+  }
+  // ---- gauge
+  const pct = Math.round(S.cal), v = S.verdict;
+  const [nx, ny] = gPt(S.cal, G.r), [ix, iy] = gPt(S.cal, G.r - 22);
+  $('gnl').setAttribute('x1', ix.toFixed(2)); $('gnl').setAttribute('y1', iy.toFixed(2)); $('gnl').setAttribute('x2', nx.toFixed(2)); $('gnl').setAttribute('y2', ny.toFixed(2));
+  $('gnc').setAttribute('cx', nx.toFixed(2)); $('gnc').setAttribute('cy', ny.toFixed(2)); $('gnc').setAttribute('stroke', VCOL[v]);
+  ['ben', 'sus', 'mal'].forEach(z => $('gz-' + z).setAttribute('stroke-opacity', z === v ? '1' : '.2'));
+  setText($('gnum'), String(pct)); $('gpct').setAttribute('x', G.cx + (pct >= 100 ? 52 : pct >= 10 ? 33 : 15));
+  const chip = $('vchip'); if (chip.__v !== v) { chip.__v = v; chip.className = 'vchip ' + v; chip.textContent = VNAME[v]; }
+  $('vcard').style.setProperty('--vglow', { mal: 'rgba(255,106,85,.16)', sus: 'rgba(242,181,58,.14)', ben: 'rgba(76,201,166,.12)' }[v]);
+  setHTML($('vsub'), `raw <b>${sgn(S.score)}</b> bits → calibrated <b>${S.cal.toFixed(1)}%</b>`);
+  setHTML($('vsen'), bandSentence(S.cal));
+  $('vsen').classList.toggle('emph', A && t >= 14 && t < 18.6);
+  $('vcf').style.opacity = A ? (t >= RESET ? 0 : smooth(8.4, 9.2, t)).toFixed(3) : '1';
+  // counterfactual, exact from the model with the current toggles
+  const settled = {}; KEYS.forEach(k => settled[k] = T[k] ? 1 : 0);
+  const alt = compute({ ...settled, interview: T.interview ? 0 : 1 });
+  setHTML($('vcftx'), T.interview
+    ? `Simulating her call-back-verified yes. Without it: <b style="color:${VCOL[alt.verdict]}">${VNAME[alt.verdict]} ${Math.round(alt.cal)}%</b>`
+    : `If j.alvarez confirms the login: <b style="color:${VCOL[alt.verdict]}">${VNAME[alt.verdict]} ${Math.round(alt.cal)}%</b> <span style="color:var(--text3)">· interview pending</span>`);
+  // ---- reliability
+  setText($('relh'), S.cal >= 50 ? `Is ${pct}% honest?` : 'Is the confidence honest?');
+  $('relcard').classList.toggle('emph', A && t >= 14 && t < 18.6);
+  if (REL) {
+    const B = bandOf(S.cal), on = S.cal >= 50;
+    const cx = REL.x(clamp(S.cal, 50, 100));
+    REL.caseLine.attr('x1', cx).attr('x2', cx).attr('opacity', on ? 1 : 0);
+    const right = cx > REL.W * 0.5;
+    REL.caseTxt.attr('x', right ? cx - 6 : cx + 6).attr('text-anchor', right ? 'end' : 'start').attr('opacity', on ? 1 : 0).text(`this case, ${pct}%`);
+    if (REL.fk !== (B ? B.a : -1)) { REL.fk = B ? B.a : -1; REL.dots.attr('fill', d => d === B ? '#E8EBEF' : '#8AB4FF'); }
+    const pulse = A && t >= 14 && t < 18.6 ? 0.5 + 0.5 * Math.sin((t - 14) * 4.2) : 0;
+    if (B) {
+      const bx = REL.x(B.mean), by = REL.y(B.obs), rr = REL.rad(B), fs = REL.fs;
+      REL.halo.attr('cx', bx).attr('cy', by).attr('r', rr + 4 + pulse * 3).attr('opacity', 0.9 - pulse * 0.4);
+      if (REL.bkey !== B.a) {
+        REL.bkey = B.a;
+        REL.lab1.text(`${B.a}–${B.b}% stated`); REL.lab2.text(`${fmt(B.n)} verdicts · ${B.obs.toFixed(1)}% confirmed`);
+        REL.tw = Math.max(REL.lab1.node().getComputedTextLength(), REL.lab2.node().getComputedTextLength());
+      }
+      REL.lab1.attr('opacity', 1); REL.lab2.attr('opacity', 1);
+      const tw = REL.tw;
+      const sx = REL.cx0 + tw + 0.5 * fs, sy = REL.cy0 - 0.25 * fs;
+      const ex = bx - (rr + 5) * 0.7, ey = by - (rr + 5) * 0.7;
+      REL.lead.attr('opacity', 1).attr('d', ex > sx + 8 ? `M${sx} ${sy}H${Math.max(sx, ex - Math.abs(ey - sy))}L${ex} ${ey}` : `M${REL.cx0 + 0.5 * fs} ${REL.cy0 + 1.5 * fs}L${ex} ${ey}`);
+    } else { REL.halo.attr('opacity', 0); REL.lab1.attr('opacity', 0); REL.lab2.attr('opacity', 0); REL.lead.attr('opacity', 0); REL.bkey = null; }
+  }
+  // ---- caption, progress, ghost
+  if (A) {
+    const ci = CAPS.findIndex(c => t >= c[0] && t < c[1]);
+    if (ci !== lastCap) { lastCap = ci; const ct = $('captxt'); ct.classList.remove('in', 'hint'); ct.textContent = ci >= 0 ? CAPS[ci][2] : ''; if (playing && !RM) { void ct.offsetWidth; ct.classList.add('in'); } }
+    $('prog').style.transform = `scaleX(${(t / PERIOD).toFixed(4)})`;
+    // reset dip: a soft fade hides the jump back to the base rate
+    if (!fading) $('stage').style.opacity = (1 - bump(t, RESET - 0.55, RESET + 0.7, .5, .65)).toFixed(3);
+  } else {
+    if (lastCap !== -9) { lastCap = -9; const ct = $('captxt'); ct.classList.remove('in'); ct.classList.add('hint'); ct.textContent = 'Your turn: switch evidence on and off, or answer the interview. Hover any row or dot for the numbers.'; }
+    $('prog').style.transform = 'scaleX(0)';
+  }
+  drawGhost();
+}
+
+// ghost cursor: shows that the interview switch is a real control (attract mode only)
+function swCenter() { const r = R.interview.input.parentElement.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
+function drawGhost() {
+  const g = $('ghost');
+  if (mode !== 'attract' || RM || t < 18.9 || t > 22.6) { g.style.opacity = '0'; return; }
+  const p = swCenter(), start = { x: p.x + innerWidth * 0.16, y: p.y + innerHeight * 0.22 }, end = { x: p.x + innerWidth * 0.1, y: innerHeight + 30 };
+  let q, down = false;
+  if (t < 19.9) q = { x: lerp(start.x, p.x, ease((t - 18.9) / 1.0)), y: lerp(start.y, p.y, ease((t - 18.9) / 1.0)) };
+  else if (t < 21.6) { q = p; down = t >= 20.1 && t < 20.4; }
+  else q = { x: lerp(p.x, end.x, ease((t - 21.6) / 1.0)), y: lerp(p.y, end.y, ease((t - 21.6) / 1.0)) };
+  g.style.opacity = String(smooth(18.9, 19.2, t) * (1 - smooth(22.2, 22.6, t)));
+  g.style.transform = `translate3d(${q.x.toFixed(1)}px,${q.y.toFixed(1)}px,0)`;
+  g.classList.toggle('down', down);
+}
+
+// tooltip
+const tip = $('tip');
+function showTip(h, cx, cy) {
+  tip.innerHTML = h; tip.hidden = false;
+  const w = tip.offsetWidth, hh = tip.offsetHeight;
+  tip.style.left = clamp(cx + 14, 8, innerWidth - w - 8) + 'px';
+  tip.style.top = (cy + 16 + hh > innerHeight - 8 ? cy - hh - 12 : cy + 16) + 'px';
+}
+function hideTip() { tip.hidden = true; }
+function rowTip(key) {
+  if (key === 'prior') return `<b>Base rate</b><br>In 90 days, <span class="m">72</span> of <span class="m">1,800</span> “MFA push burst” cases were confirmed malicious: odds <span class="m">1 : 24</span>, log₂(1/24) = <b class="m">${sgn(PRIOR.bits)} bits</b>.`;
+  if (key === 'total') return '<b>Raw score</b><br>Prior plus every weight. Bits add because they are logs of likelihood ratios; the calibration map below turns the sum into a probability.';
+  const e = key === 'interview' ? IV : EV.find(x => x.id === key), lr = e.pm / e.pb;
+  const lrTxt = lr >= 1 ? `${+lr.toFixed(1)}× likelier in an attack` : `${Math.round(1 / lr)}× likelier if benign`;
+  return `<b>${INFO[key][0]}</b> <span style="color:var(--text3)">· ${e.src}</span><br>${INFO[key][1]}<br><span class="m">P(e | malicious) ${e.pm} · P(e | benign) ${e.pb.toFixed(2)}</span><br>${lrTxt} → <b class="m">${sgn(e.bits)} bits</b>${SUPER.has(key) ? '<br><span style="color:var(--cold3)">Explained away if the interview confirms the login.</span>' : ''}`;
+}
+wf.addEventListener('pointermove', e => {
+  const n = e.target.closest && e.target.closest('.r'); if (!n || n.classList.contains('c-sw')) { hideTip(); return; }
+  showTip(rowTip(n.dataset.k), e.clientX, e.clientY);
+});
+wf.addEventListener('pointerleave', hideTip);
+
+// =====================================================================
+// 5. Clock, input take-over, hooks
+// =====================================================================
+const IDLE_MS = (+qs.get('idle') || 15) * 1000;   // ?idle=seconds, for tests
+let raf = 0, lastNow = performance.now();
+const halted = () => embedPaused || document.hidden;
+function kick() { if (!raf && !halted()) { lastNow = performance.now(); raf = requestAnimationFrame(frame); } }
+function frame(now) {
+  raf = 0;
+  const dt = Math.min(0.1, (now - lastNow) / 1000); lastNow = now;
+  if (mode === 'attract' && playing) { t += dt; if (t >= PERIOD) { t -= PERIOD; } }
+  if (mode === 'user') uclock += Math.min(0.25, (now - (frame.prev || now)) / 1000) || dt;
+  frame.prev = now;
+  render();
+  if (!halted() && ((mode === 'attract' && playing) || (mode === 'user' && userAnimating()) || fading)) raf = requestAnimationFrame(frame);
+}
+function takeOver() {
+  if (mode === 'attract') {
+    KEYS.forEach(k => { user[k] = { from: attractP(k, t), to: attractTarget(k, t), at: uclock }; });
+    mode = 'user'; $('stage').style.opacity = '1';
+    setBtn();
+  }
+  lastInput = performance.now();
+  clearTimeout(idleTimer);
+  if (autoResume) idleTimer = setTimeout(resumeAttract, IDLE_MS);
+  kick();
+}
+function resumeAttract() {
+  if (halted()) { idleTimer = setTimeout(resumeAttract, 1000); return; }
+  if (mode !== 'user' || !autoResume) return;
+  fading = true; hideTip();
+  const st = $('stage'); st.style.opacity = '0';
+  setTimeout(() => { mode = 'attract'; t = 0; playing = true; lastCap = -2; setBtn(); render(); st.style.opacity = '1'; setTimeout(() => { fading = false; }, 500); kick(); }, 480);
+  kick();
+}
+document.addEventListener('change', e => {
+  const k = e.target && e.target.dataset && e.target.dataset.k; if (!k || !(k in user)) return;
+  takeOver();
+  user[k] = { from: presence(k), to: e.target.checked ? 1 : 0, at: uclock };
+  kick();
+});
+let pmAcc = 0, pmLast = null;
+addEventListener('pointermove', e => {
+  if (e.pointerType === 'touch') return;
+  if (pmLast) pmAcc += Math.abs(e.clientX - pmLast[0]) + Math.abs(e.clientY - pmLast[1]); pmLast = [e.clientX, e.clientY];
+  if (pmAcc > 8) { pmAcc = 0; if (!(e.target.closest && e.target.closest('#ctl'))) takeOver(); }
+}, { passive: true });
+['pointerdown', 'wheel', 'touchstart'].forEach(ev => addEventListener(ev, e => { if (e.target.closest && e.target.closest('#ctl')) return; takeOver(); }, { passive: true }));
+addEventListener('keydown', e => {
+  if (e.key === ' ' && !(document.activeElement && /INPUT|BUTTON/.test(document.activeElement.tagName))) { e.preventDefault(); togglePlay(); return; }
+  takeOver();
+});
+// play / pause control
+function setBtn() {
+  const on = mode === 'attract' && playing;
+  $('ppt').textContent = on ? 'Pause' : 'Play';
+  $('ppi').setAttribute('d', on ? 'M2 1h2v8H2zM6 1h2v8H6z' : 'M2 1l7 4-7 4z');
+  $('pp').setAttribute('aria-pressed', String(!on));
+  $('md').textContent = mode === 'user' ? (autoResume ? 'Exploring · auto-play resumes after 15 s idle' : 'Exploring') : playing ? 'Auto-play' : '';
+}
+function play() { autoResume = true; clearTimeout(idleTimer); if (mode !== 'attract') { mode = 'attract'; lastCap = -2; } playing = true; setBtn(); kick(); }
+function pause() { playing = false; if (mode === 'user') { autoResume = false; clearTimeout(idleTimer); } setBtn(); render(); }
+function togglePlay() { if (mode === 'attract' && playing) { autoResume = false; pause(); } else play(); }
+$('pp').addEventListener('click', togglePlay);
+function seek(tt) {
+  mode = 'attract'; playing = false; fading = false; clearTimeout(idleTimer);
+  t = ((Number(tt) % PERIOD) + PERIOD) % PERIOD; lastCap = -2;
+  setBtn(); render();
+}
+window.__seek = seek;
+window.__play = play;
+window.__state = () => { const S = compute(Object.fromEntries(KEYS.map(k => [k, presence(k)]))); return { mode, t: +t.toFixed(3), playing: playing && mode === 'attract' && !halted(), raf: !!raf, score: +S.score.toFixed(2), cal: +S.cal.toFixed(1), verdict: S.verdict }; };
+addEventListener('message', e => {
+  const m = e.data && e.data.corvid; if (!m) return;
+  if (m === 'pause') { embedPaused = true; if (raf) { cancelAnimationFrame(raf); raf = 0; } }
+  else if (m === 'play') { embedPaused = false; kick(); }
+});
+document.addEventListener('visibilitychange', () => { if (document.hidden) { if (raf) { cancelAnimationFrame(raf); raf = 0; } } else kick(); });
+
+// layout: rebuild the two D3 figures on any size change
+function relayout() { buildIso(); buildRel(); render(); }
+let roT = 0;
+const ro = new ResizeObserver(() => { cancelAnimationFrame(roT); roT = requestAnimationFrame(relayout); });
+ro.observe($('stage'));
+
+// start
+const q0 = qs.get('t');
+relayout();
+if (q0 !== null && q0 !== '' && isFinite(+q0)) seek(+q0);
+else if (RM) seek(15);
+else { setBtn(); kick(); }
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => relayout());
+})();
+</script>
+</body>
+</html>

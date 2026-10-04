@@ -1,0 +1,860 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ten million sign-ins</title>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../shared/ui.css">
+<style>
+html,body{height:100%;overflow:hidden}
+body{min-height:0;background:var(--ground)}
+.cmp{position:fixed;inset:0;display:grid;grid-template-rows:auto minmax(0,1fr)}
+/* component header */
+.ch{display:flex;align-items:center;gap:10px;height:50px;padding:0 16px;border-bottom:1px solid #1C222B;min-width:0}
+.ci{flex:none;width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:linear-gradient(160deg,#0F2230,#0B151D);border:1px solid rgba(127,214,238,.35);color:#7FD6EE}
+.ch h1{font-size:15px;font-weight:600;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.ctx{font:500 11px var(--mono);color:var(--text2);flex:none}
+.cs{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text2);white-space:nowrap;flex:none}
+.cs .dot{width:8px;height:8px}
+.cs .dot.load{color:var(--sus)} .cs .dot.ok{color:var(--ben)}
+.eng{flex:none;height:24px;font-size:11.5px;gap:5px;font-variant-numeric:tabular-nums}
+.eng b{font:600 11.5px var(--mono);color:#CFE0FF}
+/* body */
+.cb{position:relative;display:grid;grid-template-columns:minmax(0,1fr) clamp(320px,29vw,400px);gap:12px;padding:12px;min-height:0}
+.sw-wrap{position:relative;display:flex;flex-direction:column;min-height:0;min-width:0;border:1px solid var(--line);border-radius:12px;background:var(--panel);overflow:hidden}
+.ctrl{flex:none;display:flex;align-items:center;flex-wrap:wrap;gap:8px 14px;padding:9px 14px;border-bottom:1px solid #1C222B}
+.ctrl .lab{font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--text3)}
+.seg{display:inline-flex;border:1px solid var(--line2);border-radius:8px;overflow:hidden}
+.seg button{height:28px;padding:0 11px;border:0;border-left:1px solid var(--line);background:transparent;color:var(--text3);font-size:12px;cursor:pointer;white-space:nowrap}
+.seg button:first-child{border-left:0}
+.seg button:hover{color:var(--text)}
+.seg button[aria-pressed="true"]{background:#1A2230;color:var(--text)}
+.seg .s{display:none}
+.leg{margin-left:auto;display:flex;align-items:center;gap:8px;font:500 11px var(--mono);color:var(--text3);white-space:nowrap}
+.ramp{width:120px;height:8px;border-radius:4px;background:linear-gradient(90deg,#0E2633,#16506A,#2F93B5,#7FD6EE,#F2FBFF)}
+.hm{position:relative;flex:1;min-height:0;display:grid;grid-template-columns:104px minmax(0,1fr) 16px;grid-template-rows:24px minmax(0,1fr) 10px}
+.hm-top{grid-column:2;grid-row:1;position:relative;border-bottom:1px solid #1C222B}
+.hm-left{grid-column:1;grid-row:2;position:relative;border-right:1px solid #1C222B}
+.hm-plot{grid-column:2;grid-row:2;position:relative;background:#0A0D11;touch-action:none}
+.hm-plot canvas{position:absolute;inset:0;width:100%;height:100%;display:block;image-rendering:pixelated}
+#ov{position:absolute;inset:0;width:100%;height:100%;cursor:crosshair;overflow:visible;z-index:2}
+.dlab{position:absolute;right:9px;transform:translateY(-50%);font-size:11.5px;color:var(--text2);text-align:right;white-space:nowrap;line-height:1.25}
+.dlab small{display:block;font:500 10px var(--mono);color:var(--text3)}
+.tick{position:absolute;bottom:5px;transform:translateX(-50%);font:500 10.5px var(--mono);color:var(--text3);white-space:nowrap}
+.counter{position:absolute;left:14px;top:12px;z-index:3;display:flex;flex-direction:column;gap:2px;padding:10px 14px 11px;border-radius:12px;background:rgba(10,13,17,.84);border:1px solid rgba(127,214,238,.22);box-shadow:0 12px 30px rgba(0,0,0,.45);pointer-events:none;opacity:0}
+.counter b{font:600 34px/1 var(--mono);letter-spacing:-.02em;color:#E8F7FF;font-variant-numeric:tabular-nums}
+.counter span{font-size:12px;color:var(--text2)}
+.counter i{display:block;height:3px;border-radius:2px;background:#1A2733;margin-top:6px;overflow:hidden}
+.counter i em{display:block;height:100%;width:0;background:linear-gradient(90deg,#2F93B5,#7FD6EE)}
+.tip{position:absolute;z-index:6;pointer-events:none;max-width:290px;padding:8px 10px;border-radius:8px;background:#141A22;border:1px solid var(--line2);box-shadow:0 10px 26px rgba(0,0,0,.45);font-size:12px;opacity:0;transition:opacity .1s}
+.loading{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:#0A0D11;font-size:12.5px;color:var(--text2)}
+.loading .pbar{width:240px;height:4px;border-radius:2px;background:var(--line2);overflow:hidden}
+.loading .pbar i{display:block;height:100%;width:0;background:#7FD6EE}
+/* captions */
+.cap{position:absolute;left:50%;bottom:22px;z-index:8;transform:translateX(-50%);max-width:calc(100% - 32px);padding:9px 16px 10px;border-radius:12px;background:rgba(10,13,17,.86);border:1px solid rgba(255,255,255,.09);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:0 12px 34px rgba(0,0,0,.45);font-size:15.5px;line-height:1.35;font-weight:500;color:var(--text);text-align:center;white-space:nowrap;pointer-events:none;opacity:0}
+.cap .pg{position:absolute;left:14px;right:14px;bottom:3px;height:2px;border-radius:1px;background:rgba(255,255,255,.07);overflow:hidden}
+.cap .pg i{display:block;height:100%;width:0;background:rgba(232,235,239,.38)}
+.hint{position:absolute;left:50%;bottom:22px;z-index:8;transform:translateX(-50%);padding:6px 12px;border-radius:999px;background:rgba(10,13,17,.9);border:1px solid var(--line2);font-size:12px;color:var(--text2);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .4s}
+body.nocap .cap{display:none}
+/* query panel */
+.qp{display:flex;flex-direction:column;min-height:0;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.ph2{flex:none;display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid #1C222B;min-height:44px}
+.ph2 h2{font-size:13px;font-weight:600;white-space:nowrap}
+.ph2 .btn{margin-left:auto}
+.qb{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.qe{padding:16px 14px;display:flex;flex-direction:column;gap:14px}
+.qe .lead{font-size:13.5px;line-height:1.45;color:var(--text)}
+.qe .lead span{color:var(--text3)}
+.spot{border-top:1px solid #1C222B;padding-top:12px}
+.sp{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #1A2029;font-size:12.5px}
+.sp .t3{font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sp b{font-weight:600;min-width:20px;text-align:right}
+.qe .glyph{width:100%;height:84px;border-radius:10px;border:1px dashed #2C3540;display:grid;place-items:center;color:var(--text3);font-size:12px;background:repeating-linear-gradient(135deg,rgba(255,255,255,.015) 0 8px,transparent 8px 16px)}
+.kv2{display:grid;grid-template-columns:86px minmax(0,1fr);gap:6px 12px;font-size:12.5px;margin:0}
+.kv2 dt{color:var(--text3)} .kv2 dd{margin:0;min-width:0}
+.qsel{padding:12px 14px 10px}
+.sqlw{position:relative;padding:0 14px;flex:0 1 auto;min-height:0;overflow:hidden;-webkit-mask-image:linear-gradient(#000 calc(100% - 18px),transparent);mask-image:linear-gradient(#000 calc(100% - 18px),transparent)}
+.sqlw.fits{-webkit-mask-image:none;mask-image:none}
+.code{font-size:11px;line-height:1.6;padding:10px 12px;white-space:pre-wrap;word-break:break-word;min-height:0}
+.caret{display:inline-block;width:7px;height:13px;margin-left:1px;vertical-align:-2px;background:#7FD6EE}
+.res{flex:none;padding:10px 14px 0}
+.rh{display:flex;align-items:baseline;gap:8px;font-size:12px;font-weight:600;margin-bottom:4px}
+.rh .t3{font-weight:400;font-size:11.5px;margin-left:auto}
+.utbl td{font-size:12.5px;padding:6px 8px;border-bottom:1px solid #1A2029}
+.utbl tr td:first-child{padding-left:0}
+.utbl tr td:last-child{padding-right:0;text-align:right}
+.utbl .ct{font:600 13px var(--mono);text-align:right}
+.utbl tr.rvh{opacity:0}
+.qf{flex:none;margin-top:auto;display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:10px 14px;border-top:1px solid #1C222B}
+.qf .t3{font-size:11.5px;margin-left:auto}
+/* ghost + fade */
+.ghost{position:fixed;left:0;top:0;z-index:40;pointer-events:none;opacity:0;will-change:transform}
+.ghost svg{display:block;transform:scale(1.12);transform-origin:2px 2px;filter:drop-shadow(0 3px 6px rgba(0,0,0,.6))}
+.ghost .rip{position:absolute;left:-14px;top:-14px;width:28px;height:28px;border-radius:50%;border:2px solid rgba(232,235,239,.9);opacity:0}
+.fade{position:absolute;inset:0;z-index:30;background:var(--ground);opacity:0;pointer-events:none}
+@media (max-width:1460px){ .ctrl .hint2{display:none} }
+@media (max-width:1180px){ #sel-chip,.leg .lx{display:none} .code{font-size:10.5px} }
+@media (max-width:1100px){ .seg button{padding:0 8px;font-size:11.5px} .ramp{width:80px} }
+@media (max-height:700px){
+  .ch{height:44px}
+  .cb{padding:10px;gap:10px}
+  .ctrl{padding:7px 12px}
+  .seg button{height:26px}
+  .qsel{padding:8px 12px 6px}
+  .qsel .kv2 > :nth-child(n+3){display:none}
+  .code{font-size:10.5px;padding:8px 10px;line-height:1.5}
+  .sqlw{padding:0 12px}
+  .res{padding:8px 12px 0}
+  .qf{padding:7px 12px}
+  .qf .t3{display:none}
+  .cap{font-size:14px;bottom:18px}
+  .counter b{font-size:28px}
+}
+@media (max-width:720px){
+  .ch{height:44px;padding:0 12px;gap:8px}
+  .ch h1{font-size:13.5px}
+  .ch h1 .x,.ctx{display:none}
+  .eng{font-size:10.5px;padding:0 6px}
+  .eng .x,#st{display:none}
+  .cb{grid-template-columns:1fr;grid-template-rows:minmax(0,47fr) minmax(0,53fr);padding:8px;gap:8px}
+  .ctrl{padding:6px 8px;gap:6px}
+  .ctrl .lab,.leg{display:none}
+  .seg{width:100%}
+  .seg button{flex:1;padding:0 4px;font-size:11.5px}
+  .seg .l{display:none} .seg .s{display:inline}
+  .hm{grid-template-columns:62px minmax(0,1fr) 10px}
+  .dlab{font-size:10px;right:6px}
+  .counter{left:8px;top:8px;padding:7px 10px}
+  .counter b{font-size:22px}
+  .cap{font-size:12.5px;white-space:normal;width:calc(100% - 20px);bottom:16px;padding:7px 10px 9px}
+  .qsel .kv2 > :nth-child(n+3){display:none}
+  .code{font-size:10px;line-height:1.5;padding:8px 10px}
+  .qe .glyph{display:none}
+  .qf .t3{display:none}
+}
+</style>
+</head>
+<body>
+<div class="cmp" id="cmp">
+  <header class="ch">
+    <span class="ci" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16"><g fill="currentColor"><rect x="1" y="2" width="3" height="2.4" rx=".6" opacity=".35"/><rect x="5" y="2" width="3" height="2.4" rx=".6" opacity=".6"/><rect x="9" y="2" width="3" height="2.4" rx=".6" opacity=".35"/><rect x="1" y="6.8" width="3" height="2.4" rx=".6" opacity=".6"/><rect x="5" y="6.8" width="3" height="2.4" rx=".6" opacity=".35"/><rect x="9" y="6.8" width="3" height="2.4" rx=".6" opacity=".5"/><rect x="1" y="11.6" width="3" height="2.4" rx=".6" opacity=".35"/><rect x="5" y="11.6" width="3" height="2.4" rx=".6" opacity=".5"/><rect x="9" y="11.6" width="3" height="2.4" rx=".6" opacity=".35"/></g><circle cx="13.4" cy="3.2" r="2.1" fill="#F2FBFF"/></svg></span>
+    <h1>Ten million sign-ins<span class="x">, hunted in the browser</span></h1>
+    <span class="chip ctx">Hunt H-77 · Meridian Freight</span>
+    <span class="cs" role="status"><span class="dot live load" id="st-dot"></span><span id="st">Loading</span></span>
+    <span class="chip c-info eng" id="eng"><b id="eng-n">0</b><span class="x">events binned</span><span id="eng-ms"></span></span>
+  </header>
+  <main class="cb" id="cb">
+    <section class="sw-wrap" aria-label="Identity by time density map">
+      <div class="ctrl">
+        <span class="lab">Metric</span>
+        <span class="seg" role="group" aria-label="Metric" id="metric">
+          <button type="button" data-v="0" aria-pressed="false"><span class="l">Push denials</span><span class="s">Denials</span></button><button type="button" data-v="2" aria-pressed="false"><span class="l">New-network sign-ins</span><span class="s">New net</span></button><button type="button" data-v="1" aria-pressed="true"><span class="l">Successful sign-ins</span><span class="s">Success</span></button><button type="button" data-v="3" aria-pressed="false"><span class="l">Other failures</span><span class="s">Failures</span></button>
+        </span>
+        <span class="leg" aria-hidden="true"><span id="leg-min">0</span><span class="ramp"></span><span id="leg-max">—</span><span class="lx">per 15 min · log</span></span>
+        <span class="t3 hint2" style="font-size:11.5px">drag to select · <span class="kbd">Esc</span> clears</span>
+      </div>
+      <div class="hm" id="hm">
+        <div class="hm-top" id="hm-top"></div>
+        <div class="hm-left" id="hm-left"></div>
+        <div class="hm-plot" id="plot">
+          <svg id="ov" aria-label="Density map: one row per identity, one column per 15 minutes. Drag to select a region."></svg>
+          <div class="counter" id="counter"><b id="cnt">0</b><span>Okta sign-ins streamed · 14 days</span><i><em id="cnt-bar"></em></i></div>
+          <div class="tip" id="tip" role="tooltip"></div>
+          <div class="loading" id="loading"><span id="load-text">Preparing two weeks of sign-ins…</span><span class="pbar"><i id="load-bar"></i></span></div>
+        </div>
+      </div>
+      <div class="cap" id="cap" aria-live="polite"><span id="cap-t"></span><span class="pg"><i id="cap-p"></i></span></div>
+      <div class="hint" id="hint">You're in control · the demo resumes after 15 s idle</div>
+    </section>
+    <aside class="qp" aria-labelledby="qp-h">
+      <div class="ph2"><h2 id="qp-h">Selection → SQL</h2><span class="chip sm" id="sel-chip" hidden></span><button class="btn sm gh" type="button" id="clear" disabled>Clear</button></div>
+      <div class="qb" id="qb"></div>
+    </aside>
+    <div class="fade" id="fade"></div>
+  </main>
+</div>
+<div class="ghost" id="ghost" aria-hidden="true"><svg width="20" height="24" viewBox="0 0 20 24"><path d="M2 1.5v18.2l4.7-4.4 3.1 7.1 3.3-1.5-3.1-6.9h6.6z" fill="#F4F6F8" stroke="#0A0D11" stroke-width="1.4" stroke-linejoin="round"/></svg><span class="rip" id="rip"></span></div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.webgpu.min.js",
+  "three/webgpu": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.webgpu.min.js",
+  "three/tsl": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.tsl.min.js"
+} }
+</script>
+<script type="module">
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, t) => a + (b - a) * t;
+const easeIO = t => { t = clamp(t, 0, 1); return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; };
+const easeOut = t => 1 - Math.pow(1 - clamp(t, 0, 1), 3);
+const qs = new URLSearchParams(location.search);
+const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const IDLE_MS = 1000 * (+qs.get('idle') || 15);
+if (qs.get('captions') === '0') document.body.classList.add('nocap');
+const fmt = n => Math.round(n).toLocaleString('en-US');
+
+/* =====================================================================
+   Data model (from the verified density explorer): 2,048 identities, 14 days
+   ===================================================================== */
+const N_EVENTS = Math.max(200000, Math.min(12000000, +(qs.get('n') || 10000000)));
+const START = Date.parse('2026-09-19T03:00:00Z'), MINUTES = 20160, BIN = 15, TB = MINUTES / BIN;
+const DEPTS = [
+  { name: 'Service accounts', short: 'Service', n: 64, w: 38, prof: 0 },
+  { name: 'Finance', short: 'Finance', n: 180, w: 1.2, prof: 1 },
+  { name: 'Logistics ops', short: 'Ops', n: 420, w: 1.0, prof: 2 },
+  { name: 'Warehouse', short: 'Warehouse', n: 610, w: 0.55, prof: 3 },
+  { name: 'Sales', short: 'Sales', n: 300, w: 1.0, prof: 1 },
+  { name: 'IT', short: 'IT', n: 120, w: 1.6, prof: 4 },
+  { name: 'HR', short: 'HR', n: 60, w: 0.9, prof: 1 },
+  { name: 'Executive', short: 'Exec', n: 30, w: 0.8, prof: 5 },
+  { name: 'Engineering', short: 'Eng', n: 264, w: 1.4, prof: 6 },
+];
+const NUSERS = DEPTS.reduce((a, d) => a + d.n, 0), R = NUSERS;   // 2048 rows
+const DSTART = []; { let r = 0; DEPTS.forEach(d => { DSTART.push(r); r += d.n; }); }
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const rnd = mulberry32(4127);
+const SUR = ['alvarez','huang','santos','lind','reyes','mendes','nair','osei','ibrahim','lindqvist','kowalski','ochoa','lund','berg','cruz','dahl','eze','fox','gill','hahn','ito','jung','kerr','lim','moss','ngo','otto','park','quinn','ruiz','shah','tan','uddin','vega','wolf','xu','yoon','adler','baker','costa','dube','evans','ferro','gomez','haas','iqbal','jensen','kato','lopez','meyer','novak','obi','patel','qadir','rossi','silva','toth','ueda','vidal','weber','young','zane','amari','brandt','chen','diaz','ekberg','fujii','grant','holm','ivers','jovic','klein','lacroix','mwangi','nolan','ortiz','pires','rahman','sato','torres','ulloa','varga','ward','yamada','zhou','abbott','bauer','carter','dupont','engel','farah','graf','hughes','ilic','jaramillo','kim','lowe','maric','nash','oliveira','price','reid','sousa','tanaka','vogel','wells','yusuf','arnaud','bianchi','castro','delgado','esposito','franco','gupta','hoffmann','ivanov','janssen'];
+const INI = 'abcdefghijklmnoprstvwy';
+const NAMED = { 1: { 37: 'j.alvarez', 12: 'd.huang', 88: 'r.santos', 140: 'c.lind', 60: 'a.reyes', 61: 'k.mendes', 62: 'p.nair', 5: 'c.osei' }, 2: { 199: 't.ibrahim', 77: 'p.lindqvist' }, 3: { 250: 'm.kowalski' }, 4: { 40: 'b.ochoa', 77: 'k.lund' } };
+const SVC = ['svc-backup', 'svc-etl', 'it-svc-deploy', 'svc-ci-runner', 'svc-finance-etl', 'svc-billing-sync', 'svc-s3-lifecycle', 'svc-okta-sync', 'svc-jira', 'svc-wms-api', 'svc-tms-api', 'svc-edi-gw'];
+const USERS = []; const used = new Set(Object.values(NAMED).flatMap(o => Object.values(o)));
+DEPTS.forEach((d, di) => { for (let k = 0; k < d.n; k++) {
+  let name;
+  if (di === 0) name = k < SVC.length ? SVC[k] : `svc-${['sync', 'agent', 'batch', 'report', 'scan', 'probe'][k % 6]}-${String(k).padStart(2, '0')}`;
+  else if (NAMED[di] && NAMED[di][k]) name = NAMED[di][k];
+  else { do { name = INI[Math.floor(rnd() * INI.length)] + '.' + SUR[Math.floor(rnd() * SUR.length)]; if (used.has(name)) name += Math.floor(rnd() * 9 + 1); } while (used.has(name)); used.add(name); }
+  const g = Math.sqrt(-2 * Math.log(Math.max(1e-9, rnd()))) * Math.cos(6.2831853 * rnd());
+  USERS.push({ name, dept: di, w: d.w * Math.exp(0.5 * g), travel: null });
+} });
+const uid = n => USERS.findIndex(u => u.name === n);
+for (let k = 0; k < 36; k++) { const u = 64 + Math.floor(rnd() * (NUSERS - 64)); if (Object.values(NAMED).some(o => Object.values(o).includes(USERS[u].name))) continue; const s = Math.floor(1 + rnd() * 11) * 1440; USERS[u].travel = [s, s + Math.floor(1 + rnd() * 3) * 1440]; }
+const mOf = iso => Math.floor((Date.parse(iso + 'Z') - START) / 60000);
+const pack = (minute, u, type, na) => (minute & 0x7FFF) | (u << 15) | (type << 26) | ((na ? 1 : 0) << 28);
+const SCRIPT = [];
+{ const ja = uid('j.alvarez'), mk = uid('m.kowalski'), ti = uid('t.ibrahim'), pl = uid('p.lindqvist'), dh = uid('d.huang');
+  const t0 = Date.parse('2026-10-03T02:11:52Z');
+  for (let i = 0; i < 14; i++) SCRIPT.push(pack(Math.floor((t0 + i * 11400 - START) / 60000), ja, 1, 0));
+  SCRIPT.push(pack(mOf('2026-10-03T02:14:38'), ja, 0, 1));
+  for (let i = 0; i < 24; i++) SCRIPT.push(pack(mOf('2026-10-03T02:15:00') + Math.floor(i * 1.05), ja, 0, 1));
+  for (let i = 0; i < 6; i++) SCRIPT.push(pack(mOf('2026-09-28T18:52:00') + i, mk, 1, 0));
+  SCRIPT.push(pack(mOf('2026-09-28T19:02:00'), mk, 0, 1));
+  for (let i = 0; i < 5; i++) SCRIPT.push(pack(mOf('2026-09-28T19:03:00') + i * 6, mk, 0, 1));
+  for (let i = 0; i < 5; i++) SCRIPT.push(pack(mOf('2026-09-30T07:46:00') + i * 2, ti, 1, 0));
+  SCRIPT.push(pack(mOf('2026-09-30T07:55:00'), ti, 0, 0));
+  for (let i = 0; i < 4; i++) SCRIPT.push(pack(mOf('2026-09-25T14:16:00') + i * 4, pl, 1, 0));
+  for (let i = 0; i < 3; i++) SCRIPT.push(pack(mOf('2026-09-22T16:05:00') + i * 2, dh, 1, 0));
+}
+const NOTE = { 'j.alvarez': ['CASE-4127', 'v-mal'], 'm.kowalski': ['H-77 lead · no case', 'v-sus'], 't.ibrahim': ['known device', 'v-ben'], 'p.lindqvist': ['re-enrolled 09-25', 'v-ben'] };
+const METRIC = { 0: 'push denials', 1: 'successful sign-ins', 2: 'new-network sign-ins', 3: 'other failures' };
+const RAMP = ['#0E2633', '#16506A', '#2F93B5', '#7FD6EE', '#F2FBFF'];
+const HASH = 2654435761;          // Weyl/golden-ratio hash: a prefix by threshold is an even sample of the stream
+const thrOf = f => f >= 1 ? 0xFFFFFFFF : Math.max(0, Math.floor(f * 4294967296));
+
+/* worker: generates the events; bins them when the GPU path is unavailable */
+const WORKER_SRC = `
+let EV = null;
+function profile(p, m) {
+  const lm = m - 120, day = Math.floor(lm / 1440), lmd = ((lm % 1440) + 1440) % 1440, dow = ((6 + day) % 7 + 7) % 7, we = dow === 0 || dow === 6;
+  const office = (lmd >= 480 && lmd < 1080) ? (lmd >= 720 && lmd < 780 ? 0.75 : 1) : ((lmd >= 420 && lmd < 480) || (lmd >= 1080 && lmd < 1200)) ? 0.35 : 0.04;
+  if (p === 0) return (1 + ((m % 60) < 2 ? 2.2 : 0)) * ((lmd >= 60 && lmd < 180) ? 1.6 : 1);
+  if (p === 1) return office * (we ? 0.12 : 1);
+  if (p === 2) return (0.45 + 0.55 * office) * (we ? 0.7 : 1);
+  if (p === 3) { let pk = 0; for (const c of [600, 1080, 120]) { let d = Math.abs(lmd - c); d = Math.min(d, 1440 - d); pk = Math.max(pk, Math.exp(-(d / 150) * (d / 150))); } return (0.35 + 0.65 * pk) * (we ? 0.6 : 1); }
+  if (p === 4) return (office + 0.15) * (we ? 0.25 : 1);
+  if (p === 5) return ((lmd >= 420 && lmd < 1140) ? 0.95 : 0.06) * (we ? 0.25 : 1);
+  const eng = (lmd >= 600 && lmd < 1200) ? 1 : (lmd >= 1200 || lmd < 60) ? 0.3 : 0.05; return eng * (we ? 0.2 : 1);
+}
+function alias(w) {
+  const n = w.length, prob = new Float32Array(n), al = new Int32Array(n), s = w.reduce((a, b) => a + b, 0), q = new Float64Array(n), small = [], large = [];
+  for (let i = 0; i < n; i++) { q[i] = w[i] * n / s; (q[i] < 1 ? small : large).push(i); }
+  while (small.length && large.length) { const a = small.pop(), b = large.pop(); prob[a] = q[a]; al[a] = b; q[b] = q[b] + q[a] - 1; (q[b] < 1 ? small : large).push(b); }
+  for (const i of large.concat(small)) { prob[i] = 1; al[i] = i; }
+  return { prob, al, n };
+}
+function gen(msg) {
+  const { N, users, script, seed } = msg; let s = seed >>> 0 || 1;
+  const rnd = () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; };
+  const tables = []; for (let p = 0; p < 7; p++) { const w = new Float64Array(20160); for (let m = 0; m < 20160; m++) w[m] = profile(p, m); tables.push(alias(w)); }
+  const ev = new Uint32Array(N), totalW = users.reduce((a, u) => a + u.w, 0), R = N - script.length;
+  let k = 0, lastPost = 0;
+  for (let u = 0; u < users.length && k < R; u++) {
+    const U = users[u], cnt = u === users.length - 1 ? R - k : Math.min(R - k, Math.round(R * U.w / totalW)), T = tables[U.prof], svc = U.prof === 0;
+    for (let c = 0; c < cnt; c++) {
+      const r1 = rnd() * T.n, b = r1 | 0, m = (r1 - b) < T.prob[b] ? b : T.al[b], r = rnd();
+      let type = 0; if (svc) { if (r < 0.006) type = 2; } else if (r < 0.0012) type = 1; else if (r < 0.02) type = 2;
+      let na = 0; if (type === 0) { const tr = U.travel; na = (tr && m >= tr[0] && m < tr[1]) ? (rnd() < 0.3 ? 1 : 0) : (rnd() < 0.00004 ? 1 : 0); }
+      ev[k++] = (m & 0x7FFF) | (u << 15) | (type << 26) | (na << 28);
+    }
+    if (k - lastPost > 400000) { postMessage({ progress: k / N }); lastPost = k; }
+  }
+  for (const e of script) ev[k++] = e;
+  return ev;
+}
+function bin(msg) {
+  const { metric, tb, thr } = msg, bins = new Uint32Array(${NUSERS} * tb), t0 = performance.now(), all = thr >= 4294967295;
+  for (let i = 0; i < EV.length; i++) {
+    if (!all && (Math.imul(i, ${HASH}) >>> 0) > thr) continue;
+    const e = EV[i], u = (e >>> 15) & 0x7FF, type = (e >>> 26) & 3, na = (e >>> 28) & 1;
+    const ok = metric === 0 ? type === 1 : metric === 1 ? type === 0 : metric === 2 ? (type === 0 && na === 1) : type === 2;
+    if (ok) bins[u * tb + Math.floor((e & 0x7FFF) / ${BIN})]++;
+  }
+  return { bins, ms: performance.now() - t0 };
+}
+onmessage = e => {
+  const m = e.data;
+  if (m.cmd === 'gen') { EV = gen(m); if (m.keep) postMessage({ done: true, n: EV.length }); else { const out = EV; EV = null; postMessage({ done: true, events: out }, [out.buffer]); } }
+  else if (m.cmd === 'bin') { const r = bin(m); postMessage({ bins: r.bins, ms: r.ms, id: m.id }, [r.bins.buffer]); }
+};`;
+const usersMsg = USERS.map(u => ({ w: u.w, prof: DEPTS[u.dept].prof, travel: u.travel }));
+let worker = null;
+function generate(keep) {
+  return new Promise((resolve, reject) => {
+    try { worker = new Worker(URL.createObjectURL(new Blob([WORKER_SRC], { type: 'text/javascript' }))); } catch (e) { worker = null; }
+    if (!worker) {
+      const fn = new Function(WORKER_SRC.replace('onmessage =', 'self.__onmsg =') + '; return { gen, bin, setEV: e => { EV = e; } };')();
+      const ev = fn.gen({ N: N_EVENTS, users: usersMsg, script: SCRIPT, seed: 20261003 }); fn.setEV(ev);
+      worker = { local: fn }; resolve(keep ? null : ev); return;
+    }
+    worker.onmessage = e => { const m = e.data; if (m.progress != null) { $('#load-bar').style.width = (m.progress * 100).toFixed(0) + '%'; $('#load-text').textContent = `Preparing two weeks of sign-ins: ${(m.progress * N_EVENTS / 1e6).toFixed(1)}M of ${(N_EVENTS / 1e6).toFixed(0)}M`; }
+      else if (m.done) resolve(m.events || null); };
+    worker.onerror = err => reject(err);
+    worker.postMessage({ cmd: 'gen', N: N_EVENTS, users: usersMsg, script: SCRIPT, seed: 20261003, keep });
+  });
+}
+let binReq = 0;
+function cpuBin(metric, thr) {
+  const msg = { cmd: 'bin', metric, tb: TB, thr, id: ++binReq };
+  if (worker.local) return Promise.resolve(worker.local.bin(msg));
+  return new Promise(resolve => { const h = e => { if (e.data.id !== msg.id) return; worker.removeEventListener('message', h); resolve(e.data); }; worker.addEventListener('message', h); worker.postMessage(msg); });
+}
+
+/* =====================================================================
+   GPU path: Three.js WebGPURenderer + TSL compute (bin → max → max-pool → halo)
+   ===================================================================== */
+const plot = $('#plot'), ov = $('#ov'), tip = $('#tip');
+let GPU = null;
+async function initGPU(events) {
+  if (qs.has('cpu') || !navigator.gpu) return null;
+  const THREE = await import('three/webgpu');
+  const T = await import('three/tsl');
+  const { Fn, instancedArray, instanceIndex, uniform, uint, int, float, vec2, vec3, vec4, If, Loop, atomicAdd, atomicMax, atomicStore, atomicLoad, textureStore, uvec2, max: tmax, log, mix, clamp: tclamp, texture, uv, select } = T;
+  const canvas = document.createElement('canvas'); canvas.id = 'gpu'; plot.insertBefore(canvas, ov);
+  const renderer = new THREE.WebGPURenderer({ canvas, antialias: false, alpha: false });
+  renderer.outputColorSpace = THREE.LinearSRGBColorSpace; renderer.toneMapping = THREE.NoToneMapping;
+  try { await renderer.init(); } catch (e) { canvas.remove(); return null; }
+  if (renderer.backend.isWebGPUBackend !== true) { renderer.dispose(); canvas.remove(); return null; }
+  const MAXBINS = R * TB, MAXPIX = 2048 * 1100, CHUNK = 4000000;
+  const evNode = instancedArray(events, 'uint');
+  const rowArr = new Uint32Array(NUSERS); for (let i = 0; i < NUSERS; i++) rowArr[i] = i + 1;
+  const rowNode = instancedArray(rowArr, 'uint');
+  const binNode = instancedArray(MAXBINS, 'uint').toAtomic();
+  const maxNode = instancedArray(4, 'uint').toAtomic();
+  const pixNode = instancedArray(MAXPIX, 'uint');
+  const U = { off: uniform(0, 'uint'), n: uniform(events.length, 'uint'), thr: uniform(0xFFFFFFFF, 'uint'), metric: uniform(1, 'uint'), binMin: uniform(BIN, 'uint'), tb: uniform(TB, 'uint'), nb: uniform(MAXBINS, 'uint'), r: uniform(R, 'uint'), tw: uniform(1, 'uint'), th: uniform(1, 'uint'), sp: uniform(1, 'int') };
+  const cClear = Fn(() => {
+    If(instanceIndex.lessThan(U.nb), () => { atomicStore(binNode.element(instanceIndex), uint(0)); });
+    If(instanceIndex.equal(uint(0)), () => { atomicStore(maxNode.element(uint(0)), uint(0)); });
+  })().compute(MAXBINS);
+  const cBin = Fn(() => {
+    const i = instanceIndex.add(U.off);
+    // stream replay: an event is "in" when its golden-ratio hash is under the threshold
+    If(i.lessThan(U.n).and(i.mul(uint(HASH)).lessThanEqual(U.thr)), () => {
+      const e = evNode.element(i).toVar();
+      const minute = e.bitAnd(uint(0x7FFF)), user = e.shiftRight(uint(15)).bitAnd(uint(0x7FF));
+      const type = e.shiftRight(uint(26)).bitAnd(uint(3)), na = e.shiftRight(uint(28)).bitAnd(uint(1));
+      const row1 = rowNode.element(user);
+      const ok = uint(0).toVar();
+      If(U.metric.equal(uint(0)), () => { ok.assign(select(type.equal(uint(1)), uint(1), uint(0))); })
+        .ElseIf(U.metric.equal(uint(1)), () => { ok.assign(select(type.equal(uint(0)), uint(1), uint(0))); })
+        .ElseIf(U.metric.equal(uint(2)), () => { ok.assign(select(type.equal(uint(0)), na, uint(0))); })
+        .Else(() => { ok.assign(select(type.equal(uint(2)), uint(1), uint(0))); });
+      If(ok.equal(uint(1)).and(row1.greaterThan(uint(0))), () => {
+        atomicAdd(binNode.element(row1.sub(uint(1)).mul(U.tb).add(minute.div(U.binMin))), uint(1));
+      });
+    });
+  })().compute(CHUNK);
+  const cMax = Fn(() => { If(instanceIndex.lessThan(U.nb), () => { atomicMax(maxNode.element(uint(0)), atomicLoad(binNode.element(instanceIndex))); }); })().compute(MAXBINS);
+  // max-pool bins into pixels: a pixel shows the hottest bin under it, so a one-person burst never averages away
+  const cPool = Fn(() => {
+    const x = instanceIndex.mod(U.tw), y = instanceIndex.div(U.tw);
+    If(y.lessThan(U.th), () => {
+      const c0 = x.mul(U.tb).div(U.tw), c1 = tmax(x.add(uint(1)).mul(U.tb).div(U.tw), c0.add(uint(1)));
+      const r0 = y.mul(U.r).div(U.th), r1 = tmax(y.add(uint(1)).mul(U.r).div(U.th), r0.add(uint(1)));
+      const v = uint(0).toVar();
+      Loop({ start: uint(0), end: uint(8), type: 'uint', name: 'dr' }, ({ dr }) => {
+        const rr = r0.add(dr);
+        If(rr.lessThan(r1), () => {
+          Loop({ start: uint(0), end: uint(8), type: 'uint', name: 'dc' }, ({ dc }) => {
+            const cc = c0.add(dc);
+            If(cc.lessThan(c1), () => { v.assign(tmax(v, atomicLoad(binNode.element(rr.mul(U.tb).add(cc))))); });
+          });
+        });
+      });
+      pixNode.element(instanceIndex).assign(v);
+    });
+  })().compute(MAXPIX);
+  const C = RAMP.map(h => vec3(parseInt(h.slice(1, 3), 16) / 255, parseInt(h.slice(3, 5), 16) / 255, parseInt(h.slice(5, 7), 16) / 255));
+  const ramp = Fn(([t]) => { const s = tclamp(t, 0.0, 1.0).mul(4.0); const c = mix(C[0], C[1], tclamp(s, 0.0, 1.0)).toVar();
+    c.assign(mix(c, C[2], tclamp(s.sub(1.0), 0.0, 1.0))); c.assign(mix(c, C[3], tclamp(s.sub(2.0), 0.0, 1.0))); c.assign(mix(c, C[4], tclamp(s.sub(3.0), 0.0, 1.0))); return c; });
+  let tex = null, cShade = null;
+  const scene = new THREE.Scene(), cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  const mat = new THREE.MeshBasicNodeMaterial(); const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat); scene.add(mesh);
+  function buildShade(tw, th) {
+    if (tex) tex.dispose();
+    tex = new THREE.StorageTexture(tw, th); tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter;
+    cShade = Fn(() => {
+      const x = int(instanceIndex.mod(U.tw)), y = int(instanceIndex.div(U.tw));
+      If(y.lessThan(int(U.th)), () => {
+        const mx = tmax(float(atomicLoad(maxNode.element(uint(0)))), float(1.0));
+        const lnorm = log(mx.add(1.0));
+        const norm = v => log(float(v).add(1.0)).div(lnorm);
+        const v0 = pixNode.element(instanceIndex);
+        const g = float(0).toVar();
+        // halo: hot pixels cast a soft glow so an isolated burst is seen at a glance
+        Loop({ start: int(-4), end: int(5), type: 'int', name: 'oy' }, ({ oy }) => {
+          Loop({ start: int(-4), end: int(5), type: 'int', name: 'ox' }, ({ ox }) => {
+            const nx = x.add(ox.mul(U.sp)), ny = y.add(oy.mul(U.sp));
+            If(nx.greaterThanEqual(int(0)).and(ny.greaterThanEqual(int(0))).and(nx.lessThan(int(U.tw))).and(ny.lessThan(int(U.th))), () => {
+              const nv = pixNode.element(uint(ny.mul(int(U.tw)).add(nx)));
+              const d = float(ox.mul(ox).add(oy.mul(oy))).sqrt();
+              const hot = tclamp(norm(nv).sub(0.45).div(0.55), 0.0, 1.0);
+              g.assign(tmax(g, hot.mul(tclamp(float(1.0).sub(d.div(5.0)), 0.0, 1.0))));
+            });
+          });
+        });
+        const bg = vec3(10 / 255, 13 / 255, 17 / 255);
+        const base = select(v0.greaterThan(uint(0)), ramp(norm(v0).mul(0.88).add(0.12)), bg);
+        const glow = mix(bg, ramp(g.mul(0.6).add(0.4)), g.mul(0.7));
+        const col = select(v0.greaterThan(uint(0)), tmax(base, glow), tmax(glow, bg));
+        textureStore(tex, uvec2(uint(x), uint(y)), vec4(col, 1.0)).toWriteOnly();
+      });
+    })().compute(MAXPIX);
+    mat.colorNode = texture(tex, vec2(uv().x, uv().y.oneMinus())); mat.needsUpdate = true;
+  }
+  let curW = 0, curH = 0;
+  function size() {
+    const r = plot.getBoundingClientRect(), pr = Math.min(window.devicePixelRatio || 1, 2);
+    const tw = Math.min(2048, Math.max(64, Math.round(r.width * pr))), th = Math.min(1100, Math.max(64, Math.round(r.height * pr)));
+    renderer.setPixelRatio(1); renderer.setSize(tw, th, false);
+    if (tw !== curW || th !== curH) { curW = tw; curH = th; buildShade(tw, th); }
+    U.tw.value = tw; U.th.value = th; U.sp.value = Math.max(1, Math.round(pr)); return { tw, th };
+  }
+  function draw() { size(); renderer.compute(cPool); renderer.compute(cShade); renderer.render(scene, cam); }
+  async function run(metric, thr, readback) {
+    U.metric.value = metric; U.thr.value = thr;
+    const t0 = performance.now();
+    renderer.compute(cClear);
+    for (let off = 0; off < events.length; off += CHUNK) { U.off.value = off; renderer.compute(cBin); }
+    renderer.compute(cMax);
+    draw();
+    if (!readback) { await renderer.backend.device.queue.onSubmittedWorkDone(); return { bins: null, ms: null }; }
+    const raw = await renderer.getArrayBufferAsync(binNode.value), buf = raw instanceof ArrayBuffer ? raw : raw.buffer;
+    return { bins: new Uint32Array(buf.slice(0, R * TB * 4)), ms: performance.now() - t0 };
+  }
+  // warm-up: compile every pipeline (and the readback path) once, so timings report steady-state binning
+  await run(1, 0, true); await run(0, 0, true);
+  return { run, draw, kind: 'gpu' };
+}
+
+/* CPU path: worker bins, Canvas 2D draws the same max-pooled pixels and halo */
+let cpuCanvas = null;
+function drawCPU(bins) {
+  if (!cpuCanvas) { cpuCanvas = document.createElement('canvas'); cpuCanvas.id = 'cpu'; plot.insertBefore(cpuCanvas, ov); }
+  const r = plot.getBoundingClientRect(), tw = Math.max(64, Math.round(r.width)), th = Math.max(64, Math.round(r.height));
+  if (cpuCanvas.width !== tw || cpuCanvas.height !== th) { cpuCanvas.width = tw; cpuCanvas.height = th; }
+  const pix = new Uint32Array(tw * th), c0s = new Int32Array(tw), c1s = new Int32Array(tw);
+  for (let x = 0; x < tw; x++) { c0s[x] = Math.floor(x * TB / tw); c1s[x] = Math.max(Math.floor((x + 1) * TB / tw), c0s[x] + 1); }
+  let mx = 1;
+  for (let y = 0; y < th; y++) { const r0 = Math.floor(y * R / th), r1 = Math.min(R, Math.max(Math.floor((y + 1) * R / th), r0 + 1));
+    for (let x = 0; x < tw; x++) { const c0 = c0s[x], c1 = Math.min(TB, c1s[x]); let v = 0;
+      for (let rr = r0; rr < r1; rr++) { const o = rr * TB; for (let cc = c0; cc < c1; cc++) { const b = bins[o + cc]; if (b > v) v = b; } }
+      pix[y * tw + x] = v; if (v > mx) mx = v; } }
+  const ln = Math.log(mx + 1), C = RAMP.map(h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]);
+  const ramp = t => { const s = clamp(t, 0, 1) * 4, i = Math.min(3, Math.floor(s)), f = s - i; return C[i].map((c, k) => c + (C[i + 1][k] - c) * f); };
+  const LUT = new Uint8Array(256 * 3); for (let i = 0; i < 256; i++) { const c = ramp(i / 255); LUT[i * 3] = c[0]; LUT[i * 3 + 1] = c[1]; LUT[i * 3 + 2] = c[2]; }
+  const glow = new Float32Array(tw * th);
+  for (let i = 0; i < pix.length; i++) { const v = pix[i]; if (!v) continue; const hot = clamp((Math.log(v + 1) / ln - 0.45) / 0.55, 0, 1); if (hot <= 0) continue;
+    const x = i % tw, y = (i / tw) | 0;
+    for (let oy = -4; oy <= 4; oy++) { const ny = y + oy; if (ny < 0 || ny >= th) continue; for (let ox = -4; ox <= 4; ox++) { const nx = x + ox; if (nx < 0 || nx >= tw) continue; const g = hot * Math.max(0, 1 - Math.sqrt(ox * ox + oy * oy) / 5), j = ny * tw + nx; if (g > glow[j]) glow[j] = g; } } }
+  const ctx = cpuCanvas.getContext('2d'), img = ctx.createImageData(tw, th), d = img.data, BG = [10, 13, 17];
+  for (let i = 0; i < pix.length; i++) {
+    const v = pix[i], g = glow[i], o = i * 4; let R0 = BG[0], G0 = BG[1], B0 = BG[2];
+    if (v) { const li = Math.min(255, Math.round((Math.log(v + 1) / ln * 0.88 + 0.12) * 255)) * 3; R0 = LUT[li]; G0 = LUT[li + 1]; B0 = LUT[li + 2]; }
+    if (g > 0) { const li = Math.min(255, Math.round((g * 0.6 + 0.4) * 255)) * 3, a = g * 0.7;
+      R0 = Math.max(R0, BG[0] + (LUT[li] - BG[0]) * a); G0 = Math.max(G0, BG[1] + (LUT[li + 1] - BG[1]) * a); B0 = Math.max(B0, BG[2] + (LUT[li + 2] - BG[2]) * a); }
+    d[o] = R0; d[o + 1] = G0; d[o + 2] = B0; d[o + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+/* =====================================================================
+   Binning jobs: the requested state (metric, stream fraction) → GPU or worker
+   ===================================================================== */
+const S = { metric: 1, f: 0, bins: null, binsKey: '', max: 0, ms: null, brush: null, bursts: [], drawn: '' };
+const JOB = { busy: false, want: null, lastKey: '' };
+function requestBins(metric, f, force) {
+  if (!CTRL.ready) return;
+  const key = `${metric}|${f >= 1 ? 1 : f.toFixed(4)}`;
+  if (!force && key === JOB.lastKey) return;
+  JOB.want = { metric, f, key }; pump();
+}
+async function pump() {
+  if (JOB.busy || !JOB.want) return;
+  const w = JOB.want; JOB.want = null; JOB.busy = true; JOB.lastKey = w.key;
+  const full = w.f >= 1, thr = thrOf(w.f);
+  try {
+    if (GPU) {
+      const r = await GPU.run(w.metric, thr, full);
+      if (full) { S.bins = r.bins; S.ms = r.ms; }
+      else S.bins = null;
+    } else {
+      const r = await cpuBin(w.metric, thr);
+      S.bins = r.bins; if (full) S.ms = r.ms; drawCPU(r.bins);
+    }
+    S.binsKey = w.key; S.binsMetric = w.metric; S.binsF = w.f;
+    if (S.bins) { let m = 0; for (let i = 0; i < S.bins.length; i++) if (S.bins[i] > m) m = S.bins[i]; S.max = m; findBursts(); }
+    afterBins(full);
+  } catch (err) { console.error(err); }
+  JOB.busy = false;
+  if (JOB.want) pump();
+}
+window.__busy = () => JOB.busy || !!JOB.want;
+
+/* bursts: per-identity peak bin over the threshold (push denials / new-network) */
+function findBursts() {
+  S.bursts = [];
+  if (!(S.binsMetric === 0 || S.binsMetric === 2) || S.binsF < 1) return;
+  const thr = 5, list = [];
+  for (let rr = 0; rr < R; rr++) { let best = 0, bc = -1; const o = rr * TB; for (let c = 0; c < TB; c++) { const v = S.bins[o + c]; if (v > best) { best = v; bc = c; } } if (best >= thr) list.push({ r: rr, c: bc, v: best }); }
+  list.sort((a, b) => b.v - a.v);
+  S.bursts = list.slice(0, 4).map(b => ({ ...b, name: USERS[b.r].name, dept: DEPTS[USERS[b.r].dept].name }));
+}
+
+/* =====================================================================
+   Axes, overlay, query panel
+   ===================================================================== */
+let PW = 1, PH = 1, narrow = false;
+function measure() { const r = plot.getBoundingClientRect(); PW = Math.max(1, r.width); PH = Math.max(1, r.height); narrow = PW < 520; }
+const colX = c => c / TB * PW, rowY = rr => rr / R * PH;
+function renderAxes() {
+  let html = '';
+  DEPTS.forEach((d, i) => { const y0 = rowY(DSTART[i]), y1 = rowY(DSTART[i] + d.n);
+    if (y1 - y0 >= 9) html += `<div class="dlab" style="top:${((y0 + y1) / 2).toFixed(1)}px;${y1 - y0 < 22 ? 'font-size:10px;' : ''}">${esc(narrow || y1 - y0 < 22 ? d.short : d.name)}${y1 - y0 >= 34 && !narrow ? `<small>${d.n}</small>` : ''}</div>`; });
+  $('#hm-left').innerHTML = html;
+  let t = ''; const days = MINUTES / 1440;
+  for (let k = 0; k < days; k++) { if (narrow && k % 3) continue; const x = (k + 0.5) / days * PW, lab = new Date(START + k * 86400000).toISOString().slice(5, 10).replace('-', '/'); t += `<span class="tick" style="left:${x.toFixed(1)}px">${lab}</span>`; }
+  $('#hm-top').innerHTML = t;
+}
+const tOf = c => new Date(START + c * BIN * 60000);
+const fmtT = d => d.toISOString().slice(5, 16).replace('T', ' ').replace('-', '/');
+const fmtBin = c => `${fmtT(tOf(c))}–${tOf(c + 1).toISOString().slice(11, 16)}`;
+const VCOL = { 'v-mal': ['#FF7A66', '#FFB3A6'], 'v-sus': ['#F2B53A', '#FFD98A'], 'v-ben': ['#4CC9A6', '#9FE6CF'] };
+let ovFrame = { flare: 1, brush: null, drag: null };
+function renderOverlay() {
+  let s = '';
+  for (let k = 0; k < 15; k++) { const m0 = 120 + k * 1440, dow = (6 + k) % 7; if (dow === 0 || dow === 6) { const x0 = m0 / MINUTES * PW, x1 = Math.min(PW, (m0 + 1440) / MINUTES * PW); if (x0 < PW) s += `<rect x="${x0.toFixed(1)}" y="0" width="${Math.max(0, x1 - x0).toFixed(1)}" height="${PH}" fill="rgba(255,255,255,0.022)"/>`; } }
+  for (let k = 1; k < 14; k++) { const x = k / 14 * PW; s += `<line x1="${x}" x2="${x}" y1="0" y2="${PH}" stroke="rgba(255,255,255,0.045)"/>`; }
+  DEPTS.forEach((d, i) => { if (i) { const y = rowY(DSTART[i]); s += `<line x1="0" x2="${PW}" y1="${y}" y2="${y}" stroke="rgba(255,255,255,0.09)"/>`; } });
+  // bursts flare in after the switch to push denials
+  const fl = ovFrame.flare;
+  if (S.bursts.length && S.metric === S.binsMetric && S.binsF >= 1) S.bursts.slice(0, 3).forEach((b, i) => {
+    const e = typeof fl === 'number' ? fl : easeOut((fl.t - fl.t0 - i * 0.22) / 0.75); if (e <= 0.001) return;
+    const x = colX(b.c + 0.5), y = rowY(b.r + 0.5), n = NOTE[b.name], col = n ? VCOL[n[1]] : ['#AAB3BF', '#C2CAD6'];
+    const rad = 12 + 30 * (1 - e);
+    s += `<circle cx="${x}" cy="${y}" r="${(rad * 2.5).toFixed(1)}" fill="url(#gl${i})" opacity="${e.toFixed(3)}"/>`;
+    s += `<circle cx="${x}" cy="${y}" r="${rad.toFixed(1)}" fill="none" stroke="${col[0]}" stroke-width="1.6" opacity="${e.toFixed(3)}"/>`;
+    const right = x + 18 + 120 < PW, tx = right ? x + 18 : x - 18;
+    s += `<text x="${tx}" y="${y + 4}" text-anchor="${right ? 'start' : 'end'}" font-family="Geist Mono, monospace" font-size="11.5" font-weight="500" fill="${col[1]}" paint-order="stroke" stroke="#0A0D11" stroke-width="3.5" opacity="${e.toFixed(3)}">${esc(b.name)} · ${b.v}</text>`;
+  });
+  const defs = S.bursts.slice(0, 3).map((b, i) => { const n = NOTE[b.name], c = n ? VCOL[n[1]][0] : '#AAB3BF'; return `<radialGradient id="gl${i}"><stop offset="0" stop-color="${c}" stop-opacity=".5"/><stop offset="1" stop-color="${c}" stop-opacity="0"/></radialGradient>`; }).join('');
+  const b = ovFrame.brush;
+  if (b) { const x0 = colX(b.c0), x1 = colX(b.c1 + 1), y0 = rowY(b.r0), y1 = Math.max(rowY(b.r1 + 1), y0 + 6);
+    s += `<rect x="${x0.toFixed(1)}" y="${y0.toFixed(1)}" width="${Math.max(3, x1 - x0).toFixed(1)}" height="${(y1 - y0).toFixed(1)}" fill="rgba(138,180,255,0.07)" stroke="#8AB4FF" stroke-width="1.4" stroke-dasharray="${b.live ? '0' : '5 3'}"/>`; }
+  ov.setAttribute('viewBox', `0 0 ${PW} ${PH}`); ov.innerHTML = `<defs>${defs}</defs>` + s;
+}
+
+/* selection → SQL + results computed from the bins */
+function snapRows(r0, r1) {
+  if (r1 - r0 + 1 <= 6) return [r0, r1];
+  const d0 = USERS[r0].dept, d1 = USERS[r1].dept;
+  return [DSTART[d0], DSTART[d1] + DEPTS[d1].n - 1];
+}
+function selection(br) {
+  const { r0, r1, c0, c1 } = br, metric = S.metric;
+  const users = r1 - r0 + 1 <= 6 ? Array.from({ length: r1 - r0 + 1 }, (_, k) => USERS[r0 + k]) : null;
+  const depts = [...new Set(Array.from({ length: USERS[r1].dept - USERS[r0].dept + 1 }, (_, k) => DEPTS[USERS[r0].dept + k].name))];
+  const tA = tOf(c0), tB = tOf(c1 + 1), iso = d => d.toISOString().slice(0, 16).replace('T', ' ');
+  const cond = { 0: "auth_protocol = 'OKTA_VERIFY_PUSH'\n  AND status = 'Failure'", 1: "status = 'Success'", 2: "status = 'Success'\n  AND src_endpoint.autonomous_system.number\n      NOT IN (SELECT b.asn\n              FROM ocsf.asn_baseline b\n              WHERE b.user_email =\n                    actor.user.email_addr)", 3: "status = 'Failure'\n  AND auth_protocol <> 'OKTA_VERIFY_PUSH'" }[metric];
+  const col = { 0: 'denied_pushes', 1: 'sign_ins', 2: 'new_network', 3: 'failures' }[metric];
+  const wrapList = (items, ind) => { const lines = []; let cur = ''; for (const it of items) { const nx = cur ? cur + ', ' + it : it; if (cur && ind.length + nx.length + 2 > 42) { lines.push(cur + ','); cur = it; } else cur = nx; } lines.push(cur); return '(' + lines.join('\n' + ind + ' ') + ')'; };
+  const who = users ? `actor.user.email_addr IN\n      ${users.length === 1 ? `('${users[0].name}@meridianfreight.com')` : wrapList(users.map(u => `'${u.name}@meridianfreight.com'`), '      ')}` : depts.length < DEPTS.length ? `actor.user.org_unit IN\n      ${wrapList(depts.map(d => `'${d}'`), '      ')}` : null;
+  const sql = `SELECT actor.user.email_addr AS user,\n       time_bucket('15 min', time) AS bin,\n       count(*) AS ${col}\nFROM ocsf.authentication\nWHERE ${cond}\n  AND time >= TIMESTAMP '${iso(tA)}'\n  AND time <  TIMESTAMP '${iso(tB)}'${who ? `\n  AND ${who}` : ''}\nGROUP BY 1, 2\nORDER BY 3 DESC\nLIMIT 20;`;
+  let total = 0; const top = [];
+  if (S.bins) for (let rr = r0; rr <= r1; rr++) { const o = rr * TB; for (let c = c0; c <= c1; c++) { const v = S.bins[o + c]; if (!v) continue; total += v;
+    if (top.length < 5 || v > top[top.length - 1].v) { top.push({ rr, c, v }); top.sort((a, b) => b.v - a.v || a.rr - b.rr); if (top.length > 5) top.pop(); } } }
+  return { sql, total, top, users, depts, tA, tB, n: r1 - r0 + 1, metric };
+}
+const hlSQL = sql => sql.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\b(SELECT|FROM|WHERE|AND|IN|NOT|GROUP BY|ORDER BY|LIMIT|AS|DESC|TIMESTAMP|INTERVAL)\b/g, '<span class="kw">$1</span>').replace(/('[^'\n]*')/g, '<span class="str">$1</span>').replace(/\b(count|time_bucket)\b/g, '<span class="fn">$1</span>');
+let panelMemo = '', curSel = null;
+function renderPanel(view) {
+  // view: { brush, typed (chars or Infinity), rows (0..5, revealed result rows), live }
+  const box = $('#qb'), chip = $('#sel-chip');
+  if (!view.brush || !S.bins || S.metric !== S.binsMetric) {
+    const showB = S.bursts.length && S.metric === S.binsMetric && view.spot !== false;
+    const memo = `empty|${S.metric}|${showB ? S.bursts.length : 0}`; if (memo === panelMemo) return; panelMemo = memo; curSel = null;
+    const spotted = showB ? `<div class="spot"><div class="rh">Spotted at a glance<span class="t3">peak ${esc(METRIC[S.metric])} in one 15-min bin</span></div>${S.bursts.slice(0, 3).map(b => { const n = NOTE[b.name]; return `<div class="sp"><span class="mono">${esc(b.name)}</span><span class="t3">${esc(b.dept)} · ${fmtT(tOf(b.c))}</span><b class="mono">${b.v}</b>${n ? `<span class="chip sm ${n[1]}">${esc(n[0])}</span>` : '<span></span>'}</div>`; }).join('')}</div>` : '';
+    chip.hidden = true; $('#clear').disabled = true;
+    box.innerHTML = `<div class="qe"><p class="lead">Brush any region of the map and the query writes itself. <span>The preview runs on the in-browser bins, so there is no round trip.</span></p>
+      <div class="glyph">drag across identities × time</div>
+      <dl class="kv2"><dt>Source</dt><dd class="mono">ocsf.authentication</dd><dt>Window</dt><dd>19 Sep 03:00 → 3 Oct 03:00 UTC</dd><dt>Identities</dt><dd>2,048 in 9 departments</dd><dt>Resolution</dt><dd>1,344 bins of 15 min per identity</dd><dt>Metric</dt><dd>${esc(METRIC[S.metric])}</dd></dl>${spotted}</div>`;
+    return;
+  }
+  const b = view.brush, key = `${b.r0},${b.r1},${b.c0},${b.c1}|${S.metric}|${S.binsKey}`;
+  if (!curSel || curSel.key !== key) { curSel = selection(b); curSel.key = key; panelMemo = ''; }
+  const sel = curSel, typed = Math.min(sel.sql.length, view.typed), done = typed >= sel.sql.length;
+  const memo = `${key}|${typed}|${view.rows}|${view.caret}`; if (memo === panelMemo) return; panelMemo = memo;
+  chip.hidden = false; chip.textContent = `${fmt(sel.n)} identit${sel.n === 1 ? 'y' : 'ies'} · ${b.c1 - b.c0 + 1} × 15 min`; $('#clear').disabled = false;
+  const who = sel.users ? sel.users.map(u => u.name).join(', ') : sel.depts.length === DEPTS.length ? 'everyone' : sel.depts.join(', ');
+  const rowsHtml = sel.top.map((p, i) => { const u = USERS[p.rr], n = NOTE[u.name];
+    return `<tr class="${i < view.rows ? '' : 'rvh'}"><td><span class="mono">${esc(u.name)}</span><div class="t3" style="font-size:11px">${esc(DEPTS[u.dept].name)} · ${fmtT(tOf(p.c))}</div></td><td class="ct">${p.v}</td><td>${n ? `<span class="chip sm ${n[1]}">${esc(n[0])}</span>` : ''}</td></tr>`; }).join('');
+  box.innerHTML = `<div class="qsel"><dl class="kv2"><dt>Window <span class="t3" style="font-size:10.5px">UTC</span></dt><dd class="mono">${fmtT(sel.tA)} → ${fmtT(sel.tB)}</dd><dt>Who</dt><dd>${esc(who)}</dd><dt>${esc(METRIC[sel.metric][0].toUpperCase() + METRIC[sel.metric].slice(1))}</dt><dd><b class="mono">${fmt(sel.total)}</b> <span class="t3">in the selection</span></dd></dl></div>
+    <div class="sqlw"><pre class="code" id="sql">${hlSQL(sel.sql.slice(0, typed))}${!done && view.caret ? '<span class="caret"></span>' : ''}</pre></div>
+    <div class="res"${view.rows ? '' : ' style="visibility:hidden"'}><div class="rh">Top results<span class="t3">identity × 15-min bin, by count</span></div><table class="tbl utbl"><tbody>${rowsHtml || `<tr><td class="t3">No ${esc(METRIC[sel.metric])} in this selection.</td></tr>`}</tbody></table></div>
+    <div class="qf"><button class="btn sm" type="button" id="copy"${done ? '' : ' disabled'}>Copy SQL</button><button class="btn sm" type="button" id="nb"${done ? '' : ' disabled'}>Add to H-77 notebook</button><span class="t3">read-only · hot tier</span></div>`;
+  fitPanel();
+}
+function fitPanel() {
+  const box = $('#qb'), res = box.querySelector('.res'); if (!res) return;
+  const rows = [...res.querySelectorAll('tr')]; rows.forEach(r => r.style.display = '');
+  const lim = box.querySelector('.qf').getBoundingClientRect().top - 4;
+  for (let i = rows.length - 1; i > 0 && rows[i].getBoundingClientRect().bottom > lim; i--) rows[i].style.display = 'none';
+  const w = box.querySelector('.sqlw'), pre = w && w.querySelector('pre'); if (w) w.classList.toggle('fits', pre.offsetHeight <= w.clientHeight + 1);
+}
+$('#qb').addEventListener('click', e => {
+  if (e.target.closest('#copy') && curSel) { try { navigator.clipboard && navigator.clipboard.writeText(curSel.sql).catch(() => {}); } catch (err) {} flash(e.target.closest('#copy'), 'Copied'); }
+  if (e.target.closest('#nb') && curSel) flash(e.target.closest('#nb'), 'Added to H-77 as a SQL cell');
+});
+function flash(btn, txt) { const o = btn.textContent; btn.textContent = txt; btn.disabled = true; setTimeout(() => { btn.textContent = o; btn.disabled = false; }, 1600); }
+$('#clear').onclick = () => { LIVEV.brush = null; liveRender(); };
+
+/* header chip + status */
+function renderEngine(count, ms, streaming) {
+  $('#eng-n').textContent = fmt(count);
+  $('#eng-ms').textContent = streaming || ms == null ? '' : `in ${ms < 10 ? ms.toFixed(1) : Math.round(ms)} ms`;
+  $('#eng').title = GPU ? 'WebGPU compute: clear, bin with atomic adds, max, max-pool and halo passes, plus the readback that feeds the panel' : 'No WebGPU here: a Web Worker bins on the CPU and Canvas 2D draws the same pixels';
+}
+function setStatus(txt, ok) { $('#st').textContent = txt; $('#st-dot').className = ok ? 'dot ok' : 'dot live load'; }
+
+/* =====================================================================
+   The attract loop
+   ===================================================================== */
+const L = 34;
+const TL = { s0: 0.5, s1: 7.6, click: 9.6, flare: 9.75, press: 17.5, release: 19.2, snap: 19.55, type0: 19.7, type1: 23.4, res0: 23.5 };
+const CAPS = [
+  [0.3, 4.6, 'Two weeks of Okta sign-ins stream in: 10 million events, binned on the GPU.'],
+  [4.6, 9.6, 'One row per person, one column per 15 minutes: the company’s rhythm at a glance.'],
+  [9.6, 14.2, 'Switch to denied MFA pushes: the noise drops away and three bursts flare.'],
+  [14.2, 17.6, 'Even one person’s 15-minute burst stays visible among 2,048 people.'],
+  [17.6, 24.0, 'Brush a region and the query writes itself instantly, with no round trip.'],
+  [24.0, 29.0, 'j.alvarez is CASE-4127. m.kowalski was push-bombed the same way on 28 Sep: no case yet.'],
+  [29.0, 33.4, 'Get ahead of the next attack: from 10 million sign-ins to one lead in seconds.'],
+];
+const POSTER_T = 25.6;
+const BR = { ja: uid('j.alvarez'), mk: uid('m.kowalski') };
+// ghost brush, in cells: from j.alvarez's burst down-left past m.kowalski's
+const JA_C = Math.floor(mOf('2026-10-03T02:11:52') / BIN), MK_C = Math.floor(mOf('2026-09-28T18:52:00') / BIN);
+const GB = { r0: BR.ja - 4, c0: TB - 1, r1: BR.mk + 14, c1: MK_C - 45 };
+const cellXY = (rr, c) => { const r = plot.getBoundingClientRect(); return [r.left + colX(c + 0.5), r.top + rowY(rr + 0.5)]; };
+const centerOf = sel => { const el = document.querySelector(sel); if (!el) return [0, 0]; const r = el.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; };
+function brushAt(t) {
+  if (t < TL.press) return null;
+  if (t < TL.release) { const p = easeIO((t - TL.press - 0.1) / (TL.release - TL.press - 0.2)); const rr = Math.round(lerp(GB.r0, GB.r1, p)), cc = Math.round(lerp(GB.c0, GB.c1, p));
+    return { r0: Math.min(GB.r0, rr), r1: Math.max(GB.r0, rr), c0: Math.min(GB.c0, cc), c1: Math.max(GB.c0, cc), live: true }; }
+  const [s0, s1] = snapRows(Math.min(GB.r0, GB.r1), Math.max(GB.r0, GB.r1)), k = easeOut((t - TL.release) / (TL.snap - TL.release));
+  return { r0: Math.round(lerp(GB.r0, s0, k)), r1: Math.round(lerp(GB.r1, s1, k)), c0: GB.c1, c1: GB.c0, snapped: k >= 1 };
+}
+function ghostAt(t) {
+  // segment 1: click "Push denials"; segment 2: press on j.alvarez's burst, drag, release
+  if (t >= 8.6 && t < 10.2) {
+    const a = cellXY(R * 0.55, TB * 0.45), b = centerOf('#metric button[data-v="0"]'), p = easeIO((t - 8.8) / (TL.click - 0.12 - 8.8));
+    return { x: lerp(a[0], b[0], p), y: lerp(a[1], b[1], p), o: Math.min(1, (t - 8.6) / 0.25, (10.2 - t) / 0.3), press: t >= TL.click - 0.08 && t < TL.click + 0.12, click: TL.click };
+  }
+  if (t >= 16.4 && t < 19.9) {
+    const a = centerOf('#metric button[data-v="0"]'), s = cellXY(GB.r0, GB.c0), e = cellXY(GB.r1, GB.c1);
+    let x, y;
+    if (t < TL.press) { const p = easeIO((t - 16.6) / (TL.press - 0.1 - 16.6)); x = lerp(a[0], s[0], p); y = lerp(a[1], s[1], p); }
+    else if (t < TL.release) { const p = easeIO((t - TL.press - 0.1) / (TL.release - TL.press - 0.2)); x = lerp(s[0], e[0], p); y = lerp(s[1], e[1], p); }
+    else { x = e[0]; y = e[1]; }
+    return { x, y, o: Math.min(1, (t - 16.4) / 0.25, (19.9 - t) / 0.35), press: t >= TL.press - 0.05 && t < TL.release, click: TL.press };
+  }
+  return null;
+}
+function captionAt(t) { for (const [a, b, s] of CAPS) if (t >= a && t < b) return { s, o: clamp(Math.min((t - a) / 0.35, (b - t) / 0.35), 0, 1) }; return { s: '', o: 0 }; }
+let capMemo = '';
+function renderCaption(t) {
+  const c = captionAt(t), cap = $('#cap');
+  if (c.s !== capMemo) { $('#cap-t').textContent = c.s; capMemo = c.s; }
+  cap.style.opacity = c.o.toFixed(3); cap.style.transform = `translateX(-50%) translateY(${((1 - c.o) * 6).toFixed(1)}px)`;
+  $('#cap-p').style.width = (t / L * 100).toFixed(2) + '%';
+}
+function renderGhost(g) {
+  const el = $('#ghost'), rip = $('#rip');
+  if (!g || CTRL.mode !== 'loop') { el.style.opacity = 0; return; }
+  el.style.opacity = clamp(g.o, 0, 1).toFixed(3); el.style.transform = `translate(${(g.x - 3).toFixed(1)}px,${(g.y - 2).toFixed(1)}px) scale(${g.press ? 0.86 : 1})`;
+  const rk = (CTRL.t - g.click) / 0.5; if (rk >= 0 && rk < 1) { rip.style.opacity = (1 - rk).toFixed(3); rip.style.transform = `scale(${0.5 + rk * 1.4})`; } else rip.style.opacity = 0;
+}
+function setMetricUI(m) { document.querySelectorAll('#metric button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.v === m))); }
+let lastStreamReq = 0;
+function applyFrame(t, exact) {
+  const metric = t < TL.click ? 1 : 0;
+  const f = t < TL.s0 ? 0.0004 : t < TL.s1 ? Math.max(0.0004, easeIO((t - TL.s0) / (TL.s1 - TL.s0))) : 1;
+  const metricChanged = metric !== S.metric; S.metric = metric; S.f = f; setMetricUI(metric);
+  // binning: exact frames always; during play, throttle stream re-bins
+  const now = performance.now();
+  if (exact || metricChanged || f >= 1 || now - lastStreamReq > (GPU ? 33 : 60)) { requestBins(metric, f, exact); lastStreamReq = now; }
+  const count = f * N_EVENTS;
+  renderEngine(count, S.ms, f < 1);
+  setStatus(f < 1 ? 'Streaming' : 'Live · 14 days', f >= 1);
+  // big counter during the stream
+  const co = t < TL.s0 ? clamp(t / 0.4, 0, 1) : t < TL.s1 + 0.6 ? 1 : clamp(1 - (t - TL.s1 - 0.6) / 0.6, 0, 1);
+  $('#counter').style.opacity = co.toFixed(3); $('#cnt').textContent = fmt(count); $('#cnt-bar').style.width = (f * 100).toFixed(2) + '%';
+  // canvas dips while re-binning on the metric switch
+  const cv = plot.querySelector('canvas'); if (cv) cv.style.opacity = t >= TL.click && t < TL.click + 0.5 ? (0.35 + 0.65 * easeOut((t - TL.click) / 0.5)).toFixed(3) : '1';
+  ovFrame = { flare: t >= TL.flare ? { t, t0: TL.flare } : 0, brush: brushAt(t) };
+  renderOverlay();
+  const br = ovFrame.brush && ovFrame.brush.snapped ? ovFrame.brush : null;
+  const typed = t < TL.type0 ? 0 : Math.floor((t - TL.type0) / (TL.type1 - TL.type0) * 520);
+  const rows = t < TL.res0 ? 0 : Math.min(5, 1 + Math.floor((t - TL.res0) / 0.22));
+  renderPanel({ brush: br, typed, rows, caret: Math.floor(t * 2.6) % 2 === 0, spot: t >= TL.flare + 1.2 });
+  renderCaption(t); renderGhost(ghostAt(t));
+  $('#fade').style.opacity = (t < 0.6 ? 1 - t / 0.6 : t > L - 0.55 ? (t - (L - 0.55)) / 0.55 : 0).toFixed(3);
+}
+function afterBins(full) {
+  // async bins landed: refresh what depends on them
+  $('#leg-max').textContent = S.bins ? fmt(S.max) : '—';
+  if (CTRL.mode === 'loop') { renderEngine(S.f * N_EVENTS, S.ms, S.f < 1); applyOverlayOnly(); }
+  else liveRender();
+}
+function applyOverlayOnly() { renderOverlay(); panelMemo = ''; if (CTRL.mode === 'loop') { const t = CTRL.t, br = ovFrame.brush && ovFrame.brush.snapped ? ovFrame.brush : null;
+  renderPanel({ brush: br, typed: t < TL.type0 ? 0 : Math.floor((t - TL.type0) / (TL.type1 - TL.type0) * 520), rows: t < TL.res0 ? 0 : Math.min(5, 1 + Math.floor((t - TL.res0) / 0.22)), caret: Math.floor(t * 2.6) % 2 === 0, spot: t >= TL.flare + 1.2 }); } }
+
+/* =====================================================================
+   Live mode: the real tool
+   ===================================================================== */
+const LIVEV = { brush: null };
+function liveRender() {
+  ovFrame = { flare: 1, brush: LIVEV.brush ? { ...LIVEV.brush } : drag ? null : null };
+  if (drag) ovFrame.brush = { ...drag.cells, live: true };
+  renderOverlay();
+  renderPanel({ brush: LIVEV.brush, typed: Infinity, rows: 5, caret: false });
+  renderEngine(N_EVENTS, S.ms, false);
+}
+function setMetric(m) { S.metric = m; S.f = 1; setMetricUI(m); LIVEV.brush = LIVEV.brush ? { ...LIVEV.brush } : null; requestBins(m, 1); liveRender(); }
+let drag = null;
+const toCell = (x, y) => ({ c: clamp(Math.floor(x / PW * TB), 0, TB - 1), rr: clamp(Math.floor(y / PH * R), 0, R - 1) });
+/* what a pixel shows is the hottest bin under it (max-pooling), so hover and click resolve to that cell, within 2 px */
+function hotCell(x, y, tol = 2) {
+  const r0 = clamp(Math.floor((y - tol) / PH * R), 0, R - 1), r1 = clamp(Math.ceil((y + tol + 1) / PH * R), r0 + 1, R);
+  const c0 = clamp(Math.floor((x - tol) / PW * TB), 0, TB - 1), c1 = clamp(Math.ceil((x + tol + 1) / PW * TB), c0 + 1, TB);
+  const own = toCell(x, y); let best = { rr: own.rr, c: own.c, v: S.bins ? S.bins[own.rr * TB + own.c] : 0 };
+  if (S.bins) for (let rr = r0; rr < r1; rr++) { const o = rr * TB; for (let c = c0; c < c1; c++) { const v = S.bins[o + c]; if (v > best.v) best = { rr, c, v }; } }
+  return best;
+}
+ov.addEventListener('pointerdown', e => { if (!S.bins || CTRL.mode !== 'live') return; const r = plot.getBoundingClientRect(); const a = toCell(e.clientX - r.left, e.clientY - r.top); drag = { a, x0: e.clientX, y0: e.clientY, cells: { r0: a.rr, r1: a.rr, c0: a.c, c1: a.c } }; ov.setPointerCapture(e.pointerId); tip.style.opacity = 0; });
+ov.addEventListener('pointermove', e => {
+  if (CTRL.mode !== 'live' || !S.bins) return;
+  const r = plot.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, b = toCell(x, y);
+  if (drag) { drag.cells = { r0: Math.min(drag.a.rr, b.rr), r1: Math.max(drag.a.rr, b.rr), c0: Math.min(drag.a.c, b.c), c1: Math.max(drag.a.c, b.c) }; liveRender(); return; }
+  const h = hotCell(x, y), u = USERS[h.rr], v = h.v, perPx = Math.max(1, Math.round(R / PH)); b.rr = h.rr; b.c = h.c;
+  tip.innerHTML = `<div class="row" style="gap:6px"><b class="mono">${esc(u.name)}</b><span class="t3">${esc(DEPTS[u.dept].name)}</span></div><div class="mono t2" style="margin:3px 0">${fmtBin(b.c)} UTC</div><div><b class="mono">${v}</b> ${esc(METRIC[S.metric])}</div>${perPx > 1 ? `<div class="t3" style="font-size:11px;margin-top:3px">each pixel shows the hottest of ~${perPx} identities</div>` : ''}`;
+  tip.style.left = Math.max(4, Math.min(PW - 296, x + 14)) + 'px'; tip.style.top = Math.max(4, Math.min(PH - 92, y + 14)) + 'px'; tip.style.opacity = 1;
+});
+ov.addEventListener('pointerleave', () => { tip.style.opacity = 0; });
+ov.addEventListener('pointerup', e => {
+  if (!drag) return; const d = drag; drag = null;
+  const click = Math.abs(e.clientX - d.x0) < 4 && Math.abs(e.clientY - d.y0) < 4;
+  if (click) { const r = plot.getBoundingClientRect(), h = hotCell(e.clientX - r.left, e.clientY - r.top); LIVEV.brush = { r0: h.rr, r1: h.rr, c0: Math.max(0, h.c - 3), c1: Math.min(TB - 1, h.c + 3) }; }
+  else { const [r0, r1] = snapRows(d.cells.r0, d.cells.r1); LIVEV.brush = { r0, r1, c0: d.cells.c0, c1: d.cells.c1 }; }
+  liveRender();
+});
+document.querySelectorAll('#metric button').forEach(b => b.addEventListener('click', () => { if (CTRL.mode === 'live') setMetric(+b.dataset.v); }));
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && LIVEV.brush && CTRL.mode === 'live') { LIVEV.brush = null; liveRender(); } });
+
+/* =====================================================================
+   Loop controller: attract loop, take-over, idle resume, embedding
+   ===================================================================== */
+const CTRL = { t: 0, mode: 'loop', playing: !RM, ext: false, hidden: document.hidden, raf: 0, last: 0, lastInput: 0, resumeAt: 0, ready: false };
+function running() { return CTRL.ready && !CTRL.ext && !CTRL.hidden && (CTRL.mode === 'live' || CTRL.playing); }
+function schedule(fromTick) { if (!CTRL.raf && running()) { if (!fromTick) CTRL.last = performance.now(); CTRL.raf = requestAnimationFrame(tick); } }
+function stop() { if (CTRL.raf) cancelAnimationFrame(CTRL.raf); CTRL.raf = 0; }
+function tick() {
+  CTRL.raf = 0; const now = performance.now();
+  const dt = Math.min(0.1, Math.max(0, (now - CTRL.last) / 1000)); CTRL.last = now;
+  if (CTRL.mode === 'loop' && CTRL.playing) { let t = CTRL.t + dt; if (t >= L) t -= L; CTRL.t = t; applyFrame(t, false); }
+  else if (CTRL.mode === 'live') {
+    if (CTRL.resumeAt) { const k = (now - CTRL.resumeAt) / 500; $('#fade').style.opacity = clamp(k, 0, 1).toFixed(3); if (k >= 1) { CTRL.resumeAt = 0; CTRL.mode = 'loop'; CTRL.playing = true; LIVEV.brush = null; seekCore(0); } }
+    else if (!RM && now - CTRL.lastInput > IDLE_MS) CTRL.resumeAt = now;
+  }
+  schedule(true);
+}
+function seekCore(t) { CTRL.t = clamp(+t || 0, 0, L - 1e-6); panelMemo = ''; curSel = null; applyFrame(CTRL.t, true); }
+function enterLive() {
+  if (CTRL.mode === 'live') return;
+  CTRL.mode = 'live'; CTRL.resumeAt = 0;
+  $('#cap').style.opacity = 0; $('#ghost').style.opacity = 0; $('#fade').style.opacity = 0; $('#counter').style.opacity = 0;
+  const cv = plot.querySelector('canvas'); if (cv) cv.style.opacity = '1';
+  // finish the stream instantly and keep what is on screen
+  const b = ovFrame.brush && ovFrame.brush.snapped ? ovFrame.brush : null;
+  LIVEV.brush = b ? { r0: b.r0, r1: b.r1, c0: b.c0, c1: b.c1 } : null;
+  if (S.f < 1) { S.f = 1; requestBins(S.metric, 1); }
+  setStatus('Live · 14 days', true);
+  liveRender();
+  const h = $('#hint'); h.style.opacity = 1; clearTimeout(enterLive.t); enterLive.t = setTimeout(() => { h.style.opacity = 0; }, 2600);
+  schedule();
+}
+function input() { CTRL.lastInput = performance.now(); if (CTRL.resumeAt) { CTRL.resumeAt = 0; $('#fade').style.opacity = 0; } if (CTRL.mode !== 'live' && CTRL.ready) enterLive(); else schedule(); }
+for (const ev of ['pointerdown', 'wheel', 'keydown', 'touchstart']) addEventListener(ev, input, { capture: true, passive: true });
+let lastPM = null;
+addEventListener('pointermove', e => { if (lastPM && Math.hypot(e.clientX - lastPM[0], e.clientY - lastPM[1]) > 3) input(); lastPM = [e.clientX, e.clientY]; }, { capture: true, passive: true });
+addEventListener('message', e => { const d = e.data; if (!d || typeof d !== 'object') return;
+  if (d.corvid === 'pause') { CTRL.ext = true; stop(); }
+  else if (d.corvid === 'play') { CTRL.ext = false; if (CTRL.mode === 'loop' && !RM) CTRL.playing = true; schedule(); } });
+document.addEventListener('visibilitychange', () => { CTRL.hidden = document.hidden; if (CTRL.hidden) stop(); else schedule(); });
+window.__burstXY = i => S.bursts[i] ? cellXY(S.bursts[i].r, S.bursts[i].c) : null;
+window.__seek = t => { if (!CTRL.ready) { CTRL.pendingSeek = t; return; } stop(); CTRL.mode = 'loop'; CTRL.playing = false; CTRL.resumeAt = 0; seekCore(t); };
+window.__play = () => { CTRL.ext = false; if (CTRL.mode !== 'loop') { CTRL.mode = 'loop'; seekCore(CTRL.t); } CTRL.playing = true; schedule(); };
+window.__state = () => ({ t: CTRL.t, mode: CTRL.mode, playing: CTRL.playing, running: !!CTRL.raf, ext: CTRL.ext, engine: GPU ? 'gpu' : 'cpu', metric: S.metric, f: S.f, binsKey: S.binsKey, ms: S.ms, max: S.max,
+  bursts: S.bursts.map(b => `${b.name} ${b.v}`), brush: LIVEV.brush, sel: curSel ? { total: curSel.total, top: curSel.top.map(p => `${USERS[p.rr].name} ${p.v}`), sql: curSel.sql } : null, count: $('#eng-n').textContent, busy: window.__busy() });
+
+/* resize */
+let rsT = 0;
+new ResizeObserver(() => { clearTimeout(rsT); rsT = setTimeout(() => {
+  measure(); renderAxes(); if (!CTRL.ready) { renderOverlay(); return; }
+  if (GPU && S.binsKey) GPU.draw(); else if (S.bins) drawCPU(S.bins);
+  panelMemo = ''; if (CTRL.mode === 'loop') applyFrame(CTRL.t, false); else liveRender();
+}, 100); }).observe(plot);
+
+/* boot */
+measure(); renderAxes(); renderOverlay(); renderPanel({ brush: null }); setStatus('Loading', false); renderEngine(0, null, true);
+try {
+  const wantGPU = !!navigator.gpu && !qs.has('cpu');
+  const events = await generate(!wantGPU);
+  if (wantGPU) {
+    $('#load-text').textContent = 'Uploading 10M events to a GPU storage buffer…';
+    try { GPU = await initGPU(events); } catch (err) { console.warn('WebGPU path unavailable:', err && err.message); GPU = null; }
+    if (!GPU) { $('#load-text').textContent = 'No WebGPU here: binning on the CPU instead…'; if (worker && worker.terminate) worker.terminate(); await generate(true); }
+  }
+  $('#loading').remove();
+  CTRL.ready = true;
+  const t0 = qs.has('t') ? +qs.get('t') : CTRL.pendingSeek != null ? CTRL.pendingSeek : RM ? POSTER_T : 0;
+  if (qs.has('t') || CTRL.pendingSeek != null || RM) window.__seek(t0); else { seekCore(0); schedule(); }
+  window.__ready = true;
+} catch (err) {
+  console.error(err); $('#load-text').textContent = 'Could not build the density view: ' + (err && err.message || err);
+}
+</script>
+</body>
+</html>
