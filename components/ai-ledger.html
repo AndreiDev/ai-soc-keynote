@@ -7,7 +7,7 @@
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../shared/ui.css">
 <!--
-  Keynote component: tamper-evident decision ledger (CASE-4127, Meridian Freight, shift C).
+  Keynote component: tamper-evident decision ledger (CASE-4127, Quellbrook Freight, shift C).
   Every AI-agent and human decision is canonical JSON, SHA-256 hash-chained (entry text + '|prev=' + previous hash,
   crypto.subtle in this tab, pure-JS fallback). Same canonical form, genesis and older entries as app/agents-ledger.html,
   so every digest matches the app. Attract loop (31 s, every frame a pure function of t): entries append, Verify walks
@@ -219,7 +219,7 @@ body.paused *{animation-play-state:paused!important}
   <header class="cx-head">
     <span class="cx-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6.6 9.4l2.8-2.8"/><path d="M7.8 4.4l1.3-1.3a2.6 2.6 0 013.7 3.7l-1.3 1.3"/><path d="M8.2 11.6l-1.3 1.3a2.6 2.6 0 01-3.7-3.7l1.3-1.3"/></svg></span>
     <span class="cx-title">Decision ledger</span>
-    <span class="chip cx-ctx">CASE-4127 · Meridian Freight</span>
+    <span class="chip cx-ctx">CASE-4127 · Quellbrook Freight</span>
     <span class="cx-sp"></span>
     <span class="cx-status" id="hstatus"><i class="cx-dot"></i><span id="hstatus-t">Recording</span></span>
     <span class="chip cx-anchor">SHA-256 · head anchored 02:47:00 · RFC 3161</span>
@@ -936,7 +936,7 @@ addEventListener('resize', () => { cancelAnimationFrame(roT); roT = requestAnima
 // Boot: hash the real chain (older entries first, as in the app), the scripted tamper, then start
 (async function boot() {
   buildRows();
-  let prev = toHex(await sha256('corvid-ledger|meridian-freight|2026-10-03|genesis'));
+  let prev = toHex(await sha256('corvid-ledger|quellbrook-freight|2026-10-03|genesis'));
   for (const o of OLDER) prev = toHex(await sha256(canon(o) + '|prev=' + prev));
   OLD_HEAD = prev;
   STORED = await chainFrom(E.map(e => e.text), OLD_HEAD);

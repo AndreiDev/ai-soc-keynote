@@ -209,7 +209,7 @@ body{min-height:0}
     <span class="ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.5" fill="#DDF6FF"/><g stroke="#7FD6EE" stroke-width="1.4" stroke-linecap="round"><path d="M8 1.5v2.1M8 12.4v2.1M1.5 8h2.1M12.4 8h2.1M3.4 3.4l1.5 1.5M11.1 11.1l1.5 1.5M3.4 12.6l1.5-1.5"/></g><path d="M11.1 4.9l1.5-1.5" stroke="#4A5664" stroke-width="1.4" stroke-linecap="round" stroke-dasharray="0.6 1.6"/></svg></span>
     <h1>Telemetry blind spots</h1>
     <span class="br"></span>
-    <span class="chip ctx">CASE-4125<span class="ctx-l"> · Meridian Freight</span></span>
+    <span class="chip ctx">CASE-4125<span class="ctx-l"> · Quellbrook Freight</span></span>
     <div class="lg" aria-hidden="true">
       <span><i class="sw" style="background:#7FD6EE;box-shadow:0 0 8px #7FD6EE"></i>Telemetry</span>
       <span><i class="sw" style="background:#F59A3D"></i>Late</span>
@@ -220,8 +220,8 @@ body{min-height:0}
   </header>
 
   <main class="mn">
-    <section class="stage" id="stage" aria-label="Meridian Freight floor plan lit by telemetry">
-      <canvas id="gl" aria-label="Floor plan of Meridian Freight, lit only where the SOC receives telemetry. The Laredo warehouse, VLAN 40, has no sensor and stays dark."></canvas>
+    <section class="stage" id="stage" aria-label="Quellbrook Freight floor plan lit by telemetry">
+      <canvas id="gl" aria-label="Floor plan of Quellbrook Freight, lit only where the SOC receives telemetry. The Laredo warehouse, VLAN 40, has no sensor and stays dark."></canvas>
       <svg id="ov" aria-hidden="true"></svg>
       <div class="callout" id="callout" aria-hidden="true"><span class="dot mal"></span>SMB beacon every 61 s<span class="mono">→ 198.51.100.23</span></div>
       <div class="maptip" id="maptip" role="tooltip"></div>
@@ -710,7 +710,7 @@ const SPECS = {
 const ROOM_SHORT = { fin: 'Finance', eng: 'Engineering', core: 'Core', aws: 'AWS', saas: 'SaaS', wh: 'Warehouse · VLAN 40' };
 const ROOM_TXT = {
   fin: ['HQ 3F · Finance', 'VLAN 12 · 12 endpoints · EDR'], eng: ['HQ 2F · Engineering', 'VLAN 20 · 15 endpoints · EDR on 14'],
-  core: ['Core · data center', 'NetFlow · Zscaler connector'], aws: ['AWS · mf-prod-data', 'CloudTrail · 3 VPCs'],
+  core: ['Core · data center', 'NetFlow · Zscaler connector'], aws: ['AWS · qf-prod-data', 'CloudTrail · 3 VPCs'],
   saas: ['SaaS · identity and HR', ''], wh: ['Warehouse Laredo · VLAN 40', '38 devices · no sensor'],
 };
 function roomInfo(k, z){

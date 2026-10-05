@@ -6,7 +6,7 @@
 <title>Blast radius</title>
 <!--
   Keynote component: blast-radius.
-  "What can the stolen identity reach?" Meridian Freight's 1,964-entity graph as Gaussian splats (Spark 2.3.1, WebGL 2).
+  "What can the stolen identity reach?" Quellbrook Freight's 1,964-entity graph as Gaussian splats (Spark 2.3.1, WebGL 2).
   The camera flies the CASE-4127 path hop by hop, names condense as it nears (semantic zoom), blast-radius rings come
   from a breadth-first search computed in this page, and containment cools the path. No WebGL 2: the same BFS as a table.
   Engines reused from demos/pages/16-entity-blast-radius.html and app/case-entities.html.
@@ -194,7 +194,7 @@ button{font:inherit;color:inherit}
   <header class="ch">
     <span class="ch-ic" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="8" r="6.4" stroke-opacity=".45"/><circle cx="8" cy="8" r="3.9" stroke-opacity=".75"/><circle cx="8" cy="8" r="1.5" fill="currentColor" stroke="none"/></svg></span>
     <h1>Blast radius</h1>
-    <span class="chip ctx"><b class="mono">CASE-4127</b><span class="tn">· Meridian Freight</span></span>
+    <span class="chip ctx"><b class="mono">CASE-4127</b><span class="tn">· Quellbrook Freight</span></span>
     <span class="chip mono cnt" id="entCount">1,964 entities</span>
     <span class="sp"></span>
     <span class="who"><span class="ag">TR</span>BFS by Triage · snapshot 02:41 UTC</span>
@@ -204,7 +204,7 @@ button{font:inherit;color:inherit}
   <main class="body">
     <section class="col" aria-label="Entity graph">
       <div class="stage" id="stage">
-        <canvas id="c" tabindex="0" aria-label="Meridian Freight's entity graph as Gaussian splats. The CASE-4127 attack path flares hot hop by hop, names condense as the camera nears, blast-radius rings warm amber by hop, and containment cools the path. The side panel and the table view hold the same data."></canvas>
+        <canvas id="c" tabindex="0" aria-label="Quellbrook Freight's entity graph as Gaussian splats. The CASE-4127 attack path flares hot hop by hop, names condense as the camera nears, blast-radius rings warm amber by hop, and containment cools the path. The side panel and the table view hold the same data."></canvas>
         <div class="zchip" id="zchip" aria-hidden="true"><span class="zl">Semantic zoom</span><span class="zs"><span data-z="0" class="on">Clusters</span><span data-z="1">Entities</span><span data-z="2">Names</span></span></div>
         <div class="vctl" id="vctl" role="group" aria-label="Camera">
           <button type="button" data-act="zin" aria-label="Zoom in" title="Zoom in"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M7 2.5v9M2.5 7h9"/></svg></button>
@@ -255,7 +255,7 @@ button{font:inherit;color:inherit}
 
 <script>
 /* =====================================================================
-   Model: the seeded Meridian Freight tenant (1,964 entities), the CASE-4127 path, BFS blast radius.
+   Model: the seeded Quellbrook Freight tenant (1,964 entities), the CASE-4127 path, BFS blast radius.
    Pure JS, no WebGL needed (from app/case-entities.html). Exposed as window.BR for the renderer module.
    ===================================================================== */
 (() => {
@@ -311,27 +311,27 @@ for (const d of DEPTS) {
 }
 const AWS = polar(12.2, -16, 1.9);
 const awsDataRoles = addv(AWS, [-0.2, 0.9, 0.2]), awsBuckets = addv(AWS, [1.3, -0.7, 1.2]), awsAppRoles = addv(AWS, [-0.9, 0.2, -2.4]), awsAppData = addv(AWS, [0.8, -0.6, -3.4]), awsDevRoles = addv(AWS, [2.6, 1.3, -1.2]);
-clusterCenters['AWS mf-prod-data'] = addv(AWS, [0.5, 0.1, 0.7]); clusterCenters['AWS mf-prod-app'] = addv(AWS, [0, 0, -2.9]); clusterCenters['AWS mf-dev'] = awsDevRoles.slice();
+clusterCenters['AWS qf-prod-data'] = addv(AWS, [0.5, 0.1, 0.7]); clusterCenters['AWS qf-prod-app'] = addv(AWS, [0, 0, -2.9]); clusterCenters['AWS qf-dev'] = awsDevRoles.slice();
 const DATA_ROLES = ['DataEngineer', 'LakeFormationAdmin', 'GlueJobRole', 'AthenaAnalyst', 'BackupOperator', 'AuditReadOnly', 'SecurityTooling',
   'etl-runner', 'snowflake-ingest', 'cost-reporting', 'QuickSightReader', 'RedshiftLoader', 'KinesisWriter', 's3-replication', 'break-glass',
   'terraform-deployer', 'dms-migrate', 'partner-sftp', 'EventBridgeRouter', 'LambdaETL', 'DataSteward', 'SupportReadOnly'];
-const BUCKETS = ['mf-finance-archive', 'mf-ap-invoices', 'mf-payroll-reports', 'mf-customer-contracts', 'mf-shipment-manifests',
-  'mf-telematics-raw', 'mf-telematics-curated', 'mf-lake-bronze', 'mf-lake-silver', 'mf-lake-gold', 'mf-athena-results', 'mf-glue-scripts',
-  'mf-backups-rds', 'mf-cloudtrail-logs', 'mf-vpc-flowlogs', 'mf-snowflake-stage', 'mf-partner-sftp', 'mf-quicksight-cache', 'mf-ml-features',
-  'mf-audit-evidence', 'mf-tax-filings', 'mf-hr-exports', 'mf-legal-hold'];
+const BUCKETS = ['qf-finance-archive', 'qf-ap-invoices', 'qf-payroll-reports', 'qf-customer-contracts', 'qf-shipment-manifests',
+  'qf-telematics-raw', 'qf-telematics-curated', 'qf-lake-bronze', 'qf-lake-silver', 'qf-lake-gold', 'qf-athena-results', 'qf-glue-scripts',
+  'qf-backups-rds', 'qf-cloudtrail-logs', 'qf-vpc-flowlogs', 'qf-snowflake-stage', 'qf-partner-sftp', 'qf-quicksight-cache', 'qf-ml-features',
+  'qf-audit-evidence', 'qf-tax-filings', 'qf-hr-exports', 'qf-legal-hold'];
 const dataRole = {}, bucket = {};
-DATA_ROLES.forEach(n => { dataRole[n] = add(n, CAT.role, ball(awsDataRoles, 0.55, 0.6), 'AWS mf-prod-data', 1.3); });
-BUCKETS.forEach(n => { bucket[n] = add(n, CAT.data, ball(awsBuckets, 0.6, 0.55), 'AWS mf-prod-data', 1.3); });
+DATA_ROLES.forEach(n => { dataRole[n] = add(n, CAT.role, ball(awsDataRoles, 0.55, 0.6), 'AWS qf-prod-data', 1.3); });
+BUCKETS.forEach(n => { bucket[n] = add(n, CAT.data, ball(awsBuckets, 0.6, 0.55), 'AWS qf-prod-data', 1.3); });
 const APP_ROLES = ['dispatch-api', 'routing-engine', 'tracking-web', 'pricing-svc', 'customer-portal', 'eta-model', 'notify-svc', 'billing-sync',
   'edi-gateway', 'carrier-api', 'label-print', 'yard-mgmt', 'fuel-cards', 'claims-svc', 'quote-svc', 'driver-app', 'telemetry-ingest',
   'geo-fence', 'proof-of-delivery', 'customs-docs', 'rate-engine', 'returns-svc', 'ops-dashboards', 'search-svc', 'auth-proxy', 'ci-deploy',
   'k8s-node-prod-eu', 'k8s-irsa-batch', 'secrets-reader', 'config-sync'];
-const appRoleIds = APP_ROLES.map(n => add(n, CAT.role, ball(awsAppRoles, 0.7, 0.6), 'AWS mf-prod-app', 1.1));
-const APP_DATA = ['dispatch-db', 'tracking-db', 'pricing-db', 'claims-db', 'portal-db', 'mf-portal-uploads', 'mf-pod-images', 'mf-edi-archive',
-  'mf-labels', 'mf-customs-docs', 'mf-driver-media', 'mf-app-logs', 'mf-geo-tiles', 'mf-model-artifacts'];
-const appDataIds = APP_DATA.map(n => add(n, CAT.data, ball(awsAppData, 0.55, 0.6), 'AWS mf-prod-app', 1.1));
+const appRoleIds = APP_ROLES.map(n => add(n, CAT.role, ball(awsAppRoles, 0.7, 0.6), 'AWS qf-prod-app', 1.1));
+const APP_DATA = ['dispatch-db', 'tracking-db', 'pricing-db', 'claims-db', 'portal-db', 'qf-portal-uploads', 'qf-pod-images', 'qf-edi-archive',
+  'qf-labels', 'qf-customs-docs', 'qf-driver-media', 'qf-app-logs', 'qf-geo-tiles', 'qf-model-artifacts'];
+const appDataIds = APP_DATA.map(n => add(n, CAT.data, ball(awsAppData, 0.55, 0.6), 'AWS qf-prod-app', 1.1));
 appRoleIds.forEach((r, i) => { link(r, appDataIds[i % appDataIds.length]); if (R() < 0.4) link(r, appDataIds[Math.floor(R() * appDataIds.length)]); });
-for (let i = 0; i < 20; i++) add(`dev-${['sandbox', 'ci', 'ml', 'qa'][i % 4]}-${String(i + 1).padStart(2, '0')}`, CAT.role, ball(awsDevRoles, 0.5, 0.6), 'AWS mf-dev', 0.9);
+for (let i = 0; i < 20; i++) add(`dev-${['sandbox', 'ci', 'ml', 'qa'][i % 4]}-${String(i + 1).padStart(2, '0')}`, CAT.role, ball(awsDevRoles, 0.5, 0.6), 'AWS qf-dev', 0.9);
 const K8S = polar(12.6, 238, -1.4); clusterCenters['prod-eu'] = K8S;
 for (let i = 0; i < 18; i++) { const n = add(`ip-10-42-${Math.floor(i / 6) + 5}-${10 + (i % 6) * 3}`, CAT.host, ball(addv(K8S, [0, 0.3, 0]), 0.5, 0.5), 'prod-eu', 1.4); link(n, appRoleIds[26 + (i % 2)]); }
 for (let i = 0; i < 60; i++) add(`srv-${['db', 'app', 'edi', 'ftp', 'dc'][i % 5]}-${String(i + 1).padStart(2, '0')}`, CAT.host, ball(addv(K8S, [0.9, -0.6, 1.0]), 0.75, 0.45), 'prod-eu', 1.0);
@@ -341,9 +341,9 @@ for (let i = 0; i < 64; i++) {
   const z = 2 * R() - 1, ph = R() * TAU, rr = Math.sqrt(1 - z * z), rad = 17 + R() * 3;
   add(`198.51.100.${Math.floor(R() * 250) + 2}`, CAT.ip, [rr * Math.cos(ph) * rad, Math.abs(z) * rad * 0.5 + 1, rr * Math.sin(ph) * rad], 'Internet', 0.9);
 }
-link(app['Snowflake'], bucket['mf-snowflake-stage']); link(app['Snowflake'], bucket['mf-lake-gold']);
-link(app['NetSuite'], bucket['mf-ap-invoices']); link(app['Workday'], bucket['mf-hr-exports']); link(app['Workday'], bucket['mf-payroll-reports']);
-link(app['Concur'], bucket['mf-ap-invoices']); link(app['Box'], bucket['mf-legal-hold']);
+link(app['Snowflake'], bucket['qf-snowflake-stage']); link(app['Snowflake'], bucket['qf-lake-gold']);
+link(app['NetSuite'], bucket['qf-ap-invoices']); link(app['Workday'], bucket['qf-hr-exports']); link(app['Workday'], bucket['qf-payroll-reports']);
+link(app['Concur'], bucket['qf-ap-invoices']); link(app['Box'], bucket['qf-legal-hold']);
 for (const n of DATA_ROLES) for (let k = 0; k < 3; k++) link(dataRole[n], bucket[BUCKETS[Math.floor(R() * BUCKETS.length)]]);
 deptUsers['Engineering'].forEach(u => { if (R() < 0.3) link(u, appRoleIds[Math.floor(R() * appRoleIds.length)]); });
 /* the CASE-4127 path */
@@ -354,9 +354,9 @@ const pUser = add('j.alvarez', CAT.user, addv(addv(FIN, [0, 0.35, 0]), [finDir[0
 const pDev = add('WIN-7F2C', CAT.host, addv(lerpv(ents[pUser].pos, IP_POS, 0.2), [0, 0.5, 0]), 'Unmanaged', 2.8);
 const finN = (() => { const l = Math.hypot(FIN[0], FIN[1], FIN[2]); return [FIN[0] / l, FIN[1] / l, FIN[2] / l]; })();
 const pSess = add('okta session 9f3c', CAT.app, addv([finN[0] * 1.15, finN[1] * 1.15, finN[2] * 1.15], [0, 0.45, 0]), 'Okta', 2.6);
-const pFDR = add('FinanceDataReadOnly', CAT.role, addv(awsDataRoles, [-0.95, 0.25, 0.55]), 'AWS mf-prod-data', 2.8);
-const pOps = add('ops-admin', CAT.role, addv(awsDataRoles, [0.75, 0.6, -0.45]), 'AWS mf-prod-data', 3.0);
-const pBkt = add('mf-finance-exports', CAT.data, addv(awsBuckets, [-0.4, 0.15, 0.75]), 'AWS mf-prod-data', 3.0);
+const pFDR = add('FinanceDataReadOnly', CAT.role, addv(awsDataRoles, [-0.95, 0.25, 0.55]), 'AWS qf-prod-data', 2.8);
+const pOps = add('ops-admin', CAT.role, addv(awsDataRoles, [0.75, 0.6, -0.45]), 'AWS qf-prod-data', 3.0);
+const pBkt = add('qf-finance-exports', CAT.data, addv(awsBuckets, [-0.4, 0.15, 0.75]), 'AWS qf-prod-data', 3.0);
 const pRule = add('inbox rule zz-rss', CAT.app, addv(ents[app['Microsoft 365']].pos, [0.15, 0.55, 0.2]), 'SaaS', 2.4);
 const PATH = [pIP, pUser, pDev, pSess, pFDR, pOps, pBkt, pRule];
 const PATH_SET = new Set(PATH);
@@ -365,7 +365,7 @@ link(pUser, jLaptop); link(pUser, okta); link(pUser, app['Microsoft 365']); link
 for (const a of ['Workday', 'Concur', 'NetSuite', 'Snowflake']) link(pUser, app[a]);
 link(pUser, pDev); link(pDev, pSess); link(pSess, pFDR); link(pSess, app['Microsoft 365']); link(app['Microsoft 365'], pRule);
 deptUsers['Finance'].forEach(u => { if (R() < 0.55) link(u, pFDR); });
-for (const b of ['mf-finance-archive', 'mf-ap-invoices', 'mf-payroll-reports', 'mf-tax-filings']) link(pFDR, bucket[b]);
+for (const b of ['qf-finance-archive', 'qf-ap-invoices', 'qf-payroll-reports', 'qf-tax-filings']) link(pFDR, bucket[b]);
 link(pFDR, pBkt); link(pFDR, pOps);
 for (const b of BUCKETS) link(pOps, bucket[b]);
 link(pOps, pBkt);
@@ -389,10 +389,10 @@ window.BR = { mulberry32, TAU, ents, edges, CAT, CAT_LABEL, DEPTS, clusterCenter
 /* =====================================================================
    Director: attract loop, story time, side readout, captions, controls, embedding protocol, table fallback.
    Story time s runs 0-30 (the storyboard below); the attract loop plays it in 33 s.
-     0.0  wide: Meridian Freight's identity graph, cold
+     0.0  wide: Quellbrook Freight's identity graph, cold
      0.6  203.0.113.77 flares; 0.9-3.9 fifteen push beads fly to j.alvarez, 14 cool to ice (denied), the 15th lands hot
      3.8  j.alvarez ignites; the camera follows the path: 5.6 device, 6.8 session, 8.2 FinanceDataReadOnly, 9.6 ops-admin, 11.0 bucket
-    11.6  exfil arc mf-finance-exports -> 203.0.113.77; 13.2 inbox rule
+    11.6  exfil arc qf-finance-exports -> 203.0.113.77; 13.2 inbox rule
     13.6  pull back; 14.0 blast-radius rings by BFS hop: 1, 2 at 14.9, 3 at 15.8 (amber)
     17.8  Responder revokes Okta sessions (chartreuse sweep); 19.0-19.8 approved actions cool the rest
     20.6  rings cool; the bucket stays amber: data already left
@@ -426,7 +426,7 @@ const PATH_INFO = [
   { time: '02:15:10', type: 'Okta session', sub: 'Session from Amsterdam, impossible travel', short: 'okta 9f3c', label: ['okta session 9f3c', 'Amsterdam, impossible travel'], hot: 'Active', cold: 'Revoked' },
   { time: '02:17:44', type: 'Cloud role', sub: 'AWS SSO sign-in from AS64500', short: 'FinanceDataReadOnly', label: ['FinanceDataReadOnly', 'AWS SSO, 02:17'], hot: 'In use', cold: 'STS revoked' },
   { time: '02:21:03', type: 'Privileged cloud role', sub: 'AssumeRole, first time in 365 days', short: 'ops-admin', label: ['ops-admin', 'first AssumeRole in 365 days'], hot: 'In use', cold: 'STS revoked' },
-  { time: '02:29:47', type: 'S3 bucket', sub: '1,284 objects, 2.3 GB read, sent to 203.0.113.77', short: 'mf-finance-exports', label: ['mf-finance-exports', '1,284 objects, 2.3 GB read'], hot: 'Read', cold: 'Data exposed' },
+  { time: '02:29:47', type: 'S3 bucket', sub: '1,284 objects, 2.3 GB read, sent to 203.0.113.77', short: 'qf-finance-exports', label: ['qf-finance-exports', '1,284 objects, 2.3 GB read'], hot: 'Read', cold: 'Data exposed' },
   { time: '02:35:02', type: 'M365 inbox rule', sub: 'Moves invoice and payment mail to RSS Feeds', short: 'zz-rss', label: ['inbox rule zz-rss', 'invoice|payment to RSS Feeds'], hot: 'Active', cold: 'Removed' },
 ];
 // which path entity the camera is visiting, and where a breadcrumb click lands
@@ -444,7 +444,7 @@ const CAPS = [
   [0.2, 3.9, 'IN', '203.0.113.77, never seen in 180 days, sends 15 MFA pushes. 14 denied, the 15th approved.'],
   [3.9, 6.7, 'IN', 'j.alvarez is now a stolen identity: a new device and a session from Amsterdam.'],
   [6.7, 9.5, 'IN', 'Into AWS as FinanceDataReadOnly, which a stale trust lets assume ops-admin.'],
-  [9.5, 11.6, 'IN', 'ops-admin, unused by her for 365 days, reads 1,284 objects from mf-finance-exports.'],
+  [9.5, 11.6, 'IN', 'ops-admin, unused by her for 365 days, reads 1,284 objects from qf-finance-exports.'],
   [11.6, 14.0, 'IN', '2.3 GB leaves for 203.0.113.77. An inbox rule starts hiding invoice mail.'],
   [14.0, 17.7, 'TR', 'What else can she reach? Across 1,964 entities: 22 roles, 30 data stores within 3 hops.'],
   [17.7, 20.6, 'RS', 'Responder revokes her Okta sessions; approved actions cool the rest of the path.'],
@@ -593,9 +593,9 @@ function hopCard(st) {
     return `<div class="hop-h"><span class="eyebrow">${ph === 'after' ? 'Contained' : 'Containment'} · ${cold} of 8 cooled</span><span class="chip sm ${ph === 'after' ? 'v-sus' : 'c-agent'}">${ph === 'after' ? 'Data exposed' : 'In progress'}</span></div>
       <ul class="hop-list"><li class="${a ? '' : 'wait'}"><span class="ag">RS</span><span><b>Okta sessions revoked</b> under AP-07 · 02:38:05</span></li>
       <li class="${b ? '' : 'wait'}"><span class="av">RP</span><span><b>APR-311 to 313 approved</b>: STS revoked, 203.0.113.77 blocked, rule removed</span></li>
-      ${ph === 'after' ? '<li><span class="ag" style="background:var(--sus)">!</span><span><b>mf-finance-exports</b> stays amber: 2.3 GB already left</span></li>' : ''}</ul>`;
+      ${ph === 'after' ? '<li><span class="ag" style="background:var(--sus)">!</span><span><b>qf-finance-exports</b> stays amber: 2.3 GB already left</span></li>' : ''}</ul>`;
   }
-  return `<div class="hop-h"><span class="eyebrow">Identity graph · snapshot 02:41 UTC</span><span class="chip sm">Meridian Freight</span></div>
+  return `<div class="hop-h"><span class="eyebrow">Identity graph · snapshot 02:41 UTC</span><span class="chip sm">Quellbrook Freight</span></div>
     <div class="hop-n">${ents.length.toLocaleString('en-US')} entities</div><div class="hop-t">${edges.length.toLocaleString('en-US')} relationships: users, devices, cloud roles, data, apps, IPs</div>
     <div class="hop-d">The question: once j.alvarez is stolen, what can the attacker reach?</div>`;
 }
@@ -1069,7 +1069,7 @@ function buildSplats(sp) {
   };
   for (const d of DEPTS) haze(clusterCenters[d.name], 0.6 + 0.07 * Math.sqrt(d.n), 300 + 4 * d.n, 0.28, 0.55);
   haze(HUB, 1.6, 1400, 0.36, 0.6); haze([0, 0.9, 0], 3.4, 900, 0.22, 0.25);
-  haze(clusterCenters['AWS mf-prod-data'], 1.5, 1300, 0.34, 0.6); haze(clusterCenters['AWS mf-prod-app'], 1.3, 900, 0.3, 0.6); haze(clusterCenters['AWS mf-dev'], 0.8, 300, 0.24, 0.6);
+  haze(clusterCenters['AWS qf-prod-data'], 1.5, 1300, 0.34, 0.6); haze(clusterCenters['AWS qf-prod-app'], 1.3, 900, 0.3, 0.6); haze(clusterCenters['AWS qf-dev'], 0.8, 300, 0.24, 0.6);
   haze(K8S, 1.2, 900, 0.28, 0.5); haze(FLEET, 1.8, 800, 0.24, 0.35);
   for (const e of ents) {
     const code = codeOf(e.id), c = e.pos, size = e.size, onPath = code <= 7;
@@ -1135,7 +1135,7 @@ function buildSplats(sp) {
     placeText([{ text: ents[id].name, F: F_SMALL, charW: 0.03, fam: MONO }], POS[id].clone().addScaledVector(TXU, 0.1).addScaledVector(nrm, 0.05), nrm, ROLE.label, codeOf(id), () => ents[id].cat);
   }
   const wideN = dirFrom(A0 + 0.3, EL0);
-  for (const name of [...DEPTS.map(d => d.name), 'Okta', 'AWS mf-prod-data', 'AWS mf-prod-app', 'AWS mf-dev', 'prod-eu', 'Fleet telematics']) {
+  for (const name of [...DEPTS.map(d => d.name), 'Okta', 'AWS qf-prod-data', 'AWS qf-prod-app', 'AWS qf-dev', 'prod-eu', 'Fleet telematics']) {
     const c = name === 'Okta' ? new V3(HUB[0], HUB[1] - 1.3, HUB[2]) : new V3(...clusterCenters[name]).add(new V3(0, 1.55, 0));
     placeText([{ text: name, F: F_TITLE, charW: 0.3, fam: SANS }], c, wideN, ROLE.title, 255, () => 0);
   }

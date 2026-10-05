@@ -161,14 +161,14 @@ body.nocap .cap{display:none}
   <header class="ch">
     <span class="ci" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="2.6" cy="3.2" r="1.7" fill="currentColor"/><circle cx="2.6" cy="12.8" r="1.7" fill="currentColor" opacity=".55"/><circle cx="8" cy="8" r="1.5" fill="currentColor" opacity=".8"/><path d="M13.4 5.6l2 2.4-2 2.4-2-2.4z" fill="#FFF6E0"/><path d="M4 4l2.9 3M4 12l2.9-3M9.5 8h1.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
     <h1>Attack paths<span class="x"> to crown jewels</span></h1>
-    <span class="chip ctx">CASE-4127 · Meridian Freight</span>
+    <span class="chip ctx">CASE-4127 · Quellbrook Freight</span>
     <span class="cs" role="status"><span class="dot live solve" id="st-dot"></span><span><span id="st">Solving</span><span class="x" id="st2"></span></span></span>
     <span class="eng" id="eng">starting…</span>
   </header>
   <main class="cb" id="cb">
     <section class="sw-wrap" aria-label="Reachability graph">
       <div class="stage" id="stage">
-        <canvas id="cv" role="img" aria-label="Reachability graph from five exposed entry points on the left to four crown jewels on the right. A physarum solver settles onto the easiest routes; the brightest runs from Okta push sign-in through j.alvarez, FinanceDataReadOnly and ops-admin to the mf-finance-exports bucket."></canvas>
+        <canvas id="cv" role="img" aria-label="Reachability graph from five exposed entry points on the left to four crown jewels on the right. A physarum solver settles onto the easiest routes; the brightest runs from Okta push sign-in through j.alvarez, FinanceDataReadOnly and ops-admin to the qf-finance-exports bucket."></canvas>
         <svg id="edges" aria-hidden="true"></svg>
         <div class="nodes" id="nodes"></div>
         <div class="colh l" aria-hidden="true">Exposed today</div><div class="colh r" aria-hidden="true">Crown jewels</div>
@@ -182,7 +182,7 @@ body.nocap .cap{display:none}
         <span><i style="background:repeating-linear-gradient(90deg,#7FD6EE 0 4px,transparent 4px 7px)"></i>Cut by a fix</span>
         <span><b style="color:var(--warn)">●</b> exposed today</span>
         <span><b style="color:#FFF6E0">◆</b> crown jewel</span>
-        <span class="r">29 edges · IdP, IAM, CMDB, KEV · 02:40 UTC</span>
+        <span class="r">29 edges · IdP, IAM, CMDB, exploit intel · 02:40 UTC</span>
       </div>
     </section>
     <aside class="rail">
@@ -228,13 +228,13 @@ if (qs.get('captions') === '0') document.body.classList.add('nocap');
 const NODES = [
   { id: 's_okta', label: 'Okta sign-in (push MFA)', short: 'Okta push', kind: 'src', x: 0.04, y: 0.12, w: 1.0, info: 'Internet-facing IdP. Finance and Warehouse use push MFA.' },
   { id: 's_mail', label: 'Inbound email', short: 'Email', kind: 'src', x: 0.04, y: 0.34, w: 0.8, info: 'Phishing and attachments reaching users.' },
-  { id: 's_f5', label: 'F5 BIG-IP APM', short: 'F5 BIG-IP', kind: 'src', x: 0.04, y: 0.56, w: 0.7, info: 'CVE-2026-94127 is on the KEV list and still open on 2 load balancers (8 days overdue).' },
-  { id: 's_ns', label: 'NetScaler gateway', short: 'NetScaler', kind: 'src', x: 0.04, y: 0.74, w: 0.6, info: 'CVE-2026-88771 is on the KEV list and still open on 2 gateways.' },
+  { id: 's_f5', label: 'Edge VPN appliance', short: 'Edge VPN', kind: 'src', x: 0.04, y: 0.56, w: 0.7, info: 'EXP-0412 (fictional) is on the known-exploited list and still open on 2 load balancers (8 days overdue).' },
+  { id: 's_ns', label: 'Remote-access gateway', short: 'RA gateway', kind: 'src', x: 0.04, y: 0.74, w: 0.6, info: 'EXP-0387 (fictional) is on the known-exploited list and still open on 2 gateways.' },
   { id: 's_vpn', label: 'Contractor VPN', short: 'Contractor VPN', kind: 'src', x: 0.04, y: 0.92, w: 0.4, info: 'Password + TOTP for 31 contractor accounts.' },
   { id: 'u_jal', label: 'j.alvarez', short: 'j.alvarez', kind: 'id', x: 0.27, y: 0.08, info: 'Finance analyst. Compromised in CASE-4127.' },
   { id: 'u_fin', label: 'Finance users (42)', short: 'Finance users', kind: 'id', x: 0.27, y: 0.24, info: 'Push MFA, AWS SSO and SharePoint Finance access.' },
   { id: 'u_mko', label: 'm.kowalski', short: 'm.kowalski', kind: 'id', x: 0.27, y: 0.40, info: 'Warehouse supervisor. 6 denied pushes then an approval on 09-28 (hunt H-77).' },
-  { id: 'h_dmz', label: 'DMZ web tier', short: 'DMZ web tier', kind: 'host', x: 0.27, y: 0.60, info: 'Behind the F5 BIG-IP. Holds a service-principal secret.' },
+  { id: 'h_dmz', label: 'DMZ web tier', short: 'DMZ web tier', kind: 'host', x: 0.27, y: 0.60, info: 'Behind the edge VPN appliance. Holds a service-principal secret.' },
   { id: 'h_vpn', label: 'VPN address pool', short: 'VPN pool', kind: 'host', x: 0.27, y: 0.84, info: 'RDP allowed onward to the admin jump host.' },
   { id: 'h_finlt', label: 'FIN-LT-0442', short: 'FIN-LT-0442', kind: 'host', x: 0.49, y: 0.17, info: 'Finance laptop (CASE-4126). Cached Finance credentials.' },
   { id: 'h_wh', label: 'WH-SCAN-07', short: 'WH-SCAN-07', kind: 'host', x: 0.49, y: 0.42, info: 'Warehouse scanner, no EDR, on flat VLAN 40.' },
@@ -245,7 +245,7 @@ const NODES = [
   { id: 'r_spo', label: 'SharePoint Finance owners', short: 'SharePoint owners', kind: 'role', x: 0.71, y: 0.46, info: 'Owners of the vendor bank-change forms site.' },
   { id: 'r_da', label: 'Domain Admins', short: 'Domain Admins', kind: 'role', x: 0.71, y: 0.66, info: 'AD privileged group.' },
   { id: 'r_k8s', label: 'k8s cluster-admin', short: 'k8s admin', kind: 'role', x: 0.71, y: 0.86, info: 'prod-eu cluster.' },
-  { id: 'c_s3', label: 'mf-finance-exports', short: 'mf-finance-exports', kind: 'cj', x: 0.95, y: 0.14, w: 1.0, info: 'S3 bucket, Confidential. 2.3 GB already read in CASE-4127.' },
+  { id: 'c_s3', label: 'qf-finance-exports', short: 'qf-finance-exports', kind: 'cj', x: 0.95, y: 0.14, w: 1.0, info: 'S3 bucket, Confidential. 2.3 GB already read in CASE-4127.' },
   { id: 'c_bank', label: 'Vendor bank details', short: 'Vendor bank details', kind: 'cj', x: 0.95, y: 0.40, w: 0.9, info: 'ERP vendor master data. Target of invoice fraud.' },
   { id: 'c_pay', label: 'Payroll DB', short: 'Payroll DB', kind: 'cj', x: 0.95, y: 0.62, w: 0.8, info: 'SQL Server with payroll records.' },
   { id: 'c_dc', label: 'Domain controllers', short: 'Domain controllers', kind: 'cj', x: 0.95, y: 0.84, w: 0.7, info: 'DC-01, DC-02.' },
@@ -257,8 +257,8 @@ const EDGES = [
   E('s_okta', 'u_mko', 3, 'Push MFA; 6 denials then an approval on 09-28 (H-77)', '', 'Identity team'),
   E('s_mail', 'u_fin', 4, 'Credential phishing of Finance accounts (password + push)', 'fido', 'Messaging'),
   E('s_mail', 'h_finlt', 4, 'Attachment execution on a Finance laptop (CASE-4126)', '', 'Endpoint'),
-  E('s_f5', 'h_dmz', 2, 'Open KEV entry on an internet-facing load balancer', 'f5', 'Network operations'),
-  E('s_ns', 'h_vpn', 3, 'Open KEV entry on the gateway', '', 'Network operations'),
+  E('s_f5', 'h_dmz', 2, 'Open known-exploited flaw on an internet-facing load balancer', 'f5', 'Network operations'),
+  E('s_ns', 'h_vpn', 3, 'Open known-exploited flaw on the gateway', '', 'Network operations'),
   E('s_vpn', 'h_vpn', 4, 'Contractor accounts, password + TOTP', '', 'IT'),
   E('u_jal', 'r_fdro', 1, 'AWS SSO assignment', '', 'Cloud platform'),
   E('u_fin', 'r_fdro', 2, 'AWS SSO assignment', '', 'Cloud platform'),
@@ -273,7 +273,7 @@ const EDGES = [
   E('sp_etl', 'r_ops', 2, 'svc-etl may assume ops-admin', '', 'Cloud platform'),
   E('r_fdro', 'r_ops', 1, 'Trust policy lets FinanceDataReadOnly assume ops-admin', 'trust', 'Cloud platform'),
   E('r_fdro', 'c_s3', 4, 'Read on exports/summary/ only', '', 'Cloud platform'),
-  E('r_ops', 'c_s3', 1, 's3:GetObject on mf-finance-exports', '', 'Cloud platform'),
+  E('r_ops', 'c_s3', 1, 's3:GetObject on qf-finance-exports', '', 'Cloud platform'),
   E('r_ops', 'c_pay', 3, 'RDS snapshot access', '', 'Cloud platform'),
   E('r_spo', 'c_bank', 2, 'Vendor bank-change forms live in SharePoint', '', 'Finance systems'),
   E('h_jump', 'r_da', 3, 'Admin credentials cached on the jump host', '', 'IT'),
@@ -285,7 +285,7 @@ const EDGES = [
 const WHATIFS = [
   { tag: 'fido', name: 'FIDO2 keys for Finance', d: 'Push approval and phished passwords stop working', key: '1' },
   { tag: 'trust', name: 'Remove the ops-admin trust', d: 'FinanceDataReadOnly can no longer assume ops-admin', key: '2' },
-  { tag: 'f5', name: 'Patch F5 BIG-IP', d: 'CVE-2026-94127 · CISA KEV · 8 days overdue', key: '3' },
+  { tag: 'f5', name: 'Patch the edge VPN appliance', d: 'EXP-0412 · known exploited · 8 days overdue', key: '3' },
   { tag: 'seg', name: 'Segment VLAN 40', d: 'Warehouse devices lose reach to the jump host', key: '4' },
 ];
 const OBSERVED = new Set(['s_okta>u_jal', 'u_jal>r_fdro', 'r_fdro>r_ops', 'r_ops>c_s3']);

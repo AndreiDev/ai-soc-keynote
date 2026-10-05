@@ -1,11 +1,11 @@
-/* One shared, fictional dataset for every screen: the night of 2026-10-03, Meridian Freight, shift C.
+/* One shared, fictional dataset for every screen: the night of 2026-10-03, Quellbrook Freight, shift C.
    IPs are RFC 5737 documentation ranges, ASNs are documentation ASNs. Load with <script src="assets/data.js"></script>;
    read via window.CORVID. Treat as read-only; pages keep their own UI state. */
 (function () {
   const D = {};
 
   D.meta = {
-    product: 'AI SOC', tenant: 'Meridian Freight', env: 'prod',
+    product: 'AI SOC', tenant: 'Quellbrook Freight', env: 'prod',
     now: '2026-10-03T02:47:00Z', shift: 'Shift C', onShift: 3,
     user: { id: 'RP', name: 'Ravi Patel', role: 'IR lead', initials: 'RP' },
   };
@@ -69,7 +69,7 @@
 
   // Case queue. lane: decision | escalated | working | resolved | qa
   D.cases = [
-    { id: 'CASE-4127', pri: 'P1', title: 'MFA-fatigue takeover of j.alvarez → AWS ops-admin → S3 finance export', verdict: 'malicious', conf: 97, ai: 'done', aiNote: 'verdict 02:41', signals: 9, entities: ['j.alvarez', '203.0.113.77', 'ops-admin', 'mf-finance-exports'], attack: ['T1621', 'T1078.004', 'T1530'], autonomy: '1 auto · 3 pending', age: '11m', sla: '21m left', owner: 'RP', lane: 'decision', domain: 'Identity', titleVersion: 4, updated: '02:41' },
+    { id: 'CASE-4127', pri: 'P1', title: 'MFA-fatigue takeover of j.alvarez → AWS ops-admin → S3 finance export', verdict: 'malicious', conf: 97, ai: 'done', aiNote: 'verdict 02:41', signals: 9, entities: ['j.alvarez', '203.0.113.77', 'ops-admin', 'qf-finance-exports'], attack: ['T1621', 'T1078.004', 'T1530'], autonomy: '1 auto · 3 pending', age: '11m', sla: '21m left', owner: 'RP', lane: 'decision', domain: 'Identity', titleVersion: 4, updated: '02:41' },
     { id: 'CASE-4126', pri: 'P2', title: 'Encoded PowerShell spawned by Excel on FIN-LT-0442', verdict: 'suspicious', conf: 71, ai: 'waiting', aiNote: 'user interview', signals: 3, entities: ['FIN-LT-0442', 'r.santos'], attack: ['T1059.001', 'T1566.001'], autonomy: 'host isolated (LB)', age: '27m', sla: '33m left', owner: 'LB', lane: 'decision', domain: 'Endpoint', updated: '02:45' },
     { id: 'CASE-4125', pri: 'P2', title: 'Unusual outbound SMB from WH-SCAN-07 to 198.51.100.23', verdict: 'inconclusive', conf: null, ai: 'waiting', aiNote: 'missing: EDR on WH-SCAN-07, NetFlow only', signals: 2, entities: ['WH-SCAN-07', '198.51.100.23'], attack: ['T1021.002'], autonomy: 'agent asks a question', age: '19m', sla: '41m left', owner: 'IN', lane: 'decision', domain: 'Network', question: 'Is WH-SCAN-07 expected to send scans to 198.51.100.23?', updated: '02:43' },
     { id: 'CASE-4123', pri: 'P3', title: 'DocuSign-lure credential phish reported by 6 users', verdict: 'malicious', conf: 92, ai: 'done', aiNote: 'auto-contained', signals: 7, entities: ['docu-sign-review[.]example', '41 mailboxes'], attack: ['T1566.002'], autonomy: 'auto-contained · ack needed', age: '1h 53m', sla: 'ack', owner: 'RS', lane: 'decision', domain: 'Email', updated: '00:54' },
@@ -99,7 +99,7 @@
     narrative: [
       { text: 'An attacker who already held j.alvarez\'s password sent 14 Okta Verify pushes in under three minutes from 203.0.113.77 (AS64500, a hosting network never seen for this user) until one was approved at 02:14:38.', cites: [1, 2] },
       { text: 'A new Windows device was registered at the moment of approval, and the session came from Amsterdam six hours after an Austin sign-in.', cites: [2, 3] },
-      { text: 'Using that session, the attacker signed in to AWS as FinanceDataReadOnly, then assumed ops-admin for the first time in 365 days and read 1,284 objects (2.3 GB) from mf-finance-exports.', cites: [4, 5, 6] },
+      { text: 'Using that session, the attacker signed in to AWS as FinanceDataReadOnly, then assumed ops-admin for the first time in 365 days and read 1,284 objects (2.3 GB) from qf-finance-exports.', cites: [4, 5, 6] },
       { text: 'A replication rule to an outside account was denied by the SCP guardrail, and an inbox rule now hides invoice and payment mail, a common setup for invoice fraud.', cites: [7, 9] },
       { text: 'The user-agent string carries text addressed to an AI analyst asking for a benign verdict. The AI treated it as data and counted it as an adversary indicator.', cites: [8] },
     ],
@@ -109,8 +109,8 @@
       { n: 3, t: '02:15:10', src: 'Okta', rule: 'Impossible travel', summary: 'Austin, TX → Amsterdam, NL: 8,170 km in under 6 h', entity: 'j.alvarez' },
       { n: 4, t: '02:17:44', src: 'CloudTrail', rule: 'SSO sign-in from new ASN', summary: 'AWS SSO → FinanceDataReadOnly from AS64500', entity: 'FinanceDataReadOnly' },
       { n: 5, t: '02:21:03', src: 'CloudTrail', rule: 'Rare role assumption', summary: 'sts:AssumeRole → ops-admin, first time in 365 days', entity: 'ops-admin' },
-      { n: 6, t: '02:29:47', src: 'CloudTrail', rule: 'S3 bulk read to external IP', summary: 's3:GetObject × 1,284 (2.3 GB) from mf-finance-exports to 203.0.113.77', entity: 'mf-finance-exports' },
-      { n: 7, t: '02:31:12', src: 'CloudTrail', rule: 'Replication to external account', summary: 's3:PutBucketReplication → AccessDenied (SCP deny-cross-account-replication)', entity: 'mf-finance-exports' },
+      { n: 6, t: '02:29:47', src: 'CloudTrail', rule: 'S3 bulk read to external IP', summary: 's3:GetObject × 1,284 (2.3 GB) from qf-finance-exports to 203.0.113.77', entity: 'qf-finance-exports' },
+      { n: 7, t: '02:31:12', src: 'CloudTrail', rule: 'Replication to external account', summary: 's3:PutBucketReplication → AccessDenied (SCP deny-cross-account-replication)', entity: 'qf-finance-exports' },
       { n: 8, t: '02:14:38', src: 'Okta', rule: 'Prompt-injection pattern in field', summary: 'client.userAgent.rawUserAgent contains instructions to an AI analyst', entity: 'j.alvarez' },
       { n: 9, t: '02:35:02', src: 'M365', rule: 'Hiding inbox rule', summary: 'New-InboxRule "zz-rss" moves invoice|payment mail to RSS Feeds', entity: 'j.alvarez' },
     ],
@@ -121,9 +121,9 @@
       { t: '02:15:10', src: 'Okta', ev: 'Session from Amsterdam, impossible travel', ent: '203.0.113.77', tag: 'attacker' },
       { t: '02:17:44', src: 'CloudTrail', ev: 'AWS SSO sign-in as FinanceDataReadOnly', ent: 'FinanceDataReadOnly', tag: 'attacker' },
       { t: '02:21:03', src: 'CloudTrail', ev: 'AssumeRole ops-admin, first time in 365 days', ent: 'ops-admin', tag: 'attacker' },
-      { t: '02:26:19', src: 'CloudTrail', ev: 'ListBuckets and GetBucketPolicy on mf-finance-exports', ent: 'mf-finance-exports', tag: 'attacker' },
-      { t: '02:29:47', src: 'CloudTrail', ev: 'GetObject × 1,284, 2.3 GB to 203.0.113.77', ent: 'mf-finance-exports', tag: 'attacker' },
-      { t: '02:31:12', src: 'CloudTrail', ev: 'PutBucketReplication denied by SCP', ent: 'mf-finance-exports', tag: 'blocked' },
+      { t: '02:26:19', src: 'CloudTrail', ev: 'ListBuckets and GetBucketPolicy on qf-finance-exports', ent: 'qf-finance-exports', tag: 'attacker' },
+      { t: '02:29:47', src: 'CloudTrail', ev: 'GetObject × 1,284, 2.3 GB to 203.0.113.77', ent: 'qf-finance-exports', tag: 'attacker' },
+      { t: '02:31:12', src: 'CloudTrail', ev: 'PutBucketReplication denied by SCP', ent: 'qf-finance-exports', tag: 'blocked' },
       { t: '02:35:02', src: 'M365', ev: 'Inbox rule "zz-rss" created', ent: 'j.alvarez', tag: 'attacker' },
       { t: '02:36:40', src: 'Agents', ev: 'Triage correlated 9 signals into CASE-4127 (P1)', ent: 'CASE-4127', tag: 'agent' },
       { t: '02:38:05', src: 'Agents', ev: 'Responder revoked all Okta sessions (AP-07, RCPT-9921)', ent: 'j.alvarez', tag: 'agent' },
@@ -151,7 +151,7 @@
         { id: 'okta', label: 'Okta session 9f3c', kind: 'session', sub: 'revoked 02:38', contained: true, t: '02:15:10' },
         { id: 'role1', label: 'FinanceDataReadOnly', kind: 'role', sub: 'AWS SSO', t: '02:17:44' },
         { id: 'role2', label: 'ops-admin', kind: 'role', sub: 'first use in 365 d', t: '02:21:03' },
-        { id: 'bucket', label: 'mf-finance-exports', kind: 'bucket', sub: 'Confidential, 2.3 GB read', t: '02:26:19' },
+        { id: 'bucket', label: 'qf-finance-exports', kind: 'bucket', sub: 'Confidential, 2.3 GB read', t: '02:26:19' },
         { id: 'scp', label: 'SCP guardrail', kind: 'control', sub: 'deny-cross-account-replication', t: '02:31:12' },
         { id: 'rule', label: 'inbox rule zz-rss', kind: 'mail', sub: 'hides invoice|payment', hostile: true, t: '02:35:02' },
       ],
@@ -169,29 +169,29 @@
     },
     entities: {
       who: [
-        { id: 'j.alvarez@meridianfreight.com', label: 'j.alvarez', note: 'Jordan Alvarez, Finance analyst, Austin TX · tier Sensitive · manager C. Osei', first: 'employee since 2021' },
+        { id: 'j.alvarez@quellbrook.example', label: 'j.alvarez', note: 'Jordan Alvarez, Finance analyst, Austin TX · tier Sensitive · manager C. Osei', first: 'employee since 2021' },
         { id: 'ops-admin', label: 'ops-admin', note: 'AWS role, used by 3 automation pipelines', first: 'assumed by j.alvarez for the first time' },
       ],
       what: [
         { id: 'WIN-7F2C', label: 'WIN-7F2C', note: 'Windows, Chrome 129, registered 02:14:38', first: 'seen by 0 other users' },
-        { id: 'mf-finance-exports', label: 'mf-finance-exports', note: 'S3 bucket, Confidential, 41,822 objects, 18.6 GB', first: '1,284 objects read' },
+        { id: 'qf-finance-exports', label: 'qf-finance-exports', note: 'S3 bucket, Confidential, 41,822 objects, 18.6 GB', first: '1,284 objects read' },
         { id: 'zz-rss', label: 'inbox rule zz-rss', note: 'moves invoice|payment mail to RSS Feeds', first: 'created 02:35:02' },
       ],
       where: [
         { id: '203.0.113.77', label: '203.0.113.77', note: 'AS64500 HostBV, Amsterdam NL · on an infostealer C2 list (medium confidence)', first: 'never seen in 180 days' },
-        { id: 'mf-prod-data', label: 'mf-prod-data', note: 'AWS account 4417-xxxx-2210', first: '' },
+        { id: 'qf-prod-data', label: 'qf-prod-data', note: 'AWS account 4417-xxxx-2210', first: '' },
       ],
     },
     reasoning: {
       summary: { hypotheses: 4, questions: 17, queries: 46, sources: 6, duration: '4 m 50 s', model: 'pinned 2026-09-12' },
       tree: [
         { id: 'Q1', q: 'Was the MFA approval legitimate?', a: 'No. 14 pushes were denied in 2 m 39 s before one was approved from a new device; j.alvarez normally gets one push a day.', outcome: 'finding', queries: 3, sources: 2, sec: 4.1, cites: [1, 2],
-          sql: "SELECT time, status, src_endpoint.ip, device.name\nFROM ocsf.authentication\nWHERE actor.user.email_addr = 'j.alvarez@meridianfreight.com'\n  AND auth_protocol = 'OKTA_VERIFY_PUSH'\n  AND time BETWEEN '2026-10-03 02:00' AND '2026-10-03 02:20'\nORDER BY time;",
+          sql: "SELECT time, status, src_endpoint.ip, device.name\nFROM ocsf.authentication\nWHERE actor.user.email_addr = 'j.alvarez@quellbrook.example'\n  AND auth_protocol = 'OKTA_VERIFY_PUSH'\n  AND time BETWEEN '2026-10-03 02:00' AND '2026-10-03 02:20'\nORDER BY time;",
           children: [
             { id: 'Q1.1', q: 'Has 203.0.113.77 been seen for this user before?', a: 'Never in 180 days. AS64500 is a hosting network; the IP is on an infostealer C2 list (medium confidence).', outcome: 'finding', queries: 4, sources: 3, sec: 2.2, cites: [1] },
             { id: 'Q1.2', q: 'Is the user travelling?', a: 'Workday shows no travel; her calendar puts her in the Austin office. Slack interview sent 02:39, no reply yet.', outcome: 'pending', queries: 2, sources: 2, sec: 1.4, cites: [3] },
           ] },
-        { id: 'Q2', q: 'What did the session access?', a: 'AWS SSO into FinanceDataReadOnly, then AssumeRole ops-admin (first time in 365 days), then 1,284 GetObject calls on mf-finance-exports.', outcome: 'finding', queries: 9, sources: 1, sec: 6.8, cites: [4, 5, 6],
+        { id: 'Q2', q: 'What did the session access?', a: 'AWS SSO into FinanceDataReadOnly, then AssumeRole ops-admin (first time in 365 days), then 1,284 GetObject calls on qf-finance-exports.', outcome: 'finding', queries: 9, sources: 1, sec: 6.8, cites: [4, 5, 6],
           children: [
             { id: 'Q2.1', q: 'Did data leave the organisation?', a: 'Yes: 2.3 GB egressed to 203.0.113.77. Replication to an outside account was denied by the SCP guardrail.', outcome: 'finding', queries: 5, sources: 1, sec: 3.0, cites: [6, 7] },
           ] },
@@ -224,14 +224,14 @@
       { src: 'M365', field: 'New-InboxRule.Conditions', value: 'SubjectOrBodyContainsWords: invoice, payment', reading: 'review' },
       { src: 'M365', field: 'New-InboxRule.Name', value: 'zz-rss', reading: 'review' },
       { src: 'M365', field: 'email.subject', value: 'Action required: your Okta Verify enrolment', reading: 'review' },
-      { src: 'Zscaler', field: 'web.referer', value: 'https://meridianfreight-sso.example/auth?next=okta', reading: 'data' },
+      { src: 'Zscaler', field: 'web.referer', value: 'https://quellbrook-sso.example/auth?next=okta', reading: 'data' },
       { src: 'CloudTrail', field: 'requestParameters.key', value: 'exports/vendor-bank-details/2026-09.csv', reading: 'data' },
       { src: 'Okta', field: 'device.displayName', value: 'WIN-7F2C', reading: 'data' },
     ],
     plan: [
       { id: 'RCPT-9921', state: 'done', action: 'Revoke all Okta sessions for j.alvarez', target: 'okta:j.alvarez', why: 'Session was established after push bombing', blast: { users: 1, services: 0, crit: 'Sensitive' }, reversible: true, expiry: 'undo until 08:38', policy: 'AP-07 · L3 auto', by: 'RS', at: '02:38:05', cites: [2] },
       { id: 'APR-311', state: 'pending', action: 'Revoke active STS sessions for ops-admin assumed by j.alvarez and block her SSO', target: 'aws:ops-admin (session-scoped)', why: 'Attacker holds an ops-admin session', blast: { users: 1, roles: 2, services: 0, crit: 'Crown jewel data' }, reversible: true, expiry: 'n/a', policy: 'AP-12 · L2, 1 IR approver', note: 'ops-admin is used by 3 automation pipelines, so the plan revokes the session, not the role', cites: [5] },
-      { id: 'APR-312', state: 'pending', action: 'Block 203.0.113.77 at edge firewall and Zscaler', target: 'fw:meridian-edge, zia', why: 'Source of the push burst and the 2.3 GB egress', blast: { users: 0, services: 0, crit: 'none seen from this IP in 90 days' }, reversible: true, expiry: 'auto-expires in 24 h', policy: 'AP-09 · L2', cites: [1, 6] },
+      { id: 'APR-312', state: 'pending', action: 'Block 203.0.113.77 at edge firewall and Zscaler', target: 'fw:quellbrook-edge, zia', why: 'Source of the push burst and the 2.3 GB egress', blast: { users: 0, services: 0, crit: 'none seen from this IP in 90 days' }, reversible: true, expiry: 'auto-expires in 24 h', policy: 'AP-09 · L2', cites: [1, 6] },
       { id: 'APR-313', state: 'pending', action: 'Remove inbox rule zz-rss, reset password, re-enroll MFA with a FIDO2 key', target: 'm365:j.alvarez, okta:j.alvarez', why: 'Persistence and invoice-fraud setup', blast: { users: 1, services: 0, crit: 'user-impacting, notifies manager C. Osei' }, reversible: false, expiry: 'n/a', policy: 'AP-14 · L2, 1 IR approver', cites: [9] },
     ],
     copilot: [
@@ -282,7 +282,7 @@
   ];
 
   D.containments = [
-    { id: 'RCPT-9921', action: 'Okta sessions revoked', target: 'j.alvarez@meridianfreight.com', case: 'CASE-4127', by: 'RS', policy: 'AP-07 auto', started: '02:38', expiresMin: 351, totalMin: 360, verify: '0 active sessions', reversible: true },
+    { id: 'RCPT-9921', action: 'Okta sessions revoked', target: 'j.alvarez@quellbrook.example', case: 'CASE-4127', by: 'RS', policy: 'AP-07 auto', started: '02:38', expiresMin: 351, totalMin: 360, verify: '0 active sessions', reversible: true },
     { id: 'RCPT-9919', action: 'Host isolated from network', target: 'FIN-LT-0442', case: 'CASE-4126', by: 'LB', policy: 'AP-11 approved', started: '02:20', expiresMin: 693, totalMin: 720, verify: 'EDR reports isolated', reversible: true },
     { id: 'RCPT-9912', action: 'Pod quarantined, deny-all egress', target: 'prod-eu/batch/xmrig-7f9c', case: 'CASE-4118', by: 'RS', policy: 'AP-19 auto', started: '01:12', expiresMin: 1345, totalMin: 1440, verify: 'egress 0 B/s', reversible: true },
     { id: 'RCPT-9913', action: 'Node cordoned', target: 'ip-10-42-7-19', case: 'CASE-4118', by: 'RS', policy: 'AP-19 auto', started: '01:12', expiresMin: 1345, totalMin: 1440, verify: 'no new pods scheduled', reversible: true },
@@ -314,7 +314,7 @@
   ];
   D.h77 = {
     advisory: { id: 'ADV-2026-0931', title: 'Campaign targeting logistics finance teams: push bombing, AWS SSO pivot, S3 exfiltration, invoice-fraud inbox rules', ttps: ['T1621', 'T1078.004', 'T1098.005', 'T1530', 'T1564.008'], relevance: '4 of 5 TTPs observable in your telemetry · 1 partly blind (no mailbox audit on 6% of users)' },
-    hypothesis: 'If this campaign is targeting Meridian, we would see five or more denied Okta pushes followed by an approval from a network new to that user, then an AWS AssumeRole within 30 minutes.',
+    hypothesis: 'If this campaign is targeting Quellbrook, we would see five or more denied Okta pushes followed by an approval from a network new to that user, then an AWS AssumeRole within 30 minutes.',
     question: 'Users with five or more denied MFA pushes followed by an approval within 10 minutes, last 14 days, with when that network was first seen for them.',
     sql: "WITH denies AS (\n  SELECT actor.user.email_addr AS user_email, time\n  FROM ocsf.authentication\n  WHERE metadata.product.name = 'Okta Verify'\n    AND auth_protocol = 'PUSH' AND status = 'Failure'\n    AND time > now() - INTERVAL '14' DAY\n), accepts AS (\n  SELECT actor.user.email_addr AS user_email, time,\n         src_endpoint.ip AS ip, src_endpoint.autonomous_system.number AS asn\n  FROM ocsf.authentication\n  WHERE metadata.product.name = 'Okta Verify'\n    AND auth_protocol = 'PUSH' AND status = 'Success'\n    AND time > now() - INTERVAL '14' DAY\n)\nSELECT a.user_email, count(*) AS denied, a.ip, a.asn, a.time AS approved_at,\n       b.first_seen\nFROM accepts a\nJOIN denies d ON d.user_email = a.user_email\n  AND d.time BETWEEN a.time - INTERVAL '10' MINUTE AND a.time\nLEFT JOIN ocsf.asn_baseline b ON b.user_email = a.user_email AND b.asn = a.asn\nGROUP BY 1, 3, 4, 5, 6\nHAVING count(*) >= 5\nORDER BY approved_at DESC;",
     cost: 'ocsf.authentication · hot tier · scans 412 GB · ~3.8 s · $0.21',

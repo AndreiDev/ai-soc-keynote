@@ -193,7 +193,7 @@ button.ent{cursor:pointer;background:transparent}
     <div class="ch-id">
       <span class="ci" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke-linecap="round"><path d="M2.5 3.5h5M2.5 7h4M2.5 10.5h4.6M2.5 14h5.4" stroke="#808A97" stroke-width="1.5"/><path d="M9 3.6c2.2.4 3 2.2 3.4 5.4M9 14c2.2-.4 3-2.2 3.4-5" stroke="#808A97" stroke-width="1.3"/><path d="M12.6 9h3" stroke="#C6F36B" stroke-width="2.2"/></svg></span>
       <h1>Noise to case</h1>
-      <span class="chip ctx">CASE-4127<span class="ctx-x"> · Meridian Freight</span></span>
+      <span class="chip ctx">CASE-4127<span class="ctx-x"> · Quellbrook Freight</span></span>
       <span class="stt" id="stt"><span class="dot live"></span><span id="stt-t">Live</span></span>
     </div>
     <div class="night" id="night" role="group" aria-label="Tonight, shift C">
@@ -281,11 +281,11 @@ const ENT = [
   { k: 'u', name: 'j.alvarez', col: '#8AB4FF', kind: 'user' },
   { k: 'i', name: '203.0.113.77', col: '#FF6A55', kind: 'IP' },
   { k: 'r', name: 'ops-admin', col: '#C6A8FF', kind: 'role' },
-  { k: 'b', name: 'mf-finance-exports', col: '#7FD6EE', kind: 'bucket' },
+  { k: 'b', name: 'qf-finance-exports', col: '#7FD6EE', kind: 'bucket' },
 ];
 const EK = Object.fromEntries(ENT.map(e => [e.name, e.k]));
 // entities per signal, as the app maps them (cases.html SIG_ENTS)
-const SIG_ENTS = { 1: ['j.alvarez', '203.0.113.77'], 2: ['j.alvarez', '203.0.113.77', 'WIN-7F2C'], 3: ['j.alvarez', '203.0.113.77'], 4: ['FinanceDataReadOnly', '203.0.113.77'], 5: ['ops-admin', 'j.alvarez'], 6: ['mf-finance-exports', '203.0.113.77', 'ops-admin'], 7: ['mf-finance-exports', 'ops-admin'], 8: ['j.alvarez'], 9: ['j.alvarez'] };
+const SIG_ENTS = { 1: ['j.alvarez', '203.0.113.77'], 2: ['j.alvarez', '203.0.113.77', 'WIN-7F2C'], 3: ['j.alvarez', '203.0.113.77'], 4: ['FinanceDataReadOnly', '203.0.113.77'], 5: ['ops-admin', 'j.alvarez'], 6: ['qf-finance-exports', '203.0.113.77', 'ops-admin'], 7: ['qf-finance-exports', 'ops-admin'], 8: ['j.alvarez'], 9: ['j.alvarez'] };
 const SRC = { Okta: ['OKTA', 'Okta System Log'], CloudTrail: ['AWS', 'AWS CloudTrail'], M365: ['M365', 'Microsoft 365 audit'], EDR: ['EDR', 'CrowdStrike EDR'] };
 // arrival order by time: the nine CASE-4127 signals among routine noise that becomes CASE-4121 and CASE-4124
 const NOISE_T = { src: 'Okta', at: '02:11:20', rule: 'Impossible travel', summary: 'k.lund: new egress IP after the Zscaler ZIA change', ents: ['k.lund', 'ZIA egress'], close: { conf: 98, why: 'corporate proxy egress, lesson L-207 · CASE-4121' } };
@@ -633,7 +633,7 @@ function syncDiscrete(t) {
   const grpAg = $('grp-ag');
   if (after(T.noise) && t < T.noiseOut + 0.6) { grpAg.style.display = ''; setT($('grp-t'), 'Triage closing routine noise'); setT($('grp-n'), String(NOISE.length)); setT($('grp-s'), 'planned change CHG-88213 · corporate proxy egress'); }
   else if (after(T.fold + 0.3)) { grpAg.style.display = 'none'; setT($('grp-t'), 'Incoming signals'); setT($('grp-n'), String(NOISE.length)); setT($('grp-s'), 'Triage folded 9 into CASE-4127'); }
-  else if (after(T.scan)) { grpAg.style.display = ''; setT($('grp-t'), 'Triage correlating'); setT($('grp-n'), '9 of 14'); setT($('grp-s'), 'share j.alvarez, 203.0.113.77, ops-admin or mf-finance-exports'); }
+  else if (after(T.scan)) { grpAg.style.display = ''; setT($('grp-t'), 'Triage correlating'); setT($('grp-n'), '9 of 14'); setT($('grp-s'), 'share j.alvarez, 203.0.113.77, ops-admin or qf-finance-exports'); }
   else { grpAg.style.display = 'none'; setT($('grp-t'), 'Incoming signals'); setT($('grp-n'), String(nArr)); setT($('grp-s'), 'Okta · AWS CloudTrail · Microsoft 365 · CrowdStrike EDR'); }
   // signal rows: lit chips as the scan passes, correlating / closing states, nested evidence rows
   const nested = live ? liveUnf || (t > T.unf && t < FOLD_END) : (t > T.unf && t < FOLD_END);

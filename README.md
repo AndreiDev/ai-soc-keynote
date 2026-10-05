@@ -28,4 +28,4 @@ Ten working components of an AI-native SIEM, presented as a six-act keynote. Eac
 - The injection firewall can download real models (54 MB) after a click; by default it shows a recorded snapshot.
 - Everything runs client-side: there is no server and no data leaves the browser.
 
-The scenario (Meridian Freight, CASE-4127) and every person, IP and incident in it are fictional.
+The scenario (Quellbrook Freight, CASE-4127) and every person, IP and incident in it are fictional.

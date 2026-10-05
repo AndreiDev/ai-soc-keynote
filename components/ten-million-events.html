@@ -140,7 +140,7 @@ body.nocap .cap{display:none}
   <header class="ch">
     <span class="ci" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16"><g fill="currentColor"><rect x="1" y="2" width="3" height="2.4" rx=".6" opacity=".35"/><rect x="5" y="2" width="3" height="2.4" rx=".6" opacity=".6"/><rect x="9" y="2" width="3" height="2.4" rx=".6" opacity=".35"/><rect x="1" y="6.8" width="3" height="2.4" rx=".6" opacity=".6"/><rect x="5" y="6.8" width="3" height="2.4" rx=".6" opacity=".35"/><rect x="9" y="6.8" width="3" height="2.4" rx=".6" opacity=".5"/><rect x="1" y="11.6" width="3" height="2.4" rx=".6" opacity=".35"/><rect x="5" y="11.6" width="3" height="2.4" rx=".6" opacity=".5"/><rect x="9" y="11.6" width="3" height="2.4" rx=".6" opacity=".35"/></g><circle cx="13.4" cy="3.2" r="2.1" fill="#F2FBFF"/></svg></span>
     <h1>Ten million sign-ins<span class="x">, hunted in the browser</span></h1>
-    <span class="chip ctx">Hunt H-77 · Meridian Freight</span>
+    <span class="chip ctx">Hunt H-77 · Quellbrook Freight</span>
     <span class="cs" role="status"><span class="dot live load" id="st-dot"></span><span id="st">Loading</span></span>
     <span class="chip c-info eng" id="eng"><b id="eng-n">0</b><span class="x">events binned</span><span id="eng-ms"></span></span>
   </header>
@@ -590,7 +590,7 @@ function selection(br) {
   const cond = { 0: "auth_protocol = 'OKTA_VERIFY_PUSH'\n  AND status = 'Failure'", 1: "status = 'Success'", 2: "status = 'Success'\n  AND src_endpoint.autonomous_system.number\n      NOT IN (SELECT b.asn\n              FROM ocsf.asn_baseline b\n              WHERE b.user_email =\n                    actor.user.email_addr)", 3: "status = 'Failure'\n  AND auth_protocol <> 'OKTA_VERIFY_PUSH'" }[metric];
   const col = { 0: 'denied_pushes', 1: 'sign_ins', 2: 'new_network', 3: 'failures' }[metric];
   const wrapList = (items, ind) => { const lines = []; let cur = ''; for (const it of items) { const nx = cur ? cur + ', ' + it : it; if (cur && ind.length + nx.length + 2 > 42) { lines.push(cur + ','); cur = it; } else cur = nx; } lines.push(cur); return '(' + lines.join('\n' + ind + ' ') + ')'; };
-  const who = users ? `actor.user.email_addr IN\n      ${users.length === 1 ? `('${users[0].name}@meridianfreight.com')` : wrapList(users.map(u => `'${u.name}@meridianfreight.com'`), '      ')}` : depts.length < DEPTS.length ? `actor.user.org_unit IN\n      ${wrapList(depts.map(d => `'${d}'`), '      ')}` : null;
+  const who = users ? `actor.user.email_addr IN\n      ${users.length === 1 ? `('${users[0].name}@quellbrook.example')` : wrapList(users.map(u => `'${u.name}@quellbrook.example'`), '      ')}` : depts.length < DEPTS.length ? `actor.user.org_unit IN\n      ${wrapList(depts.map(d => `'${d}'`), '      ')}` : null;
   const sql = `SELECT actor.user.email_addr AS user,\n       time_bucket('15 min', time) AS bin,\n       count(*) AS ${col}\nFROM ocsf.authentication\nWHERE ${cond}\n  AND time >= TIMESTAMP '${iso(tA)}'\n  AND time <  TIMESTAMP '${iso(tB)}'${who ? `\n  AND ${who}` : ''}\nGROUP BY 1, 2\nORDER BY 3 DESC\nLIMIT 20;`;
   let total = 0; const top = [];
   if (S.bins) for (let rr = r0; rr <= r1; rr++) { const o = rr * TB; for (let c = c0; c <= c1; c++) { const v = S.bins[o + c]; if (!v) continue; total += v;

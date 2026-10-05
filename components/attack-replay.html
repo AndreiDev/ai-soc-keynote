@@ -163,7 +163,7 @@ dialog.missing .dlg-miss{display:block} dialog.missing .dlg-v{display:none}
   <header class="ch">
     <span class="ch-ic" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="2" width="13" height="8.6" rx="1.8"/><path d="M6.6 4.4v3.8l3.1-1.9z" fill="currentColor" stroke="none"/><path d="M1.8 13.6h12.4"/><circle cx="5.4" cy="13.6" r="1.25" fill="currentColor" stroke="none"/></svg></span>
     <h1>Attack replay</h1>
-    <span class="chip ctx"><b class="mono">CASE-4127</b><span class="tn">· Meridian Freight</span></span>
+    <span class="chip ctx"><b class="mono">CASE-4127</b><span class="tn">· Quellbrook Freight</span></span>
     <span class="sp"></span>
     <span class="who"><span class="ag">IN</span>Reconstructed by Investigator</span>
     <span class="status" id="status" role="status"><span class="dot live"></span><span class="lbl" id="statusText">Auto-replay</span></span>
@@ -235,7 +235,7 @@ dialog.missing .dlg-miss{display:block} dialog.missing .dlg-v{display:none}
 <script>
 (() => {
 'use strict';
-const CUES = /*CUES-BEGIN*/{"case":"CASE-4127","tenant":"Meridian Freight","fps":30,"film":{"duration":54,"chapters":[{"id":"push","title":"Push storm","start":0,"end":10.2,"mark":0,"utc":"02:11:52"},{"id":"travel","title":"Impossible travel","start":9.3,"end":17.4,"mark":9.6,"utc":"02:14:38"},{"id":"pivot","title":"Into AWS","start":16.6,"end":33.4,"mark":17.2,"utc":"02:17:44"},{"id":"rule","title":"The inbox rule","start":32.8,"end":39.4,"mark":33.2,"utc":"02:35:02"},{"id":"corvid","title":"The AI connects it","start":38.6,"end":47.4,"mark":39,"utc":"02:36:40"},{"id":"end","title":"Where it stands","start":46.8,"end":54,"mark":47.2,"utc":"02:43:00"}],"pushes":[{"utc":"02:11:52","t":0.5},{"utc":"02:12:09","t":1.15},{"utc":"02:12:25","t":1.79},{"utc":"02:12:40","t":2.41},{"utc":"02:12:55","t":3.01},{"utc":"02:13:09","t":3.59},{"utc":"02:13:22","t":4.15},{"utc":"02:13:34","t":4.68},{"utc":"02:13:46","t":5.19},{"utc":"02:13:57","t":5.67},{"utc":"02:14:07","t":6.12},{"utc":"02:14:16","t":6.52},{"utc":"02:14:24","t":6.87},{"utc":"02:14:31","t":7.1}],"approve":{"utc":"02:14:38","arrive":7.45,"t":8.05},"clock":[[8.05,"02:14:38"],[12.4,"02:15:10"],[18.6,"02:17:44"],[21.6,"02:21:03"],[24.4,"02:26:19"],[26.6,"02:29:47"],[29.6,"02:31:12"],[34,"02:35:02"],[39.8,"02:36:40"],[42.4,"02:38:05"],[43.4,"02:39:10"],[44.8,"02:41:30"],[47.6,"02:43:00"],[54,"02:47:00"]]},"events":[{"id":"e1","utc":"02:11:52","t":0.5,"kind":"hot","source":"Okta","attack":"T1621","label":"First Okta Verify push denied","detail":"14 pushes from 203.0.113.77 between 02:11:52 and 02:14:31, all denied"},{"id":"e2","utc":"02:14:38","t":8.05,"kind":"hot","source":"Okta","attack":"T1621","label":"15th push approved, new device registered","detail":"Windows, Chrome 129, registered at the moment of approval"},{"id":"e3","utc":"02:15:10","t":12.4,"kind":"hot","source":"Okta","attack":"T1078.004","label":"Session from Amsterdam, impossible travel","detail":"8,170 km from the last sign-in in Austin, 6 h 03 m earlier"},{"id":"e4","utc":"02:17:44","t":18.6,"kind":"hot","source":"CloudTrail","attack":"T1078.004","label":"AWS SSO sign-in as FinanceDataReadOnly","detail":"Federated through the Okta session"},{"id":"e5","utc":"02:21:03","t":21.6,"kind":"hot","source":"CloudTrail","attack":"T1078.004","label":"AssumeRole ops-admin, first time in 365 days","detail":"sts:AssumeRole from the FinanceDataReadOnly session"},{"id":"e6","utc":"02:26:19","t":24.4,"kind":"hot","source":"CloudTrail","attack":"T1619","label":"ListBuckets and GetBucketPolicy","detail":"Discovery on mf-finance-exports"},{"id":"e7","utc":"02:29:47","t":26.6,"kind":"hot","source":"CloudTrail","attack":"T1530","label":"GetObject ×1,284, 2.3 GB to 203.0.113.77","detail":"Bulk read of mf-finance-exports, egress to AS64500"},{"id":"e8","utc":"02:31:12","t":29.6,"kind":"cold","source":"CloudTrail","attack":"T1537","label":"PutBucketReplication denied by SCP","detail":"AccessDenied: the organisation guardrail blocks replication to outside accounts"},{"id":"e9","utc":"02:35:02","t":34,"kind":"hot","source":"M365","attack":"T1564.008","label":"Inbox rule zz-rss created","detail":"Moves mail containing invoice or payment to RSS Feeds"},{"id":"e10","utc":"02:36:40","t":39.8,"kind":"agent","source":"Triage","attack":"","label":"Triage joins 9 signals into CASE-4127","detail":"P1, correlated through j.alvarez and 203.0.113.77"},{"id":"e11","utc":"02:38:05","t":42.4,"kind":"agent","source":"Responder","attack":"","label":"Okta sessions revoked under AP-07","detail":"Receipt RCPT-9921, undo available until 08:38"},{"id":"e12","utc":"02:39:10","t":43.4,"kind":"agent","source":"Investigator","attack":"","label":"Investigator asks j.alvarez on Slack","detail":"No reply yet"},{"id":"e13","utc":"02:41:30","t":44.8,"kind":"agent","source":"Investigator","attack":"","label":"Verdict: malicious, 97% calibrated","detail":"Of 2,310 past verdicts at 95–98%, 97.3% were confirmed by analysts"},{"id":"e14","utc":"02:43:00","t":47.6,"kind":"human","source":"Ravi Patel","attack":"","label":"Ravi Patel takes the case","detail":"3 containment actions wait for approval: APR-311, APR-312, APR-313"}],"briefing":{"duration":36,"scenes":[{"id":"title","title":"Case","start":0,"end":5.4},{"id":"timeline","title":"What happened","start":5,"end":17.4},{"id":"impact","title":"Impact","start":17,"end":24.4},{"id":"response","title":"Response","start":24,"end":31},{"id":"next","title":"Decisions needed","start":30.6,"end":36}]}}/*CUES-END*/;
+const CUES = /*CUES-BEGIN*/{"case":"CASE-4127","tenant":"Quellbrook Freight","fps":30,"film":{"duration":54,"chapters":[{"id":"push","title":"Push storm","start":0,"end":10.2,"mark":0,"utc":"02:11:52"},{"id":"travel","title":"Impossible travel","start":9.3,"end":17.4,"mark":9.6,"utc":"02:14:38"},{"id":"pivot","title":"Into AWS","start":16.6,"end":33.4,"mark":17.2,"utc":"02:17:44"},{"id":"rule","title":"The inbox rule","start":32.8,"end":39.4,"mark":33.2,"utc":"02:35:02"},{"id":"corvid","title":"The AI connects it","start":38.6,"end":47.4,"mark":39,"utc":"02:36:40"},{"id":"end","title":"Where it stands","start":46.8,"end":54,"mark":47.2,"utc":"02:43:00"}],"pushes":[{"utc":"02:11:52","t":0.5},{"utc":"02:12:09","t":1.15},{"utc":"02:12:25","t":1.79},{"utc":"02:12:40","t":2.41},{"utc":"02:12:55","t":3.01},{"utc":"02:13:09","t":3.59},{"utc":"02:13:22","t":4.15},{"utc":"02:13:34","t":4.68},{"utc":"02:13:46","t":5.19},{"utc":"02:13:57","t":5.67},{"utc":"02:14:07","t":6.12},{"utc":"02:14:16","t":6.52},{"utc":"02:14:24","t":6.87},{"utc":"02:14:31","t":7.1}],"approve":{"utc":"02:14:38","arrive":7.45,"t":8.05},"clock":[[8.05,"02:14:38"],[12.4,"02:15:10"],[18.6,"02:17:44"],[21.6,"02:21:03"],[24.4,"02:26:19"],[26.6,"02:29:47"],[29.6,"02:31:12"],[34,"02:35:02"],[39.8,"02:36:40"],[42.4,"02:38:05"],[43.4,"02:39:10"],[44.8,"02:41:30"],[47.6,"02:43:00"],[54,"02:47:00"]]},"events":[{"id":"e1","utc":"02:11:52","t":0.5,"kind":"hot","source":"Okta","attack":"T1621","label":"First Okta Verify push denied","detail":"14 pushes from 203.0.113.77 between 02:11:52 and 02:14:31, all denied"},{"id":"e2","utc":"02:14:38","t":8.05,"kind":"hot","source":"Okta","attack":"T1621","label":"15th push approved, new device registered","detail":"Windows, Chrome 129, registered at the moment of approval"},{"id":"e3","utc":"02:15:10","t":12.4,"kind":"hot","source":"Okta","attack":"T1078.004","label":"Session from Amsterdam, impossible travel","detail":"8,170 km from the last sign-in in Austin, 6 h 03 m earlier"},{"id":"e4","utc":"02:17:44","t":18.6,"kind":"hot","source":"CloudTrail","attack":"T1078.004","label":"AWS SSO sign-in as FinanceDataReadOnly","detail":"Federated through the Okta session"},{"id":"e5","utc":"02:21:03","t":21.6,"kind":"hot","source":"CloudTrail","attack":"T1078.004","label":"AssumeRole ops-admin, first time in 365 days","detail":"sts:AssumeRole from the FinanceDataReadOnly session"},{"id":"e6","utc":"02:26:19","t":24.4,"kind":"hot","source":"CloudTrail","attack":"T1619","label":"ListBuckets and GetBucketPolicy","detail":"Discovery on qf-finance-exports"},{"id":"e7","utc":"02:29:47","t":26.6,"kind":"hot","source":"CloudTrail","attack":"T1530","label":"GetObject ×1,284, 2.3 GB to 203.0.113.77","detail":"Bulk read of qf-finance-exports, egress to AS64500"},{"id":"e8","utc":"02:31:12","t":29.6,"kind":"cold","source":"CloudTrail","attack":"T1537","label":"PutBucketReplication denied by SCP","detail":"AccessDenied: the organisation guardrail blocks replication to outside accounts"},{"id":"e9","utc":"02:35:02","t":34,"kind":"hot","source":"M365","attack":"T1564.008","label":"Inbox rule zz-rss created","detail":"Moves mail containing invoice or payment to RSS Feeds"},{"id":"e10","utc":"02:36:40","t":39.8,"kind":"agent","source":"Triage","attack":"","label":"Triage joins 9 signals into CASE-4127","detail":"P1, correlated through j.alvarez and 203.0.113.77"},{"id":"e11","utc":"02:38:05","t":42.4,"kind":"agent","source":"Responder","attack":"","label":"Okta sessions revoked under AP-07","detail":"Receipt RCPT-9921, undo available until 08:38"},{"id":"e12","utc":"02:39:10","t":43.4,"kind":"agent","source":"Investigator","attack":"","label":"Investigator asks j.alvarez on Slack","detail":"No reply yet"},{"id":"e13","utc":"02:41:30","t":44.8,"kind":"agent","source":"Investigator","attack":"","label":"Verdict: malicious, 97% calibrated","detail":"Of 2,310 past verdicts at 95–98%, 97.3% were confirmed by analysts"},{"id":"e14","utc":"02:43:00","t":47.6,"kind":"human","source":"Ravi Patel","attack":"","label":"Ravi Patel takes the case","detail":"3 containment actions wait for approval: APR-311, APR-312, APR-313"}],"briefing":{"duration":36,"scenes":[{"id":"title","title":"Case","start":0,"end":5.4},{"id":"timeline","title":"What happened","start":5,"end":17.4},{"id":"impact","title":"Impact","start":17,"end":24.4},{"id":"response","title":"Response","start":24,"end":31},{"id":"next","title":"Decisions needed","start":30.6,"end":36}]}}/*CUES-END*/;
 
 const W = 1920, H = 1080, DUR = CUES.film.duration;
 const Q = new URLSearchParams(location.search);
@@ -418,7 +418,7 @@ function pushCard(c, x, y, s, alpha, k, t) {
   text(c, 'Okta Verify', 82, 52, G.text, 25, 600);
   text(c, isApprove ? APPROVE.utc : PUSH[k].utc, CARD.w - 28, 52, G.text3, 24, 400, true, 'right');
   text(c, 'Did you just try to sign in?', 28, 112, G.text, 33, 600);
-  text(c, 'Meridian Freight   203.0.113.77   Amsterdam', 28, 152, G.text3, 22, 400, true);
+  text(c, 'Quellbrook Freight   203.0.113.77   Amsterdam', 28, 152, G.text3, 22, 400, true);
   // buttons
   const by = 174, bh = 52, bw = (CARD.w - 28 * 2 - 14) / 2;
   const denyF = !isApprove && pressed ? 1 - prog(t, dAt, dAt + .35) : 0;
@@ -446,7 +446,7 @@ function drawPush(c, t) {
   const wash = eOut(prog(t, APPROVE.t, APPROVE.t + .5)) * (1 - prog(t, 9.0, 9.8));
   if (wash > 0) { const g = c.createRadialGradient(1400, 430, 50, 1400, 430, 1100); g.addColorStop(0, css(HOT[1], .42 * wash)); g.addColorStop(1, css(HOT[0], 0)); c.fillStyle = g; c.fillRect(-40, -40, W + 80, H + 80); }
   // left column
-  text(c, 'j.alvarez@meridianfreight.com', 120, 170, G.text3, 28, 400, true);
+  text(c, 'j.alvarez@quellbrook.example', 120, 170, G.text3, 28, 400, true);
   const dimL = 1 - .55 * eOut(prog(t, APPROVE.t, APPROVE.t + .4));
   c.save(); c.globalAlpha *= dimL;
   kinetic(c, 'Fourteen times,', 120, 270, t, .3, { px: 92, w: 620 });
@@ -730,7 +730,7 @@ function topo(list) {
 }
 // ---- the scene: world units, x to the right-down, y to the left-down, z up
 const ST = {
-  okta: { b: [0.9, 3.6, 0, 3.1, 5.8, 1.1], label: 'okta', sub: 'meridianfreight' },
+  okta: { b: [0.9, 3.6, 0, 3.1, 5.8, 1.1], label: 'okta', sub: 'quellbrook' },
   sso:  { b: [5.0, 4.0, 0, 6.8, 5.8, .8], label: 'AWS SSO', sub: 'identity center' },
   fdro: { b: [8.1, 6.3, 0, 9.9, 7.7, .95], label: 'FinanceDataReadOnly', sub: 'role' },
   ops:  { b: [8.1, 1.9, 0, 9.9, 3.3, 1.75], label: 'ops-admin', sub: 'role' },
@@ -828,7 +828,7 @@ function isoFloor(t) {
   pline(pen, [P(.4, 2.6, .01), P(3.7, 2.6, .01), P(3.7, 7.2, .01), P(.4, 7.2, .01), P(.4, 2.6, .01)], '#3A4656', 1.4, .8, '6 6');
   stxt(pen, 'Okta tenant', 0, 0, { m: floorMat('x', .6, 7.0, .01), fs: 30, fill: '#808A97', w: 500 });
   pline(pen, [P(4.4, .4, .01), P(14.6, .4, .01), P(14.6, 9.6, .01), P(4.4, 9.6, .01), P(4.4, .4, .01)], '#3A4656', 1.4, .8, '6 6');
-  stxt(pen, 'AWS account mf-prod-data', 0, 0, { m: floorMat('x', 4.7, 9.4, .01), fs: 30, fill: '#808A97', w: 500 });
+  stxt(pen, 'AWS account qf-prod-data', 0, 0, { m: floorMat('x', 4.7, 9.4, .01), fs: 30, fill: '#808A97', w: 500 });
   // routes on the floor
   const dash = -t * 30;
   const route = (pts, hot, op) => pline(pen, pts.map(p => P(p[0], p[1], .02)), hot ? hexOf(heat(.5)) : '#2C3540', hot ? 2.4 : 1.6, op, '10 9', dash);
@@ -909,7 +909,7 @@ function isoRender(t) {
   callout(pen, 12.35, -.2, 2.0, [['PutBucketReplication', 26, '#E8EBEF', 600], ['AccessDenied by SCP', 24, '#7FD6EE', 600]], REP_T + .6, t, '#7FD6EE');
   // label under the bucket
   const [lx, ly] = P(BTOP[0] + .9, BTOP[1] + 1.5, 0);
-  stxt(pen, 'mf-finance-exports', lx, ly + 36, { fs: 26, fill: '#AAB3BF', w: 500, anchor: 'middle' });
+  stxt(pen, 'qf-finance-exports', lx, ly + 36, { fs: 26, fill: '#AAB3BF', w: 500, anchor: 'middle' });
   stxt(pen, 'Confidential', lx, ly + 64, { fs: 20, fill: '#808A97', w: 400, anchor: 'middle', mono: false });
   iso.fx.end();
 }
@@ -918,7 +918,7 @@ const TRAIL = [
   [18.6, '02:17:44', 'sso:Federate', 'FinanceDataReadOnly', 0],
   [21.6, '02:21:03', 'sts:AssumeRole', 'ops-admin, first in 365 days', 1],
   [24.4, '02:26:19', 's3:ListBuckets', '', 0],
-  [24.8, '02:26:20', 's3:GetBucketPolicy', 'mf-finance-exports', 0],
+  [24.8, '02:26:20', 's3:GetBucketPolicy', 'qf-finance-exports', 0],
   [26.6, '02:29:47', 's3:GetObject ×1,284', '2.3 GB to 203.0.113.77', 1],
   [29.6, '02:31:12', 's3:PutBucketReplication', 'AccessDenied (SCP)', 2],
 ];
@@ -929,7 +929,7 @@ function drawTrail(c, t) {
   c.save(); c.globalAlpha = a;
   rr(c, x, y, w, h, 14); c.fillStyle = 'rgba(12,16,21,.9)'; c.fill(); c.strokeStyle = css(G.line2); c.lineWidth = 1.2; c.stroke();
   text(c, 'CloudTrail', x + 22, y + 42, G.text, 26, 600);
-  text(c, 'principal j.alvarez, mf-prod-data', x + 170, y + 42, G.text3, 22, 400, true);
+  text(c, 'principal j.alvarez, qf-prod-data', x + 170, y + 42, G.text3, 22, 400, true);
   rows.forEach((r, i) => {
     const [at, utc, api, res, kind] = r, ry = y + 70 + i * rh + 30;
     const u = (t - at) / SETTLE;
@@ -947,7 +947,7 @@ function drawTrail(c, t) {
 const RULE = [
   [['New-InboxRule', 'cmd'], [' -Name ', 'par'], ['"zz-rss"', 'hot']],
   [['  -SubjectOrBodyContainsWords ', 'par'], ['"invoice"', 'hot'], [',', 'pun'], ['"payment"', 'hot']],
-  [['  -MoveToFolder ', 'par'], ['"j.alvarez@meridianfreight.com:\\RSS Feeds"', 'str']],
+  [['  -MoveToFolder ', 'par'], ['"j.alvarez@quellbrook.example:\\RSS Feeds"', 'str']],
   [['  -MarkAsRead ', 'par'], ['$true', 'bool']],
   [['  -StopProcessingRules ', 'par'], ['$true', 'bool']],
 ];
@@ -967,7 +967,7 @@ function drawRule(c, t) {
   rr(c, RP.x, RP.y, RP.w, RP.h, 18); c.fillStyle = 'rgba(16,20,26,.96)'; c.fill(); c.strokeStyle = css(mixc(G.line2, HOT[2], mp)); c.lineWidth = 1.5; c.stroke();
   rr(c, RP.x, RP.y, RP.w, 58, [18, 18, 0, 0]); c.fillStyle = css(G.raised); c.fill();
   text(c, 'Exchange Online audit log', RP.x + 26, RP.y + 37, G.text, 22, 600);
-  text(c, 'mailbox j.alvarez@meridianfreight.com   operation New-InboxRule', RP.x + 330, RP.y + 37, G.text3, 18, 400, true);
+  text(c, 'mailbox j.alvarez@quellbrook.example   operation New-InboxRule', RP.x + 330, RP.y + 37, G.text3, 18, 400, true);
   text(c, '02:35:02 UTC', RP.x + RP.w - 26, RP.y + 37, HOT[3], 19, 500, true, 'right');
   // typed command
   let n = Math.floor(Math.max(0, t - RULE_T0) * RULE_CPS);
@@ -1001,7 +1001,7 @@ function drawRule(c, t) {
   text(c, 'RSS Feeds', fx + 22, fy + 40, G.text, 22, 600);
   const got = [0, 1, 2].filter(i => t > 36.9 + i * .45 + .7).length;
   text(c, got ? `${got} read, 0 unread` : 'empty', fx + 22, fy + 70, G.text3, 17, 400, true);
-  const mails = [['billing@harbor-logistics.example', 'Invoice 88213: payment overdue'], ['ap@northgate-fuel.example', 'Updated payment details for October'], ['treasury@meridianfreight.com', 'Re: invoice 77410 wire confirmation']];
+  const mails = [['billing@harbor-logistics.example', 'Invoice 88213: payment overdue'], ['ap@northgate-fuel.example', 'Updated payment details for October'], ['treasury@quellbrook.example', 'Re: invoice 77410 wire confirmation']];
   text(c, 'Inbox, j.alvarez', 230, 712, G.text3, 21, 500);
   mails.forEach(([from, subj], i) => {
     const s0 = 36.9 + i * .45, inP = eOut(prog(t, s0, s0 + .3)); if (inP <= 0) return;
@@ -1209,7 +1209,7 @@ const CAPS = [
   [13.6, 16.8, 'A new device registers at the same moment: Windows, Chrome 129.'],
   [17.8, 20.8, '02:17  Into AWS through single sign-on, as FinanceDataReadOnly.'],
   [21.0, 24.0, '02:21  AssumeRole into ops-admin, a role she has not used in 365 days.'],
-  [24.4, 26.5, '02:26  Listing buckets and reading the policy on mf-finance-exports.'],
+  [24.4, 26.5, '02:26  Listing buckets and reading the policy on qf-finance-exports.'],
   [26.6, 29.5, '02:29  1,284 objects, 2.3 GB, pulled to 203.0.113.77.'],
   [29.7, 33.0, '02:31  Replication to an outside account, blocked by the SCP guardrail.'],
   [34.2, 38.4, '02:35  An inbox rule hides replies about invoices.'],
